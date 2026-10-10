@@ -1,0 +1,97 @@
+name: inovasionline
+
+x-backend: &backend
+  build:
+    context: ./docker/backend
+    dockerfile: Dockerfile
+  image: inovasionline-backend:dev
+  entrypoint: ["backend-entrypoint"]
+  user: "${UID:-1000}:${GID:-1000}"
+  working_dir: /app
+  volumes:
+    - ./backend:/app
+  environment:
+    APP_ENV: ${APP_ENV:-local}
+    APP_DEBUG: ${APP_DEBUG:-true}
+    APP_URL: ${API_URL:-http://localhost:8000}
+    DB_CONNECTION: pgsql
+    DB_HOST: db
+    DB_PORT: 5432
+    DB_DATABASE: ${DB_DATABASE:-inovasionline_marketplace}
+    DB_USERNAME: ${DB_USERNAME:-postgres}
+    DB_PASSWORD: ${DB_PASSWORD:-postgres}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REVERB_HOST: "0.0.0.0"
+    REVERB_SERVER_HOST: "0.0.0.0"
+    REVERB_PORT: 8080
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: inovasionline-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-inovasionline_marketplace}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-inovasionline_marketplace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: inovasionline-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    <<: *backend
+    container_name: inovasionline-backend
+    command: ["serve"]
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  reverb:
+    <<: *backend
+    container_name: inovasionline-reverb
+    command: ["reverb"]
+    ports:
+      - "${REVERB_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_started
+
+  queue:
+    <<: *backend
+    container_name: inovasionline-queue
+    command: ["queue"]
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  db_data:
+  redis_data:
