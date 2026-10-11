@@ -24,6 +24,7 @@ backend/public/storage
 backend/public/hot
 backend/public/build
 backend/storage/*.key
+backend/storage/framework/.*
 backend/storage/framework/cache/data/*
 backend/storage/framework/sessions/*
 backend/storage/framework/views/*
