@@ -22,9 +22,10 @@ x-backend: &backend
     DB_PASSWORD: ${DB_PASSWORD:-postgres}
     REDIS_HOST: redis
     REDIS_PORT: 6379
-    REVERB_HOST: "0.0.0.0"
+    REVERB_HOST: reverb
     REVERB_SERVER_HOST: "0.0.0.0"
     REVERB_PORT: 8080
+    REVERB_SCHEME: http
   restart: unless-stopped
 
 services:
@@ -67,7 +68,7 @@ services:
     command: ["serve"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
-      - "8001:8000"
+      - "${BACKEND_ALT_PORT:-8001}:8000"
     depends_on:
       db:
         condition: service_healthy

@@ -44,6 +44,8 @@ docker compose up -d --build
 - **PostgreSQL**: `localhost:5432` (Database: `inovasionline_marketplace`, User: `postgres`, Pass: `postgres`)
 - **Redis**: `localhost:6379`
 
+> Port & kredensial bisa di-override lewat file `.env` di root project (lihat `.env.example`), mis. `BACKEND_PORT`, `BACKEND_ALT_PORT`, `REVERB_PORT`, `DB_PORT`, `REDIS_PORT`.
+
 ### Perintah Berguna:
 - **Lihat log backend**:
   ```bash
