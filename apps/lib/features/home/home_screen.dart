@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +15,7 @@ import '../../widgets/product_card.dart';
 import '../../widgets/skeleton.dart';
 import '../cart/cart_providers.dart';
 import 'home_providers.dart';
+import 'user_summary_card.dart';
 import 'welcome_message.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -55,14 +58,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final cartState = ref.watch(cartProvider);
     final cartItemCount = cartState.cart?.itemCount ?? 0;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
           children: [
             RefreshIndicator(
-              color: const Color(0xFF0284C7),
+              color: AppColors.primary,
+              edgeOffset: topPadding + 40,
               onRefresh: () async {
                 Future<void> silent(Future<void> future) => future.catchError((_) {});
                 await Future.wait([
@@ -78,29 +88,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
                 padding: const EdgeInsets.only(bottom: 90),
                 children: [
-                  // 1. Top Bar: Quick Delivery ETA, Address Dropdown & Chat CS
-                  _TopLocationHeader(),
+                  // Top Header Backdrop (Brand green gradient + Petal pattern)
+                  _HomeTopBackdrop(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: topPadding + 6),
 
-                  // 2. Modern White Search Bar
-                  _TopSearchBar(cartItemCount: cartItemCount),
+                        // 1. Top Bar: Quick Delivery ETA, Address Dropdown & Chat CS
+                        _TopLocationHeader(),
+                        const SizedBox(height: 6),
 
-                  const SizedBox(height: 14),
+                        // 2. Modern White Search Bar + Logo + Cart
+                        _TopSearchBar(cartItemCount: cartItemCount),
+                        const SizedBox(height: 12),
 
-                  // 3. Hero Promo Banner Carousel
-                  banners.when(
-                    data: (items) => items.isEmpty
-                        ? const SizedBox.shrink()
-                        : BannerCarousel(banners: items),
-                    loading: () => const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Skeleton(height: 156, borderRadius: 16),
+                        // 3. Member / User Summary Card
+                        const UserSummaryCard(),
+                        const SizedBox(height: 2),
+
+                        // 4. Hero Promo Banner Carousel
+                        banners.when(
+                          data: (items) => items.isEmpty
+                              ? const SizedBox.shrink()
+                              : BannerCarousel(banners: items),
+                          loading: () => const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Skeleton(height: 156, borderRadius: 16),
+                          ),
+                          error: (_, _) => const SizedBox.shrink(),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
                     ),
-                    error: (_, _) => const SizedBox.shrink(),
                   ),
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-                  // 4. Quick Highlight Bubbles (Astro-style 4 highlights)
+                  // Quick Highlight Bubbles (Astro-style 4 highlights)
                   const _QuickHighlightsRow(),
 
                   const SizedBox(height: 22),
@@ -179,7 +204,7 @@ class _TopLocationHeader extends ConsumerWidget {
         : 'Pilih Alamat Pengiriman';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -197,22 +222,23 @@ class _TopLocationHeader extends ConsumerWidget {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE0F2FE),
+                      color: Colors.white.withValues(alpha: 0.22),
                       borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.bolt, size: 14, color: Color(0xFF0284C7)),
-                        SizedBox(width: 2),
+                        Icon(Icons.bolt, size: 14, color: Colors.amberAccent),
+                        SizedBox(width: 3),
                         Text(
                           '15 Menit',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF0284C7),
+                            color: Colors.white,
                           ),
                         ),
                       ],
@@ -223,9 +249,12 @@ class _TopLocationHeader extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Cepat sampai',
-                          style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white.withValues(alpha: 0.88),
+                          ),
                         ),
                         Row(
                           children: [
@@ -237,11 +266,11 @@ class _TopLocationHeader extends ConsumerWidget {
                                 style: const TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0F172A),
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
-                            const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xFF64748B)),
+                            const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white),
                           ],
                         ),
                       ],
@@ -261,10 +290,9 @@ class _TopLocationHeader extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -273,14 +301,14 @@ class _TopLocationHeader extends ConsumerWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.headset_mic_outlined, size: 15, color: Color(0xFF334155)),
+                  Icon(Icons.headset_mic_outlined, size: 15, color: AppColors.primary),
                   SizedBox(width: 5),
                   Text(
                     'Chat CS',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF334155),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
                     ),
                   ),
                 ],
@@ -307,28 +335,39 @@ class _TopSearchBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
+          // Logo Mark
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'assets/images/logo_mark.png',
+              width: 38,
+              height: 38,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+            ),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: InkWell(
               onTap: () => context.push('/search'),
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                height: 44,
+                height: 42,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 6,
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
                   ],
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.search, size: 20, color: Color(0xFF94A3B8)),
+                    Icon(Icons.search, size: 20, color: AppColors.primary),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -341,6 +380,7 @@ class _TopSearchBar extends StatelessWidget {
                         ),
                       ),
                     ),
+                    Icon(Icons.qr_code_scanner_outlined, size: 18, color: Color(0xFF94A3B8)),
                   ],
                 ),
               ),
@@ -350,25 +390,31 @@ class _TopSearchBar extends StatelessWidget {
           // Cart Shortcut with Badge
           InkWell(
             onTap: () => context.push('/cart'),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(22),
             child: Container(
-              height: 44,
-              width: 44,
+              height: 42,
+              width: 42,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  const Icon(Icons.shopping_cart_outlined, size: 20, color: Color(0xFF334155)),
+                  const Icon(Icons.shopping_cart_outlined, size: 20, color: AppColors.primary),
                   if (cartItemCount > 0)
                     Positioned(
-                      top: 6,
-                      right: 6,
+                      top: 4,
+                      right: 4,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(3),
                         decoration: const BoxDecoration(
                           color: Color(0xFFEF4444),
                           shape: BoxShape.circle,
@@ -381,6 +427,7 @@ class _TopSearchBar extends StatelessWidget {
                             color: Colors.white,
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
+                            height: 1,
                           ),
                         ),
                       ),
@@ -393,6 +440,136 @@ class _TopSearchBar extends StatelessWidget {
       ),
     );
   }
+}
+
+// ==========================================
+// TOP HEADER BACKDROP WITH PETAL PATTERN
+// ==========================================
+class _HomeTopBackdrop extends StatelessWidget {
+  const _HomeTopBackdrop({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.95),
+                    AppColors.primary.withValues(alpha: 0.92),
+                    AppColors.primary.withValues(alpha: 0.85),
+                    AppColors.primary.withValues(alpha: 0.74),
+                    AppColors.primary.withValues(alpha: 0.60),
+                    AppColors.primary.withValues(alpha: 0.46),
+                    AppColors.primary.withValues(alpha: 0.33),
+                    AppColors.primary.withValues(alpha: 0.21),
+                    AppColors.primary.withValues(alpha: 0.12),
+                    AppColors.primary.withValues(alpha: 0.05),
+                    AppColors.primary.withValues(alpha: 0.0),
+                    AppColors.primary.withValues(alpha: 0.0),
+                  ],
+                  stops: const [0.0, 0.25, 0.38, 0.48, 0.57, 0.65, 0.72, 0.78, 0.83, 0.87, 0.9, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 50,
+          child: const IgnorePointer(
+            child: RepaintBoundary(
+              child: CustomPaint(painter: _PetalPatternPainter(opacity: 0.1)),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -40,
+          right: -30,
+          child: IgnorePointer(child: _decorativeCircle(90, Colors.white.withValues(alpha: 0.10))),
+        ),
+        Positioned(
+          top: 20,
+          left: -50,
+          child: IgnorePointer(child: _decorativeCircle(120, Colors.white.withValues(alpha: 0.08))),
+        ),
+        child,
+      ],
+    );
+  }
+
+  static Widget _decorativeCircle(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+class _PetalPatternPainter extends CustomPainter {
+  const _PetalPatternPainter({this.opacity = 0.12}) : color = Colors.white;
+
+  final Color color;
+  final double opacity;
+
+  static const double _tile = 56;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: opacity)
+      ..style = PaintingStyle.fill;
+
+    final cols = (size.width / _tile).ceil() + 1;
+    final rows = (size.height / _tile).ceil() + 1;
+
+    for (var row = 0; row < rows; row++) {
+      for (var col = 0; col < cols; col++) {
+        final center = Offset(col * _tile, row * _tile);
+        _drawPetals(canvas, paint, center, _tile * 0.42);
+      }
+    }
+  }
+
+  void _drawPetals(Canvas canvas, Paint paint, Offset center, double radius) {
+    for (var i = 0; i < 4; i++) {
+      final angle = i * (math.pi / 2);
+      final path = Path();
+      final petalTip = Offset(
+        center.dx + radius * math.cos(angle),
+        center.dy + radius * math.sin(angle),
+      );
+      path.moveTo(center.dx, center.dy);
+      path.quadraticBezierTo(
+        center.dx + radius * 0.55 * math.cos(angle - 0.5),
+        center.dy + radius * 0.55 * math.sin(angle - 0.5),
+        petalTip.dx,
+        petalTip.dy,
+      );
+      path.quadraticBezierTo(
+        center.dx + radius * 0.55 * math.cos(angle + 0.5),
+        center.dy + radius * 0.55 * math.sin(angle + 0.5),
+        center.dx,
+        center.dy,
+      );
+      path.close();
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PetalPatternPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.opacity != opacity;
 }
 
 // ==========================================
