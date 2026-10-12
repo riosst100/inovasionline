@@ -115,12 +115,21 @@ class SearchController extends Controller
 
         $products = Product::query()
             ->where('status', ProductStatus::ACTIVE)
+            ->whereHas('searchResultClicks')
             ->withCount('searchResultClicks')
-            ->having('search_result_clicks_count', '>', 0)
             ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0), 'store'])
             ->orderByDesc('search_result_clicks_count')
             ->limit($limit)
             ->get();
+
+        if ($products->isEmpty()) {
+            $products = Product::query()
+                ->where('status', ProductStatus::ACTIVE)
+                ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0), 'store'])
+                ->orderByDesc('view_count')
+                ->limit($limit)
+                ->get();
+        }
 
         return ApiResponse::success(
             PublicProductResource::collection($products),

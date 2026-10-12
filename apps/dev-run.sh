@@ -29,7 +29,7 @@ fi
 WIN_NATIVE_DIR="/mnt/d/inovasionline/inovasionline-apps-flutter"
 if [ -d "$WIN_NATIVE_DIR" ]; then
     echo "==> Syncing changes to Windows native drive ($WIN_NATIVE_DIR)..."
-    rsync -a --delete --exclude=".git" --exclude="build" --exclude=".dart_tool" "$SCRIPT_DIR/" "$WIN_NATIVE_DIR/"
+    rsync -a --delete --exclude=".git" --exclude="build" --exclude=".dart_tool" --exclude=".widget_preview" "$SCRIPT_DIR/" "$WIN_NATIVE_DIR/"
     echo "==> Running Flutter on Windows native drive (D:\inovasionline\inovasionline-apps-flutter)..."
     exec cmd.exe /c "cd /d D:\inovasionline\inovasionline-apps-flutter && flutter run --flavor dev -t lib/main_dev.dart $*"
 fi

@@ -76,34 +76,63 @@ class MainShell extends ConsumerWidget {
               border: Border(top: BorderSide(color: AppColors.border)),
             ),
             child: SafeArea(
-              child: NavigationBar(
-                backgroundColor: Colors.white,
-                selectedIndex: navigationShell.currentIndex,
-                onDestinationSelected: (index) => navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
+              child: NavigationBarTheme(
+                data: NavigationBarThemeData(
+                  indicatorColor: const Color(0xFFE0F2FE),
+                  iconTheme: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return const IconThemeData(color: Color(0xFF0284C7));
+                    }
+                    return const IconThemeData(color: Color(0xFF64748B));
+                  }),
+                  labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0284C7),
+                      );
+                    }
+                    return const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    );
+                  }),
                 ),
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.home_outlined),
-                    selectedIcon: Icon(Icons.home),
-                    label: 'Beranda',
+                child: NavigationBar(
+                  backgroundColor: Colors.white,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0,
+                  height: 60,
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: (index) => navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
                   ),
-                  NavigationDestination(
-                    icon: Icon(Icons.rss_feed),
-                    label: 'Postingan',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.chat_outlined),
-                    selectedIcon: Icon(Icons.chat),
-                    label: 'Chat',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.person_outline),
-                    selectedIcon: Icon(Icons.person),
-                    label: 'Akun',
-                  ),
-                ],
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home_rounded),
+                      label: 'Beranda',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.rss_feed_outlined),
+                      selectedIcon: Icon(Icons.rss_feed_rounded),
+                      label: 'Postingan',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.chat_bubble_outline_rounded),
+                      selectedIcon: Icon(Icons.chat_bubble_rounded),
+                      label: 'Chat',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.person_outline_rounded),
+                      selectedIcon: Icon(Icons.person_rounded),
+                      label: 'Akun',
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

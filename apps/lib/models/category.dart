@@ -6,6 +6,7 @@ class Category {
     this.parentId,
     this.description,
     this.icon,
+    this.imageUrl,
     this.isActive = true,
   });
 
@@ -16,6 +17,7 @@ class Category {
         slug: json['slug'] as String,
         description: json['description'] as String?,
         icon: json['icon'] as String?,
+        imageUrl: json['image_url'] as String?,
         isActive: json['is_active'] as bool? ?? true,
       );
 
@@ -25,15 +27,17 @@ class Category {
   final String slug;
   final String? description;
   final String? icon;
+  final String? imageUrl;
   final bool isActive;
 
-  Category copyWith({String? icon}) => Category(
+  Category copyWith({String? icon, String? imageUrl}) => Category(
         id: id,
         parentId: parentId,
         name: name,
         slug: slug,
         description: description,
         icon: icon ?? this.icon,
+        imageUrl: imageUrl ?? this.imageUrl,
         isActive: isActive,
       );
 }

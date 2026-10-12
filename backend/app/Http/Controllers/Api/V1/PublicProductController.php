@@ -122,6 +122,7 @@ class PublicProductController extends Controller
                 $query->whereHas('order', fn ($q) => $q->where('status', OrderStatus::COMPLETED));
             }], 'quantity')
             ->orderByDesc('order_items_sum_quantity')
+            ->orderByDesc('view_count')
             ->limit($request->integer('limit', 12))
             ->get();
 

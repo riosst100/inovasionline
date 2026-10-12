@@ -62,55 +62,69 @@ class _BannerCarouselState extends State<BannerCarousel> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          height: 150,
-          child: Stack(
-            children: [
-              Container(color: Colors.black),
-              PageView.builder(
-                controller: _controller,
-                itemCount: banners.length,
-                onPageChanged: (index) => setState(() => _page = index),
-                itemBuilder: (context, index) {
-                  final banner = banners[index];
-                  return GestureDetector(
-                    onTap: () => _handleTap(index),
-                    child: CachedNetworkImage(
-                      imageUrl: banner.imageUrl,
-                      fit: BoxFit.contain,
-                      width: double.infinity,
-                      height: double.infinity,
+      child: Container(
+        height: 156,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: const Color(0xFFF8FAFC),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: banners.length,
+              onPageChanged: (index) => setState(() => _page = index),
+              itemBuilder: (context, index) {
+                final banner = banners[index];
+                return GestureDetector(
+                  onTap: () => _handleTap(index),
+                  child: CachedNetworkImage(
+                    imageUrl: banner.imageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
+                    errorWidget: (_, _, _) => Container(
+                      color: const Color(0xFFF1F5F9),
+                      child: const Center(
+                        child: Icon(Icons.image_outlined, color: Color(0xFF94A3B8), size: 36),
+                      ),
                     ),
-                  );
-                },
-              ),
-              if (hasMultiple) ...[
-                Positioned(
-                  bottom: 8,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(banners.length, (index) {
-                      final active = index == _page;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        height: 6,
-                        width: active ? 16 : 6,
-                        decoration: BoxDecoration(
-                          color: active ? Colors.white : Colors.white.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      );
-                    }),
                   ),
+                );
+              },
+            ),
+            if (hasMultiple)
+              Positioned(
+                bottom: 8,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(banners.length, (index) {
+                    final active = index == _page;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      height: 6,
+                      width: active ? 16 : 6,
+                      decoration: BoxDecoration(
+                        color: active ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    );
+                  }),
                 ),
-              ],
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
