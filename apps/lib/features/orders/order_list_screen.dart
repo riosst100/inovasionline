@@ -66,7 +66,7 @@ class _OrderTile extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    order.store?.name ?? '-',
+                    order.orderNumber,
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -75,8 +75,6 @@ class _OrderTile extends StatelessWidget {
                 _StatusBadge(status: order.status),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(order.orderNumber, style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

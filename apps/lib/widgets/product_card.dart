@@ -86,23 +86,9 @@ class ProductCard extends StatelessWidget {
                         decoration: TextDecoration.lineThrough,
                       ),
                     ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      if (product.storeName != null)
-                        Expanded(
-                          child: Text(
-                            product.storeName!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
-                          ),
-                        ),
-                      Text(
-                        '${product.soldCount} terjual',
-                        style: const TextStyle(fontSize: 10.5, color: AppColors.mutedForeground),
-                      ),
-                    ],
+                  Text(
+                    '${product.soldCount} terjual',
+                    style: const TextStyle(fontSize: 10.5, color: AppColors.mutedForeground),
                   ),
                 ],
               ),

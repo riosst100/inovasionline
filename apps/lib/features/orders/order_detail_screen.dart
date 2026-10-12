@@ -73,8 +73,6 @@ class OrderDetailScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(order.store?.name ?? '-', style: const TextStyle(color: AppColors.mutedForeground, fontSize: 13)),
                 ],
               ),
             ),

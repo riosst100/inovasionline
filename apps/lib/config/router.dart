@@ -14,12 +14,9 @@ import '../features/home/home_screen.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
 import '../features/posts/posts_screen.dart';
-import '../features/potocandid/potocandid_landing_screen.dart';
-import '../features/potocandid/selfie_upload_screen.dart';
 import '../features/products/product_detail_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/shell/main_shell.dart';
-import '../features/stores/store_profile_screen.dart';
 import '../models/cart.dart';
 
 final router = GoRouter(
@@ -95,11 +92,6 @@ final router = GoRouter(
           ProductDetailScreen(slug: state.pathParameters['slug']!),
     ),
     GoRoute(
-      path: '/stores/:slug',
-      builder: (context, state) =>
-          StoreProfileScreen(slug: state.pathParameters['slug']!),
-    ),
-    GoRoute(
       path: '/checkout',
       builder: (context, state) =>
           CheckoutScreen(group: state.extra as CartStoreGroup),
@@ -112,14 +104,6 @@ final router = GoRouter(
       path: '/orders/:id',
       builder: (context, state) =>
           OrderDetailScreen(orderId: state.pathParameters['id']!),
-    ),
-    GoRoute(
-      path: '/potocandid',
-      builder: (context, state) => const PotoCandidLandingScreen(),
-    ),
-    GoRoute(
-      path: '/potocandid/selfie',
-      builder: (context, state) => const SelfieUploadScreen(),
     ),
   ],
 );

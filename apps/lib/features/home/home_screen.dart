@@ -103,8 +103,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: const UserSummaryCard(),
             ),
             const SizedBox(height: 20),
-            const _SubFeatureRow(),
-            const SizedBox(height: 20),
             categories.when(
               data: (items) => items.isEmpty
                   ? const SizedBox.shrink()
@@ -476,119 +474,6 @@ class _HomeTopBackdrop extends StatelessWidget {
   }
 }
 
-class _SubFeatureRow extends StatelessWidget {
-  const _SubFeatureRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _SubFeatureCard(
-              label: 'DelivBae',
-              subtitle: 'Segera hadir',
-              icon: Icons.delivery_dining,
-              color: AppColors.primary,
-              onTap: () => _showComingSoon(context, 'DelivBae'),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _SubFeatureCard(
-              label: 'PotoCandid',
-              subtitle: 'Cari fotomu',
-              icon: Icons.camera_alt,
-              color: AppColors.foreground,
-              onTap: () => context.push('/potocandid'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context, String featureName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$featureName segera hadir'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-}
-
-class _SubFeatureCard extends StatelessWidget {
-  const _SubFeatureCard({
-    required this.label,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.foreground.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 21),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _CategoryGrid extends StatelessWidget {
   const _CategoryGrid({required this.categories});
 
@@ -740,15 +625,6 @@ class _ProductTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, height: 1.25),
                         ),
-                        if (product.storeName != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            product.storeName!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
-                          ),
-                        ],
                       ],
                     ),
                     Column(

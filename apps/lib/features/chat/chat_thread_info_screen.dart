@@ -154,8 +154,7 @@ class _ChatThreadInfoScreenState extends ConsumerState<ChatThreadInfoScreen> {
 
   String _typeLabel() {
     if (widget.isDirectMessage) {
-      final base = widget.isSeller ? 'Penjual' : 'Pengguna';
-      return base;
+      return 'Pengguna';
     }
 
     final count = _participantCount;
@@ -178,7 +177,6 @@ class _ParticipantTile extends StatelessWidget {
         child: participant.avatarUrl == null ? const Icon(Icons.person_outline) : null,
       ),
       title: Text(participant.name),
-      subtitle: participant.isSeller ? const Text('Penjual') : null,
     );
   }
 }

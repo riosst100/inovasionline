@@ -79,13 +79,6 @@ class AccountScreen extends ConsumerWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('Peran'),
-              subtitle: Text(user.role ?? '-'),
-            ),
-          ),
-          Card(
-            child: ListTile(
               leading: const Icon(Icons.receipt_long_outlined),
               title: const Text('Pesanan Saya'),
               trailing: const Icon(Icons.chevron_right),

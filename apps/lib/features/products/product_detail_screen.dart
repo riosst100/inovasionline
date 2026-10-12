@@ -8,7 +8,6 @@ import '../../core/utils/formatters.dart';
 import '../../models/product.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
-import '../../widgets/chat_seller_button.dart';
 import '../../widgets/skeleton.dart';
 import '../cart/cart_providers.dart';
 
@@ -217,53 +216,6 @@ class _ProductDetailBody extends StatelessWidget {
                 style: const TextStyle(color: AppColors.mutedForeground),
               ),
               const Divider(height: 32),
-              if (product.store != null) ...[
-                InkWell(
-                  onTap: () => context.push('/stores/${product.store!.slug}'),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: AppColors.surface,
-                        backgroundImage: product.store!.logoUrl != null
-                            ? CachedNetworkImageProvider(
-                                product.store!.logoUrl!,
-                              )
-                            : null,
-                        child: product.store!.logoUrl == null
-                            ? const Icon(Icons.storefront_outlined)
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.store!.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            if (product.store!.city != null)
-                              Text(
-                                product.store!.city!,
-                                style: const TextStyle(
-                                  color: AppColors.mutedForeground,
-                                  fontSize: 12,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: AppColors.mutedForeground,
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 32),
-              ],
               const Text(
                 'Deskripsi',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -406,14 +358,6 @@ class _AddToCartBarState extends ConsumerState<_AddToCartBar> {
         ),
         child: Row(
           children: [
-            if (widget.product.store != null) ...[
-              ChatSellerButton(
-                sellerUserId: widget.product.store!.ownerUserId,
-                sellerName: widget.product.store!.name,
-                iconOnly: true,
-              ),
-              const SizedBox(width: 12),
-            ],
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: _adding ? null : _handleAddToCart,

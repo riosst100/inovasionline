@@ -119,35 +119,12 @@ class _StoreGroupCard extends ConsumerWidget {
                   tristate: true,
                   onChanged: (value) => onToggleGroup(group, !allSelected),
                 ),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => context.push('/stores/${group.store.slug}'),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundColor: AppColors.surface,
-                            backgroundImage:
-                                group.store.logoUrl != null ? CachedNetworkImageProvider(group.store.logoUrl!) : null,
-                            child: group.store.logoUrl == null
-                                ? const Icon(Icons.storefront_outlined, size: 16, color: AppColors.foreground)
-                                : null,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              group.store.name,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right, size: 18, color: AppColors.mutedForeground),
-                        ],
-                      ),
+                const Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Pilih Semua Produk',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                     ),
                   ),
                 ),
@@ -192,7 +169,7 @@ class _StoreGroupCard extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     minimumSize: Size.zero,
                   ),
-                  child: const Text('Checkout toko ini', style: TextStyle(fontSize: 12.5)),
+                  child: const Text('Checkout', style: TextStyle(fontSize: 12.5)),
                 ),
               ],
             ),

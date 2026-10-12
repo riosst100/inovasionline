@@ -456,14 +456,14 @@ class _StoreItemsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.storefront_outlined, size: 18, color: AppColors.foreground),
-              const SizedBox(width: 6),
+              Icon(Icons.shopping_bag_outlined, size: 18, color: AppColors.foreground),
+              SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  group.store.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  'Daftar Produk',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
