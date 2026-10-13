@@ -8,6 +8,7 @@ use App\Support\Enums\UserVerificationStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -30,6 +31,7 @@ class User extends Authenticatable
         'password',
         'google_id',
         'role',
+        'role_id',
         'avatar_path',
         'province_code',
         'city_code',
@@ -56,6 +58,27 @@ class User extends Authenticatable
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new ResetPasswordNotification($token));
+    }
+
+    public function assignedRole(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role_id');
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === UserRole::PLATFORM_ADMIN
+            || optional($this->assignedRole)->slug === 'super_admin';
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        $perms = $this->assignedRole?->permissions ?? [];
+        return in_array('*', $perms, true) || in_array($permission, $perms, true);
     }
 
     public function seller(): HasOne

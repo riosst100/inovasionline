@@ -13,7 +13,21 @@ use Kreait\Firebase\Messaging\Notification as FirebaseNotification;
 
 class NotificationService
 {
-    public function __construct(private readonly Messaging $messaging) {}
+    private ?Messaging $messaging = null;
+
+    public function __construct(?Messaging $messaging = null)
+    {
+        if ($messaging !== null) {
+            $this->messaging = $messaging;
+        } else {
+            try {
+                $this->messaging = app(Messaging::class);
+            } catch (\Throwable $e) {
+                Log::warning('Firebase messaging unavailable: ' . $e->getMessage());
+                $this->messaging = null;
+            }
+        }
+    }
 
     /**
      * Send a push notification to every device registered to a user.
@@ -38,7 +52,7 @@ class NotificationService
      */
     public function sendToTokens(array $tokens, string $title, string $body, array $data = []): void
     {
-        if ($tokens === []) {
+        if ($tokens === [] || ! $this->messaging) {
             return;
         }
 
@@ -56,6 +70,9 @@ class NotificationService
      */
     public function sendToTopic(string $topic, string $title, string $body, array $data = []): void
     {
+        if (! $this->messaging) {
+            return;
+        }
         $message = CloudMessage::withTarget(MessageTarget::TOPIC, $topic)
             ->withNotification(FirebaseNotification::create($title, $body))
             ->withData(array_map('strval', $data));

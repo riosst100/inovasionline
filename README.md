@@ -18,6 +18,10 @@ inovasionline/
 │   ├── assets/
 │   ├── dev-run.bat
 │   └── ...
+├── frontend-admin/     # Web Admin Portal (Next.js App Router, Tailwind)
+│   ├── src/
+│   ├── package.json
+│   └── ...
 ├── docker/             # Docker configuration
 │   └── backend/        # Dockerfile & entrypoint untuk Laravel
 ├── docker-compose.yml  # Docker Compose stack (backend, db, redis, reverb, queue)
@@ -101,3 +105,26 @@ File environment sudah disiapkan:
   ```cmd
   release-apk.bat
   ```
+
+---
+
+## 3. Web Admin Portal (Next.js)
+
+Web Admin Portal berada di folder `frontend-admin/`. Digunakan oleh **Super Admin** untuk mengelola hak akses role (Driver, Admin, Sales, dll), menambah user staff/admin, dan memonitor operasional marketplace.
+
+### Menjalankan Frontend Admin:
+```bash
+cd frontend-admin
+npm install
+npm run dev
+```
+
+- **URL Web Portal**: `http://localhost:3000`
+- **Kredensial Default Super Admin**:
+  - Email: `admin@inovasionline.com`
+  - Password: `password`
+- **Fitur Utama**:
+  - **Login Admin**: Autentikasi token Sanctum via REST API backend.
+  - **Manajemen Role**: Super Admin dapat membuat role baru (Driver, Admin, Sales, Kurir, dll) serta mengatur matriks hak akses per modul.
+  - **Manajemen User Admin & Staff**: Super Admin dapat mendaftarkan akun personil baru dan menetapkan role hak akses.
+

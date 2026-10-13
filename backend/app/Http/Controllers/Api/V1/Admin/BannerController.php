@@ -36,6 +36,13 @@ class BannerController extends Controller
         return ApiResponse::success(new BannerResource($banner), 'Banner updated successfully.');
     }
 
+    public function toggleActive(Banner $banner): JsonResponse
+    {
+        $banner->update(['is_active' => ! $banner->is_active]);
+
+        return ApiResponse::success(new BannerResource($banner), 'Status banner berhasil diperbarui.');
+    }
+
     public function reorder(Request $request): JsonResponse
     {
         $data = $request->validate([

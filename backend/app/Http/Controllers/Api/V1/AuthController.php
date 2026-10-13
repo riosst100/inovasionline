@@ -165,7 +165,8 @@ class AuthController extends Controller
      */
     private function wantsToken(Request $request): bool
     {
-        return $request->header('X-Client') === 'mobile';
+        return in_array($request->header('X-Client'), ['mobile', 'admin', 'admin-web'], true)
+            || $request->is('api/*');
     }
 
     private function tokenPayload(User $user, Request $request): array

@@ -198,21 +198,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _error = null;
     });
 
-    final success = await ref.read(authProvider.notifier).loginWithGoogle();
+    try {
+      final success = await ref.read(authProvider.notifier).loginWithGoogle();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() => _loading = false);
-
-    if (success) {
-      final name = ref.read(authProvider).user?.name;
-      ref.read(pendingWelcomeProvider.notifier).state = WelcomeMessage(
-        name: name,
-      );
-      context.go('/');
-    } else {
-      final error = ref.read(authProvider).error;
-      if (error != null) setState(() => _error = error);
+      if (success) {
+        final name = ref.read(authProvider).user?.name;
+        ref.read(pendingWelcomeProvider.notifier).state = WelcomeMessage(
+          name: name,
+        );
+        context.go('/');
+      } else {
+        final error = ref.read(authProvider).error;
+        if (error != null) setState(() => _error = error);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Gagal mendaftar dengan Google: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

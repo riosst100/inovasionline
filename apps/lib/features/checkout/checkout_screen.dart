@@ -1,7 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../config/theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/cart.dart';
 import '../../models/payment_method.dart';
@@ -63,6 +63,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => _AddressFormSheet(
         initialName: _recipientNameController.text,
         initialPhone: _recipientPhoneController.text,
@@ -93,6 +94,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => _PaymentMethodPickerSheet(methods: methods, selected: _paymentMethod),
     );
     if (selected != null) setState(() => _paymentMethod = selected);
@@ -101,9 +103,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Future<void> _pickShippingMethod() async {
     final district = _address.district;
     if (district == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lengkapi alamat pengiriman terlebih dahulu.'), behavior: SnackBarBehavior.floating),
-      );
+      _showSnack('Silakan lengkapi alamat pengiriman terlebih dahulu.');
       return;
     }
 
@@ -117,13 +117,41 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => _ShippingMethodPickerSheet(methods: methods, selected: _shippingMethod),
     );
     if (selected != null) setState(() => _shippingMethod = selected);
   }
 
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
+
+  void _handleDisabledSubmitTap() {
+    if (!_addressStepDone) {
+      _showSnack('Lengkapi alamat pengiriman terlebih dahulu.');
+      _editAddress();
+    } else if (_shippingMethod == null) {
+      _showSnack('Silakan pilih metode pengiriman terlebih dahulu.');
+      _pickShippingMethod();
+    } else if (_paymentMethod == null) {
+      _showSnack('Silakan pilih metode pembayaran terlebih dahulu.');
+      _pickPaymentMethod();
+    }
+  }
+
   Future<void> _submit() async {
-    if (!_canSubmit) return;
+    if (!_canSubmit) {
+      _handleDisabledSubmitTap();
+      return;
+    }
 
     final success = await ref.read(checkoutProvider.notifier).submit(
           storeId: widget.group.store.id,
@@ -146,15 +174,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       final order = ref.read(checkoutProvider).order;
       if (order != null) {
         context.go('/orders/${order.id}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pesanan berhasil dibuat.'), behavior: SnackBarBehavior.floating),
-        );
+        _showSnack('Pesanan berhasil dibuat!');
       }
     } else {
       final error = ref.read(checkoutProvider).error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? 'Gagal membuat pesanan.'), behavior: SnackBarBehavior.floating),
-      );
+      _showSnack(error ?? 'Gagal membuat pesanan.');
     }
   }
 
@@ -173,16 +197,73 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final checkoutState = ref.watch(checkoutProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Checkout')),
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Color(0xFF1E293B)),
+          onPressed: () => context.pop(),
+        ),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Checkout Pesanan',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.3,
+              ),
+            ),
+            SizedBox(height: 1),
+            Text(
+              'Periksa rincian & selesaikan pembayaran',
+              style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.shield_outlined, size: 14, color: Color(0xFF16A34A)),
+                SizedBox(width: 4),
+                Text(
+                  '100% Aman',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
+          // 1. Store & Purchased Products Card
           _StoreItemsCard(group: widget.group),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+
+          // 2. Shipping Address Card
           _StepCard(
             step: 1,
+            icon: Icons.location_on_rounded,
+            iconColor: const Color(0xFF0D9488),
             title: 'Alamat Pengiriman',
             done: _addressStepDone,
+            actionLabel: _addressStepDone ? 'Ubah Alamat' : 'Pilih Alamat',
             onTap: _editAddress,
             child: _addressStepDone
                 ? _AddressSummary(
@@ -191,53 +272,91 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     regionLine: _fullAddressLine,
                     detail: _addressDetailController.text.trim(),
                   )
-                : Text(
-                    'Tambahkan nama penerima, nomor telepon, dan alamat lengkap.',
-                    style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground),
+                : _EmptyStepPrompt(
+                    icon: Icons.add_location_alt_outlined,
+                    title: 'Tentukan Alamat Pengiriman',
+                    subtitle: 'Klik untuk mengisi nama penerima dan detail lokasi antar kurir.',
+                    onTap: _editAddress,
                   ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+
+          // 3. Shipping Method Card
           _StepCard(
             step: 2,
+            icon: Icons.local_shipping_rounded,
+            iconColor: const Color(0xFF2563EB),
             title: 'Metode Pengiriman',
             done: _shippingMethod != null,
             enabled: _addressStepDone,
+            actionLabel: _shippingMethod != null ? 'Ganti' : 'Pilih',
             onTap: _pickShippingMethod,
             child: !_addressStepDone
-                ? const Text('Lengkapi alamat terlebih dahulu', style: TextStyle(fontSize: 13, color: AppColors.mutedForeground))
+                ? Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF94A3B8)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Lengkapi alamat terlebih dahulu untuk memilih kurir & ongkir.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
                 : _shippingMethod != null
-                    ? _SelectionRow(
-                        icon: Icons.local_shipping_outlined,
-                        title: _shippingMethod!.name,
-                        subtitle: _shippingMethod!.estimatedDeliveryTime,
-                        trailing: formatCurrency(_shippingMethod!.displayFee),
-                      )
-                    : const _PickPrompt(icon: Icons.local_shipping_outlined, label: 'Pilih metode pengiriman'),
+                    ? _SelectedShippingTile(method: _shippingMethod!)
+                    : _EmptyStepPrompt(
+                        icon: Icons.delivery_dining_outlined,
+                        title: 'Pilih Metode Kurir & Pengiriman',
+                        subtitle: 'Tersedia opsi Instan 15 Menit dan Reguler.',
+                        onTap: _pickShippingMethod,
+                      ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+
+          // 4. Payment Method Card
           _StepCard(
             step: 3,
+            icon: Icons.account_balance_wallet_rounded,
+            iconColor: const Color(0xFF7C3AED),
             title: 'Metode Pembayaran',
             done: _paymentMethod != null,
+            actionLabel: _paymentMethod != null ? 'Ganti' : 'Pilih',
             onTap: _pickPaymentMethod,
             child: _paymentMethod != null
-                ? _SelectionRow(
-                    icon: Icons.account_balance_wallet_outlined,
-                    title: _paymentMethod!.name,
-                    subtitle: _paymentMethod!.type == 'bank_transfer' ? _paymentMethod!.bankName : _paymentMethod!.description,
-                  )
-                : const _PickPrompt(icon: Icons.account_balance_wallet_outlined, label: 'Pilih metode pembayaran'),
+                ? _SelectedPaymentTile(method: _paymentMethod!)
+                : _EmptyStepPrompt(
+                    icon: Icons.payment_outlined,
+                    title: 'Pilih Metode Pembayaran',
+                    subtitle: 'Mendukung Transfer Bank, QRIS, & COD (Bayar di Tempat).',
+                    onTap: _pickPaymentMethod,
+                  ),
           ),
-          const SizedBox(height: 12),
-          _SectionCard(
-            title: 'Catatan untuk Penjual (opsional)',
-            child: TextField(
-              controller: _notesController,
-              maxLines: 2,
-              decoration: const InputDecoration(hintText: 'Contoh: titip di satpam, jangan digabung, dll.'),
-            ),
+          const SizedBox(height: 14),
+
+          // 5. Notes to Seller
+          _CustomerNotesCard(
+            controller: _notesController,
+            onPresetSelected: (text) {
+              final current = _notesController.text.trim();
+              if (current.isEmpty) {
+                _notesController.text = text;
+              } else if (!current.contains(text)) {
+                _notesController.text = '$current, $text';
+              }
+            },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+
+          // 6. Payment Breakdown / Summary
           _OrderSummaryCard(
             subtotal: widget.group.subtotal,
             shippingFee: _shippingMethod?.displayFee,
@@ -245,43 +364,84 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AppColors.border)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Total Bayar', style: TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
-                    Text(
-                      formatCurrency(_total),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+          border: const Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Total Pembayaran',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        formatCurrency(_total),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0D9488),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: _canSubmit ? null : _handleDisabledSubmitTap,
+                  child: SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _canSubmit && !checkoutState.submitting ? _submit : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        disabledBackgroundColor: const Color(0xFFCBD5E1),
+                        foregroundColor: Colors.white,
+                        disabledForegroundColor: Colors.white.withValues(alpha: 0.9),
+                        elevation: _canSubmit ? 2 : 0,
+                        shadowColor: const Color(0xFF0D9488).withValues(alpha: 0.35),
+                        padding: const EdgeInsets.symmetric(horizontal: 26),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: checkoutState.submitting
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                            )
+                          : const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Buat Pesanan',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                SizedBox(width: 6),
+                                Icon(Icons.arrow_forward_rounded, size: 18),
+                              ],
+                            ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _canSubmit && !checkoutState.submitting ? _submit : null,
-                  child: checkoutState.submitting
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Buat Pesanan'),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -289,6 +449,839 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 }
 
+// ==========================================
+// STORE & PRODUCT LIST CARD
+// ==========================================
+class _StoreItemsCard extends StatelessWidget {
+  const _StoreItemsCard({required this.group});
+
+  final CartStoreGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Store Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCCFBF1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.storefront_rounded, size: 18, color: Color(0xFF0D9488)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              group.store.name,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Resmi',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${group.items.length} Barang dipesan',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Items List
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              children: [
+                for (int i = 0; i < group.items.length; i++) ...[
+                  _CheckoutItemRow(item: group.items[i]),
+                  if (i < group.items.length - 1)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    ),
+                ],
+              ],
+            ),
+          ),
+
+          // Card Subtotal Footer
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+              border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Subtotal (${group.items.length} Produk)',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                ),
+                Text(
+                  formatCurrency(group.subtotal),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckoutItemRow extends StatelessWidget {
+  const _CheckoutItemRow({required this.item});
+
+  final CartItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Product Thumbnail
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 48,
+            height: 48,
+            color: const Color(0xFFF1F5F9),
+            child: item.productImageUrl != null && item.productImageUrl!.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: item.productImageUrl!,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => const Center(
+                      child: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D9488)),
+                      ),
+                    ),
+                    errorWidget: (_, _, _) => const Icon(Icons.image_outlined, color: Color(0xFF94A3B8), size: 24),
+                  )
+                : const Icon(Icons.shopping_basket_outlined, color: Color(0xFF94A3B8), size: 24),
+          ),
+        ),
+        const SizedBox(width: 12),
+
+        // Product Title & Variant
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.productName,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  if (item.variantName != null && item.variantName!.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        item.variantName!,
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                  Text(
+                    '${item.quantity} x ${formatCurrency(item.unitPrice)}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Line Total
+        Text(
+          formatCurrency(item.lineTotal),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+        ),
+      ],
+    );
+  }
+}
+
+// ==========================================
+// UNIFIED STEP CARD
+// ==========================================
+class _StepCard extends StatelessWidget {
+  const _StepCard({
+    required this.step,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.done,
+    required this.actionLabel,
+    required this.onTap,
+    required this.child,
+    this.enabled = true,
+  });
+
+  final int step;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final bool done;
+  final String actionLabel;
+  final bool enabled;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: done ? iconColor.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+          width: done ? 1.4 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Step Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: done ? iconColor.withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Icon(icon, size: 18, color: done ? iconColor : const Color(0xFF64748B)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                      ),
+                      if (done) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.check, size: 10, color: Colors.white),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (enabled)
+                  InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            actionLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: done ? iconColor : const Color(0xFF0D9488),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 16,
+                            color: done ? iconColor : const Color(0xFF0D9488),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+          // Step Body
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Empty state inside a step card
+class _EmptyStepPrompt extends StatelessWidget {
+  const _EmptyStepPrompt({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCCFBF1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 20, color: const Color(0xFF0D9488)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Completed Address summary view
+class _AddressSummary extends StatelessWidget {
+  const _AddressSummary({
+    required this.name,
+    required this.phone,
+    required this.regionLine,
+    required this.detail,
+  });
+
+  final String name;
+  final String phone;
+  final String regionLine;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0F2FE),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Penerima',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              name,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+            ),
+            const Text(' · ', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+            Text(
+              phone,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          detail,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B), height: 1.35),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          regionLine,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+        ),
+      ],
+    );
+  }
+}
+
+// Selected Shipping Method view
+class _SelectedShippingTile extends StatelessWidget {
+  const _SelectedShippingTile({required this.method});
+
+  final ShippingMethod method;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBBF7D0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCFCE7),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.bolt_rounded, size: 20, color: Color(0xFF16A34A)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        method.name,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16A34A),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Cepat',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                if (method.estimatedDeliveryTime != null && method.estimatedDeliveryTime!.isNotEmpty)
+                  Row(
+                    children: [
+                      const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF15803D)),
+                      const SizedBox(width: 4),
+                      Text(
+                        method.estimatedDeliveryTime!,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            method.displayFee == 0 ? 'GRATIS' : formatCurrency(method.displayFee),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Selected Payment Method view
+class _SelectedPaymentTile extends StatelessWidget {
+  const _SelectedPaymentTile({required this.method});
+
+  final PaymentMethod method;
+
+  @override
+  Widget build(BuildContext context) {
+    IconData iconData = Icons.account_balance_wallet_rounded;
+    Color iconColor = const Color(0xFF7C3AED);
+    Color bgIcon = const Color(0xFFEDE9FE);
+
+    if (method.type == 'cod') {
+      iconData = Icons.payments_rounded;
+      iconColor = const Color(0xFFEA580C);
+      bgIcon = const Color(0xFFFFEDD5);
+    } else if (method.type == 'bank_transfer') {
+      iconData = Icons.account_balance_rounded;
+      iconColor = const Color(0xFF2563EB);
+      bgIcon = const Color(0xFFDBEAFE);
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF5FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE9D5FF)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: bgIcon,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(iconData, size: 20, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  method.name,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  method.type == 'bank_transfer' && method.bankName != null
+                      ? 'Bank: ${method.bankName}'
+                      : (method.description ?? 'Metode pembayaran terverifikasi'),
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text(
+              'Terpilih',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==========================================
+// CUSTOMER NOTES CARD WITH QUICK CHIPS
+// ==========================================
+class _CustomerNotesCard extends StatelessWidget {
+  const _CustomerNotesCard({
+    required this.controller,
+    required this.onPresetSelected,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onPresetSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.edit_note_rounded, size: 20, color: Color(0xFF0D9488)),
+              SizedBox(width: 8),
+              Text(
+                'Catatan untuk Penjual / Kurir (opsional)',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: controller,
+            maxLines: 2,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+            decoration: InputDecoration(
+              hintText: 'Contoh: Titip di satpam, pagar warna hitam, dll...',
+              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              fillColor: const Color(0xFFF8FAFC),
+              filled: true,
+              contentPadding: const EdgeInsets.all(12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF0D9488), width: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Preset Chips
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              'Titip di satpam',
+              'Hubungi sebelum sampai',
+              'Taruh depan pintu',
+              'Jangan tekan bel',
+            ].map((text) {
+              return InkWell(
+                onTap: () => onPresetSelected(text),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Text(
+                    '+ $text',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==========================================
+// ORDER SUMMARY RECEIPT CARD
+// ==========================================
+class _OrderSummaryCard extends StatelessWidget {
+  const _OrderSummaryCard({
+    required this.subtotal,
+    required this.shippingFee,
+    required this.total,
+  });
+
+  final double subtotal;
+  final double? shippingFee;
+  final double total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.receipt_long_rounded, size: 20, color: Color(0xFF0D9488)),
+              SizedBox(width: 8),
+              Text(
+                'Rincian Pembayaran',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _SummaryLine(label: 'Total Harga Produk', value: formatCurrency(subtotal)),
+          const SizedBox(height: 8),
+          _SummaryLine(
+            label: 'Biaya Pengiriman',
+            value: shippingFee != null ? (shippingFee == 0 ? 'GRATIS' : formatCurrency(shippingFee!)) : 'Pilih kurir',
+            valueColor: shippingFee != null ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+          ),
+          const SizedBox(height: 8),
+          const _SummaryLine(
+            label: 'Biaya Layanan Aplikasi',
+            value: 'GRATIS',
+            valueColor: Color(0xFF16A34A),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Total Tagihan',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+              ),
+              Text(
+                formatCurrency(total),
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0D9488)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryLine extends StatelessWidget {
+  const _SummaryLine({
+    required this.label,
+    required this.value,
+    this.valueColor = const Color(0xFF0F172A),
+  });
+
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: valueColor)),
+      ],
+    );
+  }
+}
+
+// ==========================================
+// MODAL BOTTOM SHEETS
+// ==========================================
 class _AddressFormResult {
   const _AddressFormResult({
     required this.name,
@@ -360,7 +1353,14 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: DraggableScrollableSheet(
         initialChildSize: 0.9,
@@ -370,48 +1370,70 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
         builder: (context, scrollController) {
           return Column(
             children: [
+              // Drag Handle
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
                 child: Row(
                   children: [
                     const Expanded(
-                      child: Text('Alamat Pengiriman', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      child: Text(
+                        'Alamat Pengiriman',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
               ),
-              const Divider(height: 1),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
               Expanded(
                 child: ListView(
                   controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                   children: [
                     TextField(
                       controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Nama Penerima'),
+                      decoration: const InputDecoration(
+                        labelText: 'Nama Penerima',
+                        prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                      ),
                       onChanged: (_) => setState(() {}),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     TextField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(labelText: 'Nomor Telepon'),
+                      decoration: const InputDecoration(
+                        labelText: 'Nomor Telepon Penerima',
+                        prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                      ),
                       onChanged: (_) => setState(() {}),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     AddressPicker(
                       initial: _address,
                       onChanged: (selection) => setState(() => _address = selection),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     TextField(
                       controller: _detailController,
                       maxLines: 2,
-                      decoration: const InputDecoration(labelText: 'Detail Alamat (Jalan, RT/RW, dll)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Detail Alamat (Nama Jalan, No. Rumah, RT/RW, Patokan)',
+                        alignLabelWithHint: true,
+                      ),
                       onChanged: (_) => setState(() {}),
                     ),
                   ],
@@ -420,13 +1442,17 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
               SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
                   child: SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
                       onPressed: _valid ? _save : null,
-                      child: const Text('Simpan Alamat'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Simpan Alamat Pengiriman', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -439,335 +1465,9 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
   }
 }
 
-class _StoreItemsCard extends StatelessWidget {
-  const _StoreItemsCard({required this.group});
-
-  final CartStoreGroup group;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.shopping_bag_outlined, size: 18, color: AppColors.foreground),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Daftar Produk',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          for (final item in group.items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${item.productName}${item.variantName != null ? ' (${item.variantName})' : ''} x${item.quantity}',
-                      style: const TextStyle(fontSize: 13),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(formatCurrency(item.lineTotal), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepCard extends StatelessWidget {
-  const _StepCard({
-    required this.step,
-    required this.title,
-    required this.done,
-    required this.onTap,
-    required this.child,
-    this.enabled = true,
-  });
-
-  final int step;
-  final String title;
-  final bool done;
-  final bool enabled;
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: enabled ? Colors.white : AppColors.surface,
-        border: Border.all(color: done ? AppColors.primary.withValues(alpha: 0.4) : AppColors.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: enabled ? onTap : null,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _StepBadge(step: step, done: done),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  ),
-                  if (enabled)
-                    Text(
-                      done ? 'Ubah' : 'Pilih',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              child,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StepBadge extends StatelessWidget {
-  const _StepBadge({required this.step, required this.done});
-
-  final int step;
-  final bool done;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: done ? AppColors.primary : AppColors.surface,
-        border: done ? null : Border.all(color: AppColors.border),
-      ),
-      child: done
-          ? const Icon(Icons.check, size: 14, color: Colors.white)
-          : Text('$step', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.mutedForeground)),
-    );
-  }
-}
-
-class _AddressSummary extends StatelessWidget {
-  const _AddressSummary({
-    required this.name,
-    required this.phone,
-    required this.regionLine,
-    required this.detail,
-  });
-
-  final String name;
-  final String phone;
-  final String regionLine;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('$name · $phone', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(
-          '$detail, $regionLine',
-          style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground, height: 1.4),
-        ),
-      ],
-    );
-  }
-}
-
-class _SelectionRow extends StatelessWidget {
-  const _SelectionRow({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.trailing,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final String? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 18, color: AppColors.primary),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              if (subtitle != null)
-                Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
-            ],
-          ),
-        ),
-        if (trailing != null)
-          Text(trailing!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      ],
-    );
-  }
-}
-
-class _PickPrompt extends StatelessWidget {
-  const _PickPrompt({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: AppColors.mutedForeground),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground)),
-        ),
-        const Icon(Icons.chevron_right, color: AppColors.mutedForeground),
-      ],
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 10),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _OrderSummaryCard extends StatelessWidget {
-  const _OrderSummaryCard({
-    required this.subtotal,
-    required this.shippingFee,
-    required this.total,
-  });
-
-  final double subtotal;
-  final double? shippingFee;
-  final double total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Ringkasan Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 10),
-          _SummaryLine(label: 'Subtotal Produk', value: formatCurrency(subtotal)),
-          const SizedBox(height: 6),
-          _SummaryLine(
-            label: 'Ongkos Kirim',
-            value: shippingFee != null ? formatCurrency(shippingFee!) : '—',
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1),
-          ),
-          _SummaryLine(
-            label: 'Total',
-            value: formatCurrency(total),
-            emphasize: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryLine extends StatelessWidget {
-  const _SummaryLine({required this.label, required this.value, this.emphasize = false});
-
-  final String label;
-  final String value;
-  final bool emphasize;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(
-      fontSize: emphasize ? 15 : 13,
-      fontWeight: emphasize ? FontWeight.bold : FontWeight.normal,
-      color: emphasize ? AppColors.primary : AppColors.foreground,
-    );
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: emphasize ? style : const TextStyle(fontSize: 13, color: AppColors.mutedForeground)),
-        Text(value, style: style),
-      ],
-    );
-  }
-}
-
+// ==========================================
+// PAYMENT METHOD PICKER SHEET
+// ==========================================
 class _PaymentMethodPickerSheet extends StatelessWidget {
   const _PaymentMethodPickerSheet({required this.methods, this.selected});
 
@@ -776,34 +1476,87 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Pilih Metode Pembayaran', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            if (methods.isEmpty)
-              const Padding(padding: EdgeInsets.all(12), child: Text('Belum ada metode pembayaran.')),
-            for (final method in methods)
-              _PickerOptionTile(
-                icon: Icons.account_balance_wallet_outlined,
-                title: method.name,
-                subtitle: method.type == 'bank_transfer' && method.bankName != null
-                    ? method.bankName
-                    : method.description,
-                selected: selected?.id == method.id,
-                onTap: () => Navigator.of(context).pop(method),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-          ],
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Pilih Metode Pembayaran',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (methods.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: Text('Belum ada metode pembayaran yang tersedia.'),
+                  ),
+                ),
+              for (final method in methods)
+                _PickerOptionTile(
+                  icon: method.type == 'cod'
+                      ? Icons.payments_rounded
+                      : method.type == 'bank_transfer'
+                          ? Icons.account_balance_rounded
+                          : Icons.account_balance_wallet_rounded,
+                  iconColor: method.type == 'cod'
+                      ? const Color(0xFFEA580C)
+                      : method.type == 'bank_transfer'
+                          ? const Color(0xFF2563EB)
+                          : const Color(0xFF7C3AED),
+                  title: method.name,
+                  subtitle: method.type == 'bank_transfer' && method.bankName != null
+                      ? method.bankName
+                      : method.description,
+                  badge: method.type == 'cod' ? 'COD' : (method.type == 'bank_transfer' ? 'Transfer' : null),
+                  selected: selected?.id == method.id,
+                  onTap: () => Navigator.of(context).pop(method),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+// ==========================================
+// SHIPPING METHOD PICKER SHEET
+// ==========================================
 class _ShippingMethodPickerSheet extends StatelessWidget {
   const _ShippingMethodPickerSheet({required this.methods, this.selected});
 
@@ -812,49 +1565,94 @@ class _ShippingMethodPickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Pilih Metode Pengiriman', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            if (methods.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: Text('Tidak ada metode pengiriman yang tersedia untuk alamat ini.'),
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-            for (final method in methods)
-              _PickerOptionTile(
-                icon: Icons.local_shipping_outlined,
-                title: method.name,
-                subtitle: method.estimatedDeliveryTime,
-                badge: method.isTableRate ? 'Lokal' : null,
-                trailing: formatCurrency(method.displayFee),
-                selected: selected?.id == method.id,
-                onTap: () => Navigator.of(context).pop(method),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Pilih Opsi Pengiriman',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
               ),
-          ],
+              const SizedBox(height: 8),
+              if (methods.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: Text(
+                      'Tidak ada metode pengiriman yang menjangkau alamat ini.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFF64748B)),
+                    ),
+                  ),
+                ),
+              for (final method in methods)
+                _PickerOptionTile(
+                  icon: Icons.bolt_rounded,
+                  iconColor: const Color(0xFF16A34A),
+                  title: method.name,
+                  subtitle: method.estimatedDeliveryTime,
+                  badge: method.isTableRate ? 'Instan' : 'Reguler',
+                  trailing: method.displayFee == 0 ? 'GRATIS' : formatCurrency(method.displayFee),
+                  selected: selected?.id == method.id,
+                  onTap: () => Navigator.of(context).pop(method),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+// Option Tile for Pickers
 class _PickerOptionTile extends StatelessWidget {
   const _PickerOptionTile({
     required this.icon,
     required this.title,
     required this.selected,
     required this.onTap,
+    this.iconColor = const Color(0xFF0D9488),
     this.subtitle,
     this.trailing,
     this.badge,
   });
 
   final IconData icon;
+  final Color iconColor;
   final String title;
   final String? subtitle;
   final String? trailing;
@@ -865,30 +1663,32 @@ class _PickerOptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
-            borderRadius: BorderRadius.circular(10),
-            color: selected ? AppColors.primary.withValues(alpha: 0.06) : Colors.white,
+            border: Border.all(
+              color: selected ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0),
+              width: selected ? 1.6 : 1,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            color: selected ? const Color(0xFFF0FDF4) : Colors.white,
           ),
           child: Row(
             children: [
               Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 18, color: AppColors.primary),
+                child: Icon(icon, size: 20, color: iconColor),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -898,7 +1698,7 @@ class _PickerOptionTile extends StatelessWidget {
                         Flexible(
                           child: Text(
                             title,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -906,30 +1706,42 @@ class _PickerOptionTile extends StatelessWidget {
                         if (badge != null) ...[
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                             decoration: BoxDecoration(
-                              color: AppColors.accent.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(4),
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Text(badge!, style: const TextStyle(fontSize: 10, color: AppColors.accent)),
+                            child: Text(
+                              badge!,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                            ),
                           ),
                         ],
                       ],
                     ),
-                    if (subtitle != null)
-                      Text(subtitle!, style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
+                    if (subtitle != null && subtitle!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle!, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ],
                   ],
                 ),
               ),
               if (trailing != null) ...[
                 const SizedBox(width: 8),
-                Text(trailing!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  trailing!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: trailing == 'GRATIS' ? const Color(0xFF16A34A) : const Color(0xFF0F172A),
+                  ),
+                ),
               ],
-              const SizedBox(width: 6),
+              const SizedBox(width: 10),
               Icon(
                 selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                size: 18,
-                color: selected ? AppColors.primary : AppColors.mutedForeground,
+                size: 20,
+                color: selected ? const Color(0xFF0D9488) : const Color(0xFF94A3B8),
               ),
             ],
           ),

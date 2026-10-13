@@ -48,7 +48,19 @@ class _CompleteAddressScreenState extends ConsumerState<CompleteAddressScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Lengkapi Alamat'), automaticallyImplyLeading: false),
+      appBar: AppBar(
+        title: const Text('Lengkapi Alamat'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),

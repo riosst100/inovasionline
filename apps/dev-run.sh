@@ -2,7 +2,7 @@
 # Forward backend ports to connected Android device via ADB, then run Flutter app
 set -e
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$SCRIPT_DIR"
 
 # Find ADB executable (Linux or Windows via WSL)

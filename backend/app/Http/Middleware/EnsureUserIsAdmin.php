@@ -14,8 +14,12 @@ class EnsureUserIsAdmin
     {
         $user = $request->user();
 
-        if (! $user || $user->role !== UserRole::PLATFORM_ADMIN) {
-            return ApiResponse::error('You must be a platform admin to access this resource.', [], 403);
+        if (! $user) {
+            return ApiResponse::error('Unauthenticated.', [], 401);
+        }
+
+        if ($user->role !== UserRole::PLATFORM_ADMIN && ! $user->role_id) {
+            return ApiResponse::error('You must be a platform admin or staff member to access this resource.', [], 403);
         }
 
         return $next($request);

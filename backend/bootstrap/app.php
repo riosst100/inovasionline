@@ -27,6 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // instead of the clean 401 JSON response handled below.
         Authenticate::redirectUsing(fn () => null);
 
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+        ]);
+
         $middleware->statefulApi();
 
         $middleware->api(prepend: [
@@ -42,6 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'store.owner' => \App\Http\Middleware\EnsureStoreOwnership::class,
             'seller' => \App\Http\Middleware\EnsureUserIsSeller::class,
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'admin.auth' => \App\Http\Middleware\EnsureAdminAuthenticated::class,
             'photographer' => \App\Http\Middleware\EnsureUserIsPhotographer::class,
         ]);
     })

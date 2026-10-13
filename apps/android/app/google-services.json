@@ -14,7 +14,15 @@
       },
       "oauth_client": [
         {
-          "client_id": "962366033380-169mr3kth1sl22fh94ek79ioalj7us4b.apps.googleusercontent.com",
+          "client_id": "962366033380-7vsj0faq915gh2pfubgecgle6huj08u2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.inovasionline.app",
+            "certificate_hash": "15192317190aa9984c7f2453e2ab244cc2ea0b8e"
+          }
+        },
+        {
+          "client_id": "962366033380-9fog0s6egq0oq5k0d12h68c7vt8eg53q.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -59,7 +67,7 @@
           }
         },
         {
-          "client_id": "962366033380-169mr3kth1sl22fh94ek79ioalj7us4b.apps.googleusercontent.com",
+          "client_id": "962366033380-9fog0s6egq0oq5k0d12h68c7vt8eg53q.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -88,7 +96,23 @@
       },
       "oauth_client": [
         {
-          "client_id": "962366033380-169mr3kth1sl22fh94ek79ioalj7us4b.apps.googleusercontent.com",
+          "client_id": "962366033380-ge4fkkh9qcmnlagk4nsl8rqs49p8rmt7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.inovasionline.twa.dev",
+            "certificate_hash": "7d912e51d00240866a415230b69dd161f44f9e92"
+          }
+        },
+        {
+          "client_id": "962366033380-hq5fpndfbriiadtotji50ha3omo4f31o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.inovasionline.twa.dev",
+            "certificate_hash": "15192317190aa9984c7f2453e2ab244cc2ea0b8e"
+          }
+        },
+        {
+          "client_id": "962366033380-9fog0s6egq0oq5k0d12h68c7vt8eg53q.apps.googleusercontent.com",
           "client_type": 3
         }
       ],

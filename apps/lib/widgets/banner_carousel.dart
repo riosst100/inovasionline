@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -16,31 +17,68 @@ class BannerCarousel extends StatefulWidget {
 }
 
 class _BannerCarouselState extends State<BannerCarousel> {
-  late final PageController _controller;
+  late PageController _controller;
   Timer? _timer;
-  int _page = 0;
+  int _virtualPage = 0;
+  static const int _infiniteMultiplier = 10000;
+
+  int get _itemCount => widget.banners.length;
+
+  int _calculateInitialPage() {
+    if (_itemCount <= 1) return 0;
+    return (_infiniteMultiplier ~/ 2) * _itemCount;
+  }
 
   @override
   void initState() {
     super.initState();
-    _controller = PageController();
+    _virtualPage = _calculateInitialPage();
+    _controller = PageController(initialPage: _virtualPage);
     _startAutoSlide();
   }
 
+  @override
+  void didUpdateWidget(covariant BannerCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.banners.length != widget.banners.length) {
+      _timer?.cancel();
+      _virtualPage = _calculateInitialPage();
+      _controller.dispose();
+      _controller = PageController(initialPage: _virtualPage);
+      _startAutoSlide();
+    }
+  }
+
   void _startAutoSlide() {
+    _timer?.cancel();
     if (widget.banners.length <= 1) return;
     _timer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_controller.hasClients) return;
-      final next = (_page + 1) % widget.banners.length;
-      _controller.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 400),
+      _controller.nextPage(
+        duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
       );
     });
   }
 
   void _handleTap(int index) {
+    if (index >= widget.banners.length) return;
+    final banner = widget.banners[index];
+    final link = banner.linkUrl?.trim();
+    if (link != null && link.isNotEmpty) {
+      if (link.startsWith('/')) {
+        context.push(link);
+        return;
+      }
+      if (link.startsWith('http://') || link.startsWith('https://')) {
+        showDialog(
+          context: context,
+          barrierColor: Colors.black,
+          builder: (context) => _BannerPreviewDialog(banners: widget.banners, initialIndex: index),
+        );
+        return;
+      }
+    }
     showDialog(
       context: context,
       barrierColor: Colors.black,
@@ -58,7 +96,10 @@ class _BannerCarouselState extends State<BannerCarousel> {
   @override
   Widget build(BuildContext context) {
     final banners = widget.banners;
-    final hasMultiple = banners.length > 1;
+    final count = banners.length;
+    if (count == 0) return const SizedBox.shrink();
+    final hasMultiple = count > 1;
+    final activeIndex = count > 0 ? _virtualPage % count : 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -78,29 +119,42 @@ class _BannerCarouselState extends State<BannerCarousel> {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            PageView.builder(
-              controller: _controller,
-              itemCount: banners.length,
-              onPageChanged: (index) => setState(() => _page = index),
-              itemBuilder: (context, index) {
-                final banner = banners[index];
-                return GestureDetector(
-                  onTap: () => _handleTap(index),
-                  child: CachedNetworkImage(
-                    imageUrl: banner.imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
-                    errorWidget: (_, _, _) => Container(
-                      color: const Color(0xFFF1F5F9),
-                      child: const Center(
-                        child: Icon(Icons.image_outlined, color: Color(0xFF94A3B8), size: 36),
+            NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is ScrollStartNotification) {
+                  _timer?.cancel();
+                } else if (notification is ScrollEndNotification) {
+                  _startAutoSlide();
+                }
+                return false;
+              },
+              child: PageView.builder(
+                controller: _controller,
+                itemCount: hasMultiple ? null : 1,
+                onPageChanged: (index) {
+                  setState(() => _virtualPage = index);
+                },
+                itemBuilder: (context, index) {
+                  final bannerIndex = ((index % count) + count) % count;
+                  final banner = banners[bannerIndex];
+                  return GestureDetector(
+                    onTap: () => _handleTap(bannerIndex),
+                    child: CachedNetworkImage(
+                      imageUrl: banner.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
+                      errorWidget: (_, _, _) => Container(
+                        color: const Color(0xFFF1F5F9),
+                        child: const Center(
+                          child: Icon(Icons.image_outlined, color: Color(0xFF94A3B8), size: 36),
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
             if (hasMultiple)
               Positioned(
@@ -109,8 +163,8 @@ class _BannerCarouselState extends State<BannerCarousel> {
                 right: 0,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(banners.length, (index) {
-                    final active = index == _page;
+                  children: List.generate(count, (index) {
+                    final active = index == activeIndex;
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 250),
                       margin: const EdgeInsets.symmetric(horizontal: 3),

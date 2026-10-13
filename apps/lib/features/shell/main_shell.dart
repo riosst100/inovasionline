@@ -14,23 +14,6 @@ class MainShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.status == AuthStatus.authenticated &&
-          next.user?.hasAddress == false) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) context.go('/complete-address');
-        });
-      }
-    });
-
-    final authState = ref.watch(authProvider);
-    if (authState.status == AuthStatus.authenticated &&
-        authState.user?.hasAddress == false) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go('/complete-address');
-      });
-    }
-
     return AppUpdateChecker(
       child: PopScope(
         canPop: false,

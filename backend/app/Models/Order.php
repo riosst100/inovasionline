@@ -19,6 +19,7 @@ class Order extends Model
         'order_number',
         'store_id',
         'user_id',
+        'driver_id',
         'payment_method_id',
         'shipping_method_id',
         'promotion_id',
@@ -65,6 +66,11 @@ class Order extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(AdminUser::class, 'driver_id');
     }
 
     public function paymentMethod(): BelongsTo

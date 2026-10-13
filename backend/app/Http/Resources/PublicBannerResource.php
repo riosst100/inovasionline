@@ -12,7 +12,7 @@ class PublicBannerResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'image_url' => asset('storage/'.$this->image_path),
+            'image_url' => str_starts_with($this->image_path, 'http') ? $this->image_path : asset('storage/'.$this->image_path),
             'link_url' => $this->link_url,
         ];
     }

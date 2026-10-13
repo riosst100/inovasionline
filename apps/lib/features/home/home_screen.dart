@@ -15,7 +15,6 @@ import '../../widgets/product_card.dart';
 import '../../widgets/skeleton.dart';
 import '../cart/cart_providers.dart';
 import 'home_providers.dart';
-import 'user_summary_card.dart';
 import 'welcome_message.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -101,13 +100,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                         // 2. Modern White Search Bar + Logo + Cart
                         _TopSearchBar(cartItemCount: cartItemCount),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
 
-                        // 3. Member / User Summary Card
-                        const UserSummaryCard(),
-                        const SizedBox(height: 2),
-
-                        // 4. Hero Promo Banner Carousel
+                        // 3. Hero Promo Banner Carousel
                         banners.when(
                           data: (items) => items.isEmpty
                               ? const SizedBox.shrink()

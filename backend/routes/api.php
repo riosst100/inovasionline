@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AdminAuthController;
+use App\Http\Controllers\Api\Admin\AdminStaffController;
+use App\Http\Controllers\Api\Admin\CustomerController;
+use App\Http\Controllers\Api\Admin\DriverController;
 use App\Http\Controllers\Api\V1\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\V1\Admin\FlashSaleSlotController as AdminFlashSaleSlotController;
@@ -7,6 +11,7 @@ use App\Http\Controllers\Api\V1\Admin\NotificationController as AdminNotificatio
 use App\Http\Controllers\Api\V1\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\V1\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Api\V1\Admin\PhotographerApplicationController as AdminPhotographerApplicationController;
+use App\Http\Controllers\Api\V1\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Api\V1\Admin\SellerApplicationController as AdminSellerApplicationController;
 use App\Http\Controllers\Api\V1\Admin\ShippingMethodController as AdminShippingMethodController;
 use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateController as AdminShippingRateTemplateController;
@@ -259,7 +264,22 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
-        Route::get('/users', [AdminUserController::class, 'index']);
+        Route::prefix('users')->group(function () {
+            Route::get('/', [AdminUserController::class, 'index']);
+            Route::post('/', [AdminUserController::class, 'store']);
+            Route::get('/{user}', [AdminUserController::class, 'show']);
+            Route::put('/{user}', [AdminUserController::class, 'update']);
+            Route::delete('/{user}', [AdminUserController::class, 'destroy']);
+        });
+
+        Route::prefix('roles')->group(function () {
+            Route::get('/permissions', [AdminRoleController::class, 'availablePermissions']);
+            Route::get('/', [AdminRoleController::class, 'index']);
+            Route::post('/', [AdminRoleController::class, 'store']);
+            Route::get('/{role}', [AdminRoleController::class, 'show']);
+            Route::put('/{role}', [AdminRoleController::class, 'update']);
+            Route::delete('/{role}', [AdminRoleController::class, 'destroy']);
+        });
 
         Route::prefix('seller-applications')->group(function () {
             Route::get('/', [AdminSellerApplicationController::class, 'index']);
@@ -290,7 +310,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/', [AdminBannerController::class, 'index']);
             Route::post('/', [AdminBannerController::class, 'store']);
             Route::post('/reorder', [AdminBannerController::class, 'reorder']);
-            Route::post('/{banner}', [AdminBannerController::class, 'update']);
+            Route::post('/{banner}/toggle', [AdminBannerController::class, 'toggleActive']);
+            Route::match(['post', 'put', 'patch'], '/{banner}', [AdminBannerController::class, 'update']);
             Route::delete('/{banner}', [AdminBannerController::class, 'destroy']);
         });
 
@@ -335,4 +356,93 @@ Route::prefix('v1')->group(function () {
         });
     });
 
+});
+
+/*
+|--------------------------------------------------------------------------
+| Dedicated Admin API Endpoints (/api/admin/*)
+|--------------------------------------------------------------------------
+| Completely separated from customer/client marketplace API (/api/v1/*).
+*/
+Route::prefix('admin')->group(function () {
+
+    // Public Admin Auth
+    Route::prefix('auth')->group(function () {
+        Route::post('/login', [AdminAuthController::class, 'login']);
+    });
+
+    // Protected Admin Endpoints
+    Route::middleware(['auth:sanctum', 'admin.auth'])->group(function () {
+
+        Route::prefix('auth')->group(function () {
+            Route::get('/me', [AdminAuthController::class, 'me']);
+            Route::post('/logout', [AdminAuthController::class, 'logout']);
+        });
+
+        // Staff / Admin Users Management (admin_users table)
+        Route::prefix('staff')->group(function () {
+            Route::get('/', [AdminStaffController::class, 'index']);
+            Route::post('/', [AdminStaffController::class, 'store']);
+            Route::get('/{adminUser}', [AdminStaffController::class, 'show']);
+            Route::put('/{adminUser}', [AdminStaffController::class, 'update']);
+            Route::delete('/{adminUser}', [AdminStaffController::class, 'destroy']);
+        });
+
+        // Dedicated Driver Management (/api/admin/drivers/*)
+        Route::prefix('drivers')->group(function () {
+            Route::get('/', [DriverController::class, 'index']);
+            Route::post('/', [DriverController::class, 'store']);
+            Route::get('/{driver}', [DriverController::class, 'show']);
+            Route::put('/{driver}', [DriverController::class, 'update']);
+            Route::patch('/{driver}/status', [DriverController::class, 'setStatus']);
+            Route::delete('/{driver}', [DriverController::class, 'destroy']);
+            Route::get('/{driver}/orders', [DriverController::class, 'orders']);
+        });
+
+        // Role & Permissions Management
+        Route::prefix('roles')->group(function () {
+            Route::get('/permissions', [AdminRoleController::class, 'availablePermissions']);
+            Route::get('/', [AdminRoleController::class, 'index']);
+            Route::post('/', [AdminRoleController::class, 'store']);
+            Route::get('/{role}', [AdminRoleController::class, 'show']);
+            Route::put('/{role}', [AdminRoleController::class, 'update']);
+            Route::delete('/{role}', [AdminRoleController::class, 'destroy']);
+        });
+
+        // Customer Listing (users table)
+        Route::prefix('customers')->group(function () {
+            Route::get('/', [CustomerController::class, 'index']);
+            Route::get('/{user}', [CustomerController::class, 'show']);
+        });
+
+        // Operational Marketplace Management
+        Route::prefix('banners')->group(function () {
+            Route::get('/', [AdminBannerController::class, 'index']);
+            Route::post('/', [AdminBannerController::class, 'store']);
+            Route::post('/reorder', [AdminBannerController::class, 'reorder']);
+            Route::post('/{banner}/toggle', [AdminBannerController::class, 'toggleActive']);
+            Route::match(['post', 'put', 'patch'], '/{banner}', [AdminBannerController::class, 'update']);
+            Route::delete('/{banner}', [AdminBannerController::class, 'destroy']);
+        });
+
+        Route::prefix('categories')->group(function () {
+            Route::get('/', [AdminCategoryController::class, 'index']);
+            Route::post('/', [AdminCategoryController::class, 'store']);
+            Route::put('/{category}', [AdminCategoryController::class, 'update']);
+        });
+
+        Route::prefix('orders')->group(function () {
+            Route::get('/', [AdminOrderController::class, 'index']);
+            Route::get('/{order}', [AdminOrderController::class, 'show']);
+        });
+
+        Route::prefix('flash-sale-slots')->group(function () {
+            Route::get('/', [AdminFlashSaleSlotController::class, 'index']);
+            Route::post('/', [AdminFlashSaleSlotController::class, 'store']);
+            Route::put('/{flashSaleSlot}', [AdminFlashSaleSlotController::class, 'update']);
+            Route::delete('/{flashSaleSlot}', [AdminFlashSaleSlotController::class, 'destroy']);
+        });
+
+        Route::post('/notifications/broadcast', [AdminNotificationController::class, 'broadcast']);
+    });
 });

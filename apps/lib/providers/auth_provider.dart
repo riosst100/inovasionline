@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -121,27 +122,51 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<bool> loginWithGoogle() async {
     try {
+      debugPrint('[GOOGLE_AUTH] Step 1: initializing GoogleSignIn with serverClientId: ${Env.googleServerClientId}');
       final googleSignIn = GoogleSignIn(
         serverClientId: Env.googleServerClientId,
       );
+      debugPrint('[GOOGLE_AUTH] Step 2: calling signIn()');
       final account = await googleSignIn.signIn();
-      if (account == null) return false;
-
-      final googleAuth = await account.authentication;
-      final idToken = googleAuth.idToken;
-      if (idToken == null) {
-        state = state.copyWith(error: 'Failed to get Google credentials.');
+      debugPrint('[GOOGLE_AUTH] Step 3: account selected: ${account?.email}');
+      if (account == null) {
+        debugPrint('[GOOGLE_AUTH] User cancelled account selection');
         return false;
       }
 
+      debugPrint('[GOOGLE_AUTH] Step 4: requesting authentication tokens...');
+      final googleAuth = await account.authentication;
+      final idToken = googleAuth.idToken;
+      debugPrint('[GOOGLE_AUTH] Step 5: idToken received? ${idToken != null}');
+      if (idToken == null) {
+        state = state.copyWith(error: 'Gagal mendapatkan kredensial Google.');
+        return false;
+      }
+
+      debugPrint('[GOOGLE_AUTH] Step 6: sending idToken to backend...');
       final user = await _ref
           .read(authServiceProvider)
           .loginWithGoogle(idToken);
+      debugPrint('[GOOGLE_AUTH] Step 7: login success, user: ${user.name}');
       state = AuthState(status: AuthStatus.authenticated, user: user);
       await _syncDeviceToken();
       return true;
     } on DioException catch (e) {
+      debugPrint('[GOOGLE_AUTH] DioException: $e');
       state = state.copyWith(error: _errorMessage(e));
+      return false;
+    } catch (e, stack) {
+      debugPrint('[GOOGLE_AUTH] Unexpected error: $e');
+      debugPrint('[GOOGLE_AUTH] Stack: $stack');
+      final msg = e.toString();
+      if (msg.contains('ApiException: 10')) {
+        state = state.copyWith(
+          error:
+              'Gagal masuk dengan Google (Error 10): SHA-1 fingerprint belum terdaftar di Firebase Console.',
+        );
+      } else {
+        state = state.copyWith(error: 'Gagal masuk dengan Google: $e');
+      }
       return false;
     }
   }
