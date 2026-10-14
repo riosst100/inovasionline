@@ -26,24 +26,35 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _scrollController = ScrollController();
-  final _headerKey = GlobalKey();
+  final _locationKey = GlobalKey();
+  final _searchKey = GlobalKey();
   int _selectedTab = 0;
-  bool _scrolled = false;
-  double _headerHeight = 112;
+  double _offset = 0;
+  double _locationHeight = 50;
+  double _searchHeight = 42;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(() {
-      final scrolled = _scrollController.hasClients && _scrollController.offset > 8;
-      if (scrolled != _scrolled) setState(() => _scrolled = scrolled);
+      final offset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+      if ((offset - _offset).abs() > 0.5) setState(() => _offset = offset.clamp(0.0, 400.0));
     });
   }
 
+  double _measure(GlobalKey key, double current) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    return box != null && box.hasSize ? box.size.height : current;
+  }
+
   void _measureHeader() {
-    final box = _headerKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box != null && box.hasSize && (box.size.height - _headerHeight).abs() > 0.5) {
-      setState(() => _headerHeight = box.size.height);
+    final loc = _measure(_locationKey, _locationHeight);
+    final search = _measure(_searchKey, _searchHeight);
+    if ((loc - _locationHeight).abs() > 0.5 || (search - _searchHeight).abs() > 0.5) {
+      setState(() {
+        _locationHeight = loc;
+        _searchHeight = search;
+      });
     }
   }
 
@@ -77,6 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final cartItemCount = cartState.cart?.itemCount ?? 0;
 
     final topPadding = MediaQuery.of(context).padding.top;
+    final headerOpacity = ((_offset - (_locationHeight - 20)) / 40).clamp(0.0, 1.0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _measureHeader();
     });
@@ -113,7 +125,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: _headerHeight + 4),
+                        SizedBox(height: topPadding + 6),
+                        KeyedSubtree(key: _locationKey, child: _TopLocationHeader()),
+                        SizedBox(height: 6 + _searchHeight + 14),
 
                         // 3. Hero Promo Banner Carousel
                         banners.when(
@@ -182,34 +196,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
             ),
-            // Fixed header: transparent at top, solid green once scrolled
+            // Search bar: scrolls up with the page, then sticks to the top and turns solid
             Positioned(
-              top: 0,
+              top: (_locationHeight - _offset).clamp(0.0, _locationHeight),
               left: 0,
               right: 0,
-              child: AnimatedContainer(
-                key: _headerKey,
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                padding: EdgeInsets.only(top: topPadding + 6, bottom: 10),
-                decoration: BoxDecoration(
-                  color: _scrolled ? AppColors.primary : AppColors.primary.withValues(alpha: 0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: _scrolled ? 0.15 : 0),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: headerOpacity),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15 * headerOpacity),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TopLocationHeader(),
-                    const SizedBox(height: 6),
-                    _TopSearchBar(cartItemCount: cartItemCount),
-                  ],
-                ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(top: topPadding + 6, bottom: 10),
+                    child: KeyedSubtree(
+                      key: _searchKey,
+                      child: _TopSearchBar(cartItemCount: cartItemCount),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
