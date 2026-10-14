@@ -95,9 +95,9 @@ class MainShell extends ConsumerWidget {
                   ),
                   destinations: const [
                     NavigationDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home_rounded),
-                      label: 'Beranda',
+                      icon: Icon(Icons.shopping_bag_outlined),
+                      selectedIcon: Icon(Icons.shopping_bag_rounded),
+                      label: 'Belanja Online',
                     ),
                     NavigationDestination(
                       icon: Icon(Icons.rss_feed_outlined),
@@ -105,8 +105,8 @@ class MainShell extends ConsumerWidget {
                       label: 'Postingan',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.chat_bubble_outline_rounded),
-                      selectedIcon: Icon(Icons.chat_bubble_rounded),
+                      icon: Icon(Icons.sms_outlined),
+                      selectedIcon: Icon(Icons.sms_rounded),
                       label: 'Chat',
                     ),
                     NavigationDestination(

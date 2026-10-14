@@ -83,4 +83,4 @@ lib/
 ```
 
 State management: Riverpod. Routing: go_router with a `StatefulShellRoute` bottom nav
-(Beranda / Flash Sale / Toko / Akun).
+(Belanja Online / Flash Sale / Toko / Akun).
