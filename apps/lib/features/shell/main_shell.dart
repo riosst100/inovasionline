@@ -71,13 +71,13 @@ class MainShell extends ConsumerWidget {
                   labelTextStyle: WidgetStateProperty.resolveWith((states) {
                     if (states.contains(WidgetState.selected)) {
                       return const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF0284C7),
                       );
                     }
                     return const TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w500,
                       color: Color(0xFF64748B),
                     );

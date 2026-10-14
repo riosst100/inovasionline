@@ -196,8 +196,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<bool> updateProfile({
-    required String name,
-    required String phone,
+    String? name,
+    String? phone,
     File? avatar,
   }) async {
     try {

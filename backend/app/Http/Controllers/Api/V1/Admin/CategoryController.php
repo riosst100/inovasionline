@@ -35,7 +35,7 @@ class CategoryController extends Controller
 
     public function store(CategoryRequest $request): JsonResponse
     {
-        $category = $this->categoryService->createFromAdmin($request->user(), $request->validated());
+        $category = $this->categoryService->createFromAdmin($request->user(), $request->validated(), $request->file('image'));
 
         return ApiResponse::success(new CategoryResource($category), 'Category created successfully.', [], 201);
     }
@@ -43,7 +43,7 @@ class CategoryController extends Controller
     public function update(CategoryRequest $request, Category $category): JsonResponse
     {
         try {
-            $category = $this->categoryService->update($category, $request->validated());
+            $category = $this->categoryService->update($category, $request->validated(), $request->file('image'));
         } catch (RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), [], 422);
         }

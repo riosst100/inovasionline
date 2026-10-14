@@ -2,11 +2,11 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AdminUser } from '../types';
-import { adminApi, setToken, removeToken } from '../lib/api';
+import { adminApi, clearSession } from '../lib/api';
 
 interface AuthContextType {
   user: AdminUser | null;
-  token: string | null;
+  isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<AdminUser>;
   logout: () => Promise<void>;
@@ -18,45 +18,31 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
-  const [token, setTokenState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
-    const savedUser = typeof window !== 'undefined' ? localStorage.getItem('admin_user') : null;
-
-    if (savedToken) {
-      setTokenState(savedToken);
-      if (savedUser) {
-        try {
-          setUser(JSON.parse(savedUser));
-        } catch {
-          // invalid json
-        }
-      }
-      // Re-verify admin profile
-      adminApi.getMe()
-        .then((adminUser) => {
-          setUser(adminUser);
-          localStorage.setItem('admin_user', JSON.stringify(adminUser));
-        })
-        .catch(() => {
-          removeToken();
-          setUser(null);
-          setTokenState(null);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      setIsLoading(false);
+    // Optimistic render from cached profile, then verify against the cookie session.
+    try {
+      const savedUser = localStorage.getItem('admin_user');
+      if (savedUser) setUser(JSON.parse(savedUser));
+    } catch {
+      // invalid json
     }
+
+    adminApi.getMe()
+      .then((adminUser) => {
+        setUser(adminUser);
+        localStorage.setItem('admin_user', JSON.stringify(adminUser));
+      })
+      .catch(() => {
+        clearSession();
+        setUser(null);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const login = async (email: string, password: string): Promise<AdminUser> => {
     const res = await adminApi.login({ email, password });
-    setToken(res.token);
-    setTokenState(res.token);
     setUser(res.user);
     localStorage.setItem('admin_user', JSON.stringify(res.user));
     return res.user;
@@ -69,8 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ignore
     } finally {
       setUser(null);
-      setTokenState(null);
-      removeToken();
+      clearSession();
       window.location.href = '/login';
     }
   };
@@ -87,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        token,
+        isAuthenticated: !!user,
         isLoading,
         login,
         logout,

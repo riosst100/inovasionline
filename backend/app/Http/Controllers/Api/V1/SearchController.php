@@ -44,7 +44,7 @@ class SearchController extends Controller
     public function suggestions(Request $request): JsonResponse
     {
         $request->validate([
-            'q' => ['required', 'string', 'min:1', 'max:100'],
+            'q' => ['nullable', 'string', 'max:100'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:20'],
         ]);
 
@@ -52,7 +52,7 @@ class SearchController extends Controller
         $limit = $request->integer('limit', 8);
 
         $suggestions = SearchLog::query()
-            ->where('keyword', 'like', "%{$keyword}%")
+            ->when($keyword !== '', fn ($query) => $query->where('keyword', 'like', "%{$keyword}%"))
             ->orderByDesc('search_count')
             ->orderByDesc('last_searched_at')
             ->limit($limit)

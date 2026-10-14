@@ -60,7 +60,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: const [
                       SizedBox(height: 120),
-                      Icon(Icons.shopping_cart_outlined, size: 56, color: AppColors.mutedForeground),
+                      Icon(Icons.shopping_bag_outlined, size: 56, color: AppColors.mutedForeground),
                       SizedBox(height: 12),
                       Center(child: Text('Keranjang Anda kosong.', style: TextStyle(color: AppColors.mutedForeground))),
                     ],

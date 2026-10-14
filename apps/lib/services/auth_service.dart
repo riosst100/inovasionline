@@ -104,13 +104,13 @@ class AuthService {
   }
 
   Future<User> updateProfile({
-    required String name,
-    required String phone,
+    String? name,
+    String? phone,
     File? avatar,
   }) async {
     final formData = FormData.fromMap({
-      'name': name,
-      'phone': phone,
+      if (name != null) 'name': name,
+      if (phone != null) 'phone': phone,
       if (avatar != null) 'avatar': await MultipartFile.fromFile(avatar.path),
     });
 

@@ -10,6 +10,7 @@ class SearchLog extends Model
     protected $fillable = [
         'keyword',
         'search_count',
+        'source',
         'last_searched_at',
     ];
 

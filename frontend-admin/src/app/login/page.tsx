@@ -7,7 +7,7 @@ import { ShieldCheck, Lock, Mail, Eye, EyeOff, Loader2, KeyRound, Sparkles } fro
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, token, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,10 +16,10 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && token) {
+    if (!isLoading && isAuthenticated) {
       router.replace('/dashboard');
     }
-  }, [token, isLoading, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,13 +44,14 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-slate-100 overflow-hidden">
+      <div className="bg-dots absolute inset-0" />
       {/* Decorative background glow circles */}
       <div className="absolute top-1/4 -left-20 h-96 w-96 rounded-full bg-emerald-600/15 blur-3xl" />
       <div className="absolute bottom-1/4 -right-20 h-96 w-96 rounded-full bg-teal-600/15 blur-3xl" />
 
-      <div className="relative w-full max-w-md">
+      <div className="animate-fade-up relative w-full max-w-md">
         {/* Card Container */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl">
+        <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl shadow-black/40 ring-1 ring-white/5 backdrop-blur-xl sm:p-10">
           {/* Logo & Header */}
           <div className="flex flex-col items-center text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 font-extrabold text-2xl text-white shadow-lg shadow-emerald-500/25">

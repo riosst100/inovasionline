@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '../context/AuthContext';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Inovasi Online - Admin Portal & Multi-Role Dashboard',
@@ -13,8 +16,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
-      <body className="min-h-screen bg-slate-50 antialiased font-sans">
+    <html lang="id" className={inter.variable}>
+      <body className="min-h-screen antialiased font-sans">
         <AuthProvider>
           {children}
         </AuthProvider>

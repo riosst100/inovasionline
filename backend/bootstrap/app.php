@@ -31,14 +31,25 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
 
+        // Admin session token is already an opaque random secret (stored hashed
+        // server-side); keep it readable so AdminTokenFromCookie can use it.
+        $middleware->encryptCookies(except: ['admin_session']);
+
         $middleware->statefulApi();
 
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
 
+        // Must run before auth:sanctum: Laravel's priority list otherwise sorts Authenticate first.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: \App\Http\Middleware\AdminTokenFromCookie::class,
+        );
+
         $middleware->api(append: [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
+            \App\Http\Middleware\AdminTokenFromCookie::class,
             \Illuminate\Session\Middleware\StartSession::class,
         ]);
 

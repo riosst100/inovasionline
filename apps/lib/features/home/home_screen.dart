@@ -169,16 +169,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
             ),
-
-            // Persistent Floating Free Shipping Pill Bar (Above Navigation Bar)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 12,
-              child: _FloatingFreeShippingBar(
-                onTap: () => context.push('/cart'),
-              ),
-            ),
           ],
         ),
       ),
@@ -375,7 +365,6 @@ class _TopSearchBar extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Icon(Icons.qr_code_scanner_outlined, size: 18, color: Color(0xFF94A3B8)),
                   ],
                 ),
               ),
@@ -403,7 +392,7 @@ class _TopSearchBar extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  const Icon(Icons.shopping_cart_outlined, size: 20, color: AppColors.primary),
+                  const Icon(Icons.shopping_bag_outlined, size: 20, color: AppColors.primary),
                   if (cartItemCount > 0)
                     Positioned(
                       top: 4,
@@ -789,7 +778,10 @@ class _PromoGercepSectionState extends State<_PromoGercepSection> {
 
           // Horizontal Flash Sale Cards
           SizedBox(
-            height: 258,
+            height: ProductGridDelegate.tileHeight(
+              154,
+              MediaQuery.textScalerOf(context).scale(1),
+            ),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1152,11 +1144,8 @@ class _InspirasiUntukmuSection extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: activeProducts.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.58,
+              gridDelegate: ProductGridDelegate(
+                textScale: MediaQuery.textScalerOf(context).scale(1),
               ),
               itemBuilder: (context, index) {
                 final product = activeProducts[index];
@@ -1168,64 +1157,6 @@ class _InspirasiUntukmuSection extends StatelessWidget {
               },
             ),
         ],
-      ),
-    );
-  }
-}
-
-// ==========================================
-// 7. FLOATING FREE SHIPPING BAR (Astro Sticky Banner)
-// ==========================================
-class _FloatingFreeShippingBar extends StatelessWidget {
-  const _FloatingFreeShippingBar({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0284C7).withValues(alpha: 0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.local_shipping_outlined, color: Colors.white, size: 20),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Belanja Rp35rb lagi, ada Gratis Ongkir!',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -65,7 +65,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen>
               child: Badge(
                 label: Text('$cartItemCount'),
                 isLabelVisible: cartItemCount > 0,
-                child: const Icon(Icons.shopping_cart_outlined),
+                child: const Icon(Icons.shopping_bag_outlined),
               ),
             ),
             onPressed: () => context.push('/cart'),
@@ -370,7 +370,7 @@ class _AddToCartBarState extends ConsumerState<_AddToCartBar> {
                           color: Colors.white,
                         ),
                       )
-                    : const Icon(Icons.add_shopping_cart_outlined, size: 18),
+                    : const Icon(Icons.shopping_bag_outlined, size: 18),
                 label: const Text('Tambah ke Keranjang'),
               ),
             ),

@@ -111,3 +111,57 @@ export interface Banner {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface AdminSession {
+  id: number;
+  device: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  last_active_at: string | null;
+  created_at: string | null;
+  expires_at: string | null;
+  is_current: boolean;
+}
+
+export interface SearchSuggestion {
+  id: number;
+  keyword: string;
+  search_count: number;
+  source: 'user' | 'admin';
+  last_searched_at: string | null;
+  created_at: string | null;
+}
+
+export type ProductAttributeType = 'text' | 'textarea' | 'number' | 'boolean' | 'select' | 'date';
+
+export interface ProductAttribute {
+  id: string;
+  code: string;
+  name: string;
+  type: ProductAttributeType;
+  options: string[] | null;
+  description: string | null;
+  is_system: boolean;
+  is_required: boolean;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export type WarehouseType = 'warehouse' | 'hub';
+
+export interface Warehouse {
+  id: string;
+  code: string;
+  name: string;
+  type: WarehouseType;
+  address: string | null;
+  city: string | null;
+  province: string | null;
+  postal_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  notes: string | null;
+  is_active: boolean;
+}

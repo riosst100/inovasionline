@@ -7,10 +7,6 @@ import '../../providers/core_providers.dart';
 import '../../widgets/product_grid.dart';
 import '../../widgets/skeleton.dart';
 
-final popularSearchProductsProvider = FutureProvider.autoDispose<List<Product>>((ref) {
-  return ref.watch(searchServiceProvider).popular();
-});
-
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
@@ -24,7 +20,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   List<Product> _products = [];
   bool _loading = false;
   bool _searched = false;
+  List<String> _suggestions = [];
   String _lastKeyword = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSuggestions('');
+  }
 
   @override
   void dispose() {
@@ -40,9 +43,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _products = [];
         _searched = false;
       });
+      _loadSuggestions('');
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 400), () => _search(query.trim()));
+    setState(() => _searched = false);
+    _debounce = Timer(const Duration(milliseconds: 300), () => _loadSuggestions(query.trim()));
+  }
+
+  Future<void> _loadSuggestions(String query) async {
+    try {
+      final result = await ref.read(searchServiceProvider).suggestions(query);
+      if (!mounted || _controller.text.trim() != query) return;
+      setState(() => _suggestions = result);
+    } catch (_) {}
+  }
+
+  void _selectSuggestion(String keyword) {
+    _controller.text = keyword;
+    _controller.selection = TextSelection.collapsed(offset: keyword.length);
+    FocusScope.of(context).unfocus();
+    _search(keyword);
   }
 
   Future<void> _search(String query) async {
@@ -93,7 +113,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                     ),
+                    textInputAction: TextInputAction.search,
                     onChanged: _onChanged,
+                    onSubmitted: (q) {
+                      if (q.trim().isNotEmpty) _search(q.trim());
+                    },
                   ),
                 ),
               ),
@@ -104,7 +128,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       body: _loading
           ? const ProductGridSkeleton()
           : !_searched
-              ? const _PopularSearchSection()
+              ? ListView(
+                  children: [
+                    for (final keyword in _suggestions)
+                      ListTile(
+                        leading: const Icon(Icons.trending_up),
+                        title: Text(keyword),
+                        onTap: () => _selectSuggestion(keyword),
+                      ),
+                  ],
+                )
               : _products.isEmpty
                   ? const Center(child: Text('Tidak ada hasil ditemukan.'))
                   : ListView(
@@ -121,42 +154,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         ),
                       ],
                     ),
-    );
-  }
-}
-
-class _PopularSearchSection extends ConsumerWidget {
-  const _PopularSearchSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final popular = ref.watch(popularSearchProductsProvider);
-
-    return ListView(
-      children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Pencarian Pilihan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        ),
-        popular.when(
-          data: (items) => items.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('Belum ada pencarian pilihan.'),
-                )
-              : ProductGrid(
-                  products: items,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onProductTap: (product) => context.push('/products/${product.slug}'),
-                ),
-          loading: () => const ProductGridSkeleton(shrinkWrap: true),
-          error: (_, _) => const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Gagal memuat produk pilihan.'),
-          ),
-        ),
-      ],
     );
   }
 }

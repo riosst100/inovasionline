@@ -1,9 +1,55 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../core/utils/formatters.dart';
 import '../features/cart/cart_providers.dart';
 import '../models/product.dart';
+import '../providers/auth_provider.dart';
+
+/// Grid delegate whose item height = image (square) + details area, so the
+/// card never overflows regardless of screen width or system font scale.
+class ProductGridDelegate extends SliverGridDelegate {
+  const ProductGridDelegate({
+    required this.textScale,
+    this.crossAxisCount = 2,
+    this.spacing = 12,
+  });
+
+  final double textScale;
+  final int crossAxisCount;
+  final double spacing;
+
+  // Non-text padding/margins in the details area + scalable text area.
+  static const double _fixedDetails = 34;
+  static const double _textDetails = 100;
+
+  /// Card height for a given card width (used by horizontal lists).
+  static double tileHeight(double width, double textScale) =>
+      width + _fixedDetails + _textDetails * textScale;
+
+  @override
+  SliverGridLayout getLayout(SliverConstraints constraints) {
+    final tileWidth =
+        (constraints.crossAxisExtent - spacing * (crossAxisCount - 1)) / crossAxisCount;
+    final tileHeight = ProductGridDelegate.tileHeight(tileWidth, textScale);
+    return SliverGridRegularTileLayout(
+      crossAxisCount: crossAxisCount,
+      mainAxisStride: tileHeight + spacing,
+      crossAxisStride: tileWidth + spacing,
+      childMainAxisExtent: tileHeight,
+      childCrossAxisExtent: tileWidth,
+      reverseCrossAxis: axisDirectionIsReversed(constraints.crossAxisDirection),
+    );
+  }
+
+  @override
+  bool shouldRelayout(ProductGridDelegate old) =>
+      old.textScale != textScale ||
+      old.crossAxisCount != crossAxisCount ||
+      old.spacing != spacing;
+}
 
 class ProductCard extends ConsumerWidget {
   const ProductCard({
@@ -67,32 +113,30 @@ class ProductCard extends ConsumerWidget {
                     top: 8,
                     left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF14B8A6), Color(0xFF0D9488)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 4,
+                            color: const Color(0xFF0D9488).withValues(alpha: 0.28),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.verified, size: 11, color: Color(0xFF0284C7)),
-                          const SizedBox(width: 3),
-                          Text(
-                            badgeText ?? 'Fresh',
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0369A1),
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        badgeText ?? 'Fresh',
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -108,33 +152,38 @@ class ProductCard extends ConsumerWidget {
                       child: InkWell(
                         customBorder: const CircleBorder(),
                         onTap: () async {
+                          if (ref.read(authProvider).status != AuthStatus.authenticated) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Masuk dulu untuk menambahkan ke keranjang')),
+                            );
+                            context.push('/account/login');
+                            return;
+                          }
                           final success = await ref
                               .read(cartProvider.notifier)
                               .addItem(productId: product.id);
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(Icons.check_circle, color: Colors.white, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      success
-                                          ? '${product.name} masuk keranjang'
-                                          : 'Gagal menambahkan ke keranjang',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Colors.white, size: 20),
+                                    SizedBox(width: 10),
+                                    Text('Ditambahkan ke keranjang.'),
+                                  ],
+                                ),
                               ),
-                              behavior: SnackBarBehavior.floating,
-                              duration: const Duration(seconds: 2),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          );
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  ref.read(cartProvider).error ?? 'Gagal menambahkan ke keranjang.',
+                                ),
+                              ),
+                            );
+                          }
                         },
                         child: Container(
                           width: 32,
@@ -142,12 +191,12 @@ class ProductCard extends ConsumerWidget {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3), width: 1.2),
+                            border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3), width: 1.2),
                           ),
                           child: const Icon(
                             Icons.add,
                             size: 18,
-                            color: Color(0xFF0284C7),
+                            color: Color(0xFF0D9488),
                           ),
                         ),
                       ),
@@ -239,14 +288,14 @@ class ProductCard extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.timer_outlined, size: 12, color: Color(0xFF0284C7)),
+                          const Icon(Icons.timer_outlined, size: 12, color: Color(0xFF0D9488)),
                           const SizedBox(width: 4),
                           Text(
                             etaText,
                             style: const TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF0284C7),
+                              color: Color(0xFF0D9488),
                             ),
                           ),
                         ],

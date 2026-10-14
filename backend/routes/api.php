@@ -6,6 +6,9 @@ use App\Http\Controllers\Api\Admin\CustomerController;
 use App\Http\Controllers\Api\Admin\DriverController;
 use App\Http\Controllers\Api\V1\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Api\V1\Admin\ProductAttributeController as AdminProductAttributeController;
+use App\Http\Controllers\Api\V1\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\V1\Admin\SearchSuggestionController as AdminSearchSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FlashSaleSlotController as AdminFlashSaleSlotController;
 use App\Http\Controllers\Api\V1\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\OrderController as AdminOrderController;
@@ -18,6 +21,7 @@ use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateController as AdminShi
 use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateRowController as AdminShippingRateTemplateRowController;
 use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\UserVerificationController as AdminUserVerificationController;
+use App\Http\Controllers\Api\V1\Admin\WarehouseController as AdminWarehouseController;
 use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BannerController;
@@ -377,6 +381,9 @@ Route::prefix('admin')->group(function () {
         Route::prefix('auth')->group(function () {
             Route::get('/me', [AdminAuthController::class, 'me']);
             Route::post('/logout', [AdminAuthController::class, 'logout']);
+            Route::get('/sessions', [AdminAuthController::class, 'sessions']);
+            Route::delete('/sessions', [AdminAuthController::class, 'revokeOtherSessions']);
+            Route::delete('/sessions/{id}', [AdminAuthController::class, 'revokeSession']);
         });
 
         // Staff / Admin Users Management (admin_users table)
@@ -429,7 +436,40 @@ Route::prefix('admin')->group(function () {
             Route::get('/', [AdminCategoryController::class, 'index']);
             Route::post('/', [AdminCategoryController::class, 'store']);
             Route::put('/{category}', [AdminCategoryController::class, 'update']);
+            Route::post('/{category}', [AdminCategoryController::class, 'update']);
         });
+
+        Route::prefix('search-suggestions')->group(function () {
+            Route::get('/', [AdminSearchSuggestionController::class, 'index']);
+            Route::post('/', [AdminSearchSuggestionController::class, 'store']);
+            Route::delete('/{searchLog}', [AdminSearchSuggestionController::class, 'destroy']);
+        });
+
+        Route::prefix('product-attributes')->group(function () {
+            Route::get('/', [AdminProductAttributeController::class, 'index']);
+            Route::post('/', [AdminProductAttributeController::class, 'store']);
+            Route::put('/{productAttribute}', [AdminProductAttributeController::class, 'update']);
+            Route::delete('/{productAttribute}', [AdminProductAttributeController::class, 'destroy']);
+        });
+
+        Route::prefix('warehouses')->group(function () {
+            Route::get('/', [AdminWarehouseController::class, 'index']);
+            Route::post('/', [AdminWarehouseController::class, 'store']);
+            Route::get('/{warehouse}', [AdminWarehouseController::class, 'show']);
+            Route::put('/{warehouse}', [AdminWarehouseController::class, 'update']);
+            Route::delete('/{warehouse}', [AdminWarehouseController::class, 'destroy']);
+        });
+
+        Route::get('products', [AdminProductController::class, 'index']);
+        Route::post('products/bulk-status', [AdminProductController::class, 'bulkUpdateStatus']);
+        Route::post('products/bulk-delete', [AdminProductController::class, 'bulkDestroy']);
+        Route::post('products/{product}/images', [AdminProductController::class, 'storeImages']);
+        Route::post('products/{product}/images/{image}/primary', [AdminProductController::class, 'setPrimaryImage']);
+        Route::delete('products/{product}/images/{image}', [AdminProductController::class, 'destroyImage']);
+        Route::get('products/{product}',[AdminProductController::class, 'show']);
+        Route::delete('products/{product}',[AdminProductController::class, 'destroy']);
+        Route::put('products/{product}',[AdminProductController::class, 'update']);
+        Route::patch('products/{product}/status', [AdminProductController::class, 'updateStatus']);
 
         Route::prefix('orders')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index']);

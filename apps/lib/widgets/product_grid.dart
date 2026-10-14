@@ -25,11 +25,8 @@ class ProductGrid extends StatelessWidget {
       physics: physics,
       padding: padding,
       itemCount: products.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.58,
+      gridDelegate: ProductGridDelegate(
+        textScale: MediaQuery.textScalerOf(context).scale(1),
       ),
       itemBuilder: (context, index) {
         final product = products[index];
