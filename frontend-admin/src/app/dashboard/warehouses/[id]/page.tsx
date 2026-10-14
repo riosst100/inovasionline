@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import AdminLayout from '../../../../components/layout/AdminLayout';
@@ -9,7 +9,7 @@ import { adminApi, ApiError } from '../../../../lib/api';
 import { Warehouse } from '../../../../types';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
-export default function EditWarehousePage() {
+function EditWarehousePageContent() {
   const { id } = useParams<{ id: string }>();
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,5 +43,14 @@ export default function EditWarehousePage() {
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+// useParams() must sit inside <Suspense> or prerendering the dynamic route fails the build.
+export default function EditWarehousePage() {
+  return (
+    <Suspense>
+      <EditWarehousePageContent />
+    </Suspense>
   );
 }

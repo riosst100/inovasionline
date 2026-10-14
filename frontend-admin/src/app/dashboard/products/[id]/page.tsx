@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '../../../../components/layout/AdminLayout';
@@ -25,7 +25,7 @@ const initPrice = (v: unknown) => (v == null || v === '' ? '' : String(Math.roun
 
 const inputCls = 'mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm';
 
-export default function EditProductPage() {
+function EditProductPageContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [product, setProduct] = useState<any | null>(null);
@@ -239,5 +239,14 @@ export default function EditProductPage() {
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+// useParams() must sit inside <Suspense> or prerendering the dynamic route fails the build.
+export default function EditProductPage() {
+  return (
+    <Suspense>
+      <EditProductPageContent />
+    </Suspense>
   );
 }
