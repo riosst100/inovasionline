@@ -63,7 +63,6 @@ class WarehouseController extends Controller
     {
         return [
             'name' => ['required', 'string', 'max:120'],
-            'type' => ['required', Rule::in(Warehouse::TYPES)],
             'address' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
             'province' => ['nullable', 'string', 'max:100'],

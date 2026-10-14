@@ -97,6 +97,7 @@ class Order {
     this.deliveryAddress,
     this.customerNotes,
     this.sellerNotes,
+    this.paymentRedirectUrl,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
@@ -118,6 +119,7 @@ class Order {
         deliveryAddress: (json['delivery_address'] as Map?)?.cast<String, dynamic>(),
         customerNotes: json['customer_notes'] as String?,
         sellerNotes: json['seller_notes'] as String?,
+        paymentRedirectUrl: json['payment_redirect_url'] as String?,
         statusHistory: (json['status_history'] as List<dynamic>? ?? [])
             .map((e) => OrderStatusHistoryEntry.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -141,9 +143,13 @@ class Order {
   final Map<String, dynamic>? deliveryAddress;
   final String? customerNotes;
   final String? sellerNotes;
+  final String? paymentRedirectUrl;
   final List<OrderStatusHistoryEntry> statusHistory;
   final List<OrderItem> items;
   final String createdAt;
 
   bool get isPending => status == 'pending';
+
+  bool get needsOnlinePayment =>
+      isPending && paymentStatus != 'paid' && paymentMethod?.type == 'payment_gateway';
 }

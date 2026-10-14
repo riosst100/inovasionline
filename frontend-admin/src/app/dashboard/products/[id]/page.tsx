@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import AdminLayout from '../../../../components/layout/AdminLayout';
 import SearchableSelect from '../../../../components/ui/SearchableSelect';
 import { adminApi } from '../../../../lib/api';
-import { ArrowLeft, ImagePlus, Loader2, Pencil, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, ImagePlus, Loader2, Pencil, Plus, Star, Trash2, Warehouse } from 'lucide-react';
 
 const STATUSES: Record<string, string> = {
   active: 'Aktif',
@@ -25,7 +25,7 @@ const initPrice = (v: unknown) => (v == null || v === '' ? '' : String(Math.roun
 
 const inputCls = 'mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm';
 
-export default function EditProductPage() {
+function EditProduct() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [product, setProduct] = useState<any | null>(null);
@@ -34,6 +34,8 @@ export default function EditProductPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [rows, setRows] = useState<{ warehouse_id: string; quantity: string }[]>([]);
   const [imgBusy, setImgBusy] = useState(false);
   const [imgError, setImgError] = useState('');
 
@@ -41,10 +43,18 @@ export default function EditProductPage() {
     Promise.all([
       adminApi.getProduct(id),
       adminApi.getCategories().catch(() => []),
+      adminApi.getWarehouses().catch(() => []),
     ])
-      .then(([p, cats]: any[]) => {
+      .then(([p, cats, whs]: any[]) => {
         setProduct(p);
         setCategories(Array.isArray(cats) ? cats : cats?.data ?? []);
+        const whList = Array.isArray(whs) ? whs : whs?.data ?? [];
+        setWarehouses(whList.filter((w: any) => w.is_active !== false));
+        const initial = (p.stocks ?? []).map((r: any) => ({
+          warehouse_id: String(r.warehouse_id),
+          quantity: String(r.quantity),
+        }));
+        setRows(initial);
         setForm({
           name: p.name ?? '',
           category_id: p.category_id ?? '',
@@ -60,6 +70,12 @@ export default function EditProductPage() {
       .catch((err: any) => setError(err?.message || 'Produk tidak ditemukan.'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!loading && window.location.hash === '#stok') {
+      document.getElementById('stok')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [loading]);
 
   const setField = (key: string, value: any) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -88,6 +104,14 @@ export default function EditProductPage() {
     imageAction(() => adminApi.deleteProductImage(id, imageId));
   };
 
+  const totalStock = rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+  const updateRow = (i: number, patch: Partial<{ warehouse_id: string; quantity: string }>) =>
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const addRow = () => {
+    const free = warehouses.find((w) => !rows.some((r) => r.warehouse_id === String(w.id)));
+    if (free) setRows((rs) => [...rs, { warehouse_id: String(free.id), quantity: '0' }]);
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -98,6 +122,9 @@ export default function EditProductPage() {
         category_id: form.category_id || null,
         sale_price: form.sale_price === '' ? null : form.sale_price,
         sku: form.sku || null,
+        ...(warehouses.length > 0
+          ? { stocks: rows.map((r) => ({ warehouse_id: r.warehouse_id, quantity: Number(r.quantity) || 0 })) }
+          : {}),
       });
       router.push('/dashboard/products');
     } catch (err: any) {
@@ -165,7 +192,8 @@ export default function EditProductPage() {
               </div>
             )}
           </section>
-          <form onSubmit={save} className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+          <form onSubmit={save} className="space-y-6">
+            <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
             <label className="block text-xs font-semibold text-slate-600">
               Nama
               <input required value={form.name} onChange={(e) => setField('name', e.target.value)} className={inputCls} />
@@ -206,10 +234,6 @@ export default function EditProductPage() {
                 </div>
               </label>
               <label className="block text-xs font-semibold text-slate-600">
-                Stok
-                <input type="number" min={0} required value={form.stock} onChange={(e) => setField('stock', e.target.value)} className={inputCls} />
-              </label>
-              <label className="block text-xs font-semibold text-slate-600">
                 SKU
                 <input value={form.sku} onChange={(e) => setField('sku', e.target.value)} className={inputCls} />
               </label>
@@ -223,6 +247,66 @@ export default function EditProductPage() {
               Deskripsi
               <textarea rows={6} value={form.description} onChange={(e) => setField('description', e.target.value)} className={inputCls} />
             </label>
+
+            </div>
+
+            <section id="stok" className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                  <Warehouse className="h-4 w-4 text-emerald-600" /> Stok
+                </div>
+                {warehouses.length > 0 && (
+                  <span className="text-xs text-slate-500">
+                    Total tersedia: <b className="text-slate-800">{totalStock}</b>
+                  </span>
+                )}
+              </div>
+
+              {warehouses.length === 0 ? (
+                <label className="block text-xs font-semibold text-slate-600">
+                  Stok tersedia
+                  <input type="number" min={0} required value={form.stock} onChange={(e) => setField('stock', e.target.value)} className={inputCls} />
+                  <span className="mt-1 block text-[11px] font-normal text-slate-400">Belum ada gudang aktif. Tambahkan gudang di menu Stok → Gudang untuk mengatur stok per gudang.</span>
+                </label>
+              ) : (
+                <>
+                  {rows.length === 0 && (
+                    <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                      Produk ini belum ada di gudang manapun. Tambahkan gudang lalu isi stoknya.
+                    </p>
+                  )}
+                  {rows.map((row, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_7rem_auto] items-end gap-2">
+                      <div className="text-xs font-semibold text-slate-600">
+                        {i === 0 && 'Gudang'}
+                        <SearchableSelect
+                          value={row.warehouse_id}
+                          onChange={(v) => updateRow(i, { warehouse_id: v })}
+                          options={warehouses
+                            .filter((w) => String(w.id) === row.warehouse_id || !rows.some((r) => r.warehouse_id === String(w.id)))
+                            .map((w) => ({ value: String(w.id), label: `${w.name} (${w.code})` }))}
+                        />
+                      </div>
+                      <label className="block text-xs font-semibold text-slate-600">
+                        {i === 0 && 'Stok'}
+                        <input inputMode="numeric" value={row.quantity} onChange={(e) => updateRow(i, { quantity: toDigits(e.target.value) })} className={inputCls} />
+                      </label>
+                      <button type="button" title="Hapus" onClick={() => setRows((rs) => rs.filter((_, idx) => idx !== i))} className="mb-1 rounded-lg p-2 text-rose-600 hover:bg-rose-50">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addRow}
+                    disabled={rows.length >= warehouses.length}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Tambah Gudang
+                  </button>
+                </>
+              )}
+            </section>
 
             {error && <p className="text-xs text-red-600">{error}</p>}
 
@@ -239,5 +323,21 @@ export default function EditProductPage() {
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+export default function EditProductPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminLayout>
+          <div className="flex justify-center p-10">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+          </div>
+        </AdminLayout>
+      }
+    >
+      <EditProduct />
+    </Suspense>
   );
 }

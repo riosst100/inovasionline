@@ -26,7 +26,26 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _scrollController = ScrollController();
+  final _headerKey = GlobalKey();
   int _selectedTab = 0;
+  bool _scrolled = false;
+  double _headerHeight = 112;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      final scrolled = _scrollController.hasClients && _scrollController.offset > 8;
+      if (scrolled != _scrolled) setState(() => _scrolled = scrolled);
+    });
+  }
+
+  void _measureHeader() {
+    final box = _headerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize && (box.size.height - _headerHeight).abs() > 0.5) {
+      setState(() => _headerHeight = box.size.height);
+    }
+  }
 
   @override
   void dispose() {
@@ -58,6 +77,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final cartItemCount = cartState.cart?.itemCount ?? 0;
 
     final topPadding = MediaQuery.of(context).padding.top;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _measureHeader();
+    });
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -71,7 +93,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             RefreshIndicator(
               color: AppColors.primary,
-              edgeOffset: topPadding + 40,
               onRefresh: () async {
                 Future<void> silent(Future<void> future) => future.catchError((_) {});
                 await Future.wait([
@@ -92,15 +113,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: topPadding + 6),
-
-                        // 1. Top Bar: Quick Delivery ETA, Address Dropdown & Chat CS
-                        _TopLocationHeader(),
-                        const SizedBox(height: 6),
-
-                        // 2. Modern White Search Bar + Logo + Cart
-                        _TopSearchBar(cartItemCount: cartItemCount),
-                        const SizedBox(height: 14),
+                        SizedBox(height: _headerHeight + 4),
 
                         // 3. Hero Promo Banner Carousel
                         banners.when(
@@ -167,6 +180,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     flashSaleProducts: flashSale.value?.slots.expand((s) => s.products).toList() ?? [],
                   ),
                 ],
+              ),
+            ),
+            // Fixed header: transparent at top, solid green once scrolled
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: AnimatedContainer(
+                key: _headerKey,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                padding: EdgeInsets.only(top: topPadding + 6, bottom: 10),
+                decoration: BoxDecoration(
+                  color: _scrolled ? AppColors.primary : AppColors.primary.withValues(alpha: 0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: _scrolled ? 0.15 : 0),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TopLocationHeader(),
+                    const SizedBox(height: 6),
+                    _TopSearchBar(cartItemCount: cartItemCount),
+                  ],
+                ),
               ),
             ),
           ],

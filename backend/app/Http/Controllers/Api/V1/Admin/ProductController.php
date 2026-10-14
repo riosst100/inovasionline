@@ -9,6 +9,7 @@ use App\Support\Enums\ProductStatus;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -40,9 +41,7 @@ class ProductController extends Controller
 
     public function show(Product $product): JsonResponse
     {
-        $product->load(['category:id,name', 'store:id,name', 'images']);
-
-        return ApiResponse::success($this->transform($product), 'Product retrieved successfully.');
+        return $this->freshResponse($product, 'Product retrieved successfully.');
     }
 
     public function update(Request $request, Product $product): JsonResponse
@@ -54,15 +53,33 @@ class ProductController extends Controller
             'description' => ['nullable', 'string'],
             'regular_price' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['nullable', 'numeric', 'min:0', 'lte:regular_price'],
-            'stock' => ['required', 'integer', 'min:0'],
+            'stock' => ['nullable', 'integer', 'min:0'],
+            'stocks' => ['nullable', 'array'],
+            'stocks.*.warehouse_id' => ['required', 'distinct', 'exists:warehouses,id'],
+            'stocks.*.quantity' => ['required', 'integer', 'min:0'],
             'sku' => ['nullable', 'string', 'max:100', Rule::unique('products', 'sku')->ignore($product->id)],
             'status' => ['required', Rule::enum(ProductStatus::class)],
         ]);
 
-        $product->update($data);
-        $product->load(['category:id,name', 'store:id,name', 'images']);
+        $stocks = $data['stocks'] ?? null;
+        unset($data['stocks']);
 
-        return ApiResponse::success($this->transform($product), 'Product updated successfully.');
+        DB::transaction(function () use ($product, $data, $stocks) {
+            if ($stocks !== null) {
+                $product->warehouses()->sync(
+                    collect($stocks)->mapWithKeys(fn ($row) => [
+                        $row['warehouse_id'] => ['quantity' => $row['quantity']],
+                    ])->all()
+                );
+                $data['stock'] = collect($stocks)->sum('quantity');
+            } else {
+                $data['stock'] ??= $product->stock;
+            }
+
+            $product->update($data);
+        });
+
+        return $this->freshResponse($product, 'Product updated successfully.');
     }
 
     public function bulkUpdateStatus(Request $request): JsonResponse
@@ -157,7 +174,7 @@ class ProductController extends Controller
 
     private function freshResponse(Product $product, string $message): JsonResponse
     {
-        $product->load(['category:id,name', 'store:id,name', 'images']);
+        $product->load(['category:id,name', 'store:id,name', 'images', 'warehouses:id,name']);
 
         return ApiResponse::success($this->transform($product), $message);
     }
@@ -195,6 +212,12 @@ class ProductController extends Controller
             'status' => $product->status instanceof \BackedEnum ? $product->status->value : $product->status,
             'category_name' => $product->category?->name,
             'store_name' => $product->store?->name,
+            'stocks' => $product->relationLoaded('warehouses')
+                ? $product->warehouses->map(fn ($w) => [
+                    'warehouse_id' => $w->id,
+                    'quantity' => (int) $w->pivot->quantity,
+                ])->values()
+                : [],
             'images' => $product->images->map(fn ($img) => [
                 'id' => $img->id,
                 'url' => str_starts_with($img->path, 'http') ? $img->path : asset('storage/'.$img->path),

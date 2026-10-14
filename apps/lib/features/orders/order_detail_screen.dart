@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 import '../../core/utils/formatters.dart';
+import '../../providers/core_providers.dart';
 import 'order_providers.dart';
 
 class OrderDetailScreen extends ConsumerWidget {
@@ -44,6 +46,22 @@ class OrderDetailScreen extends ConsumerWidget {
       final error = ref.read(orderCancelProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error ?? 'Gagal membatalkan pesanan.'), behavior: SnackBarBehavior.floating),
+      );
+    }
+  }
+
+  Future<void> _pay(BuildContext context, WidgetRef ref) async {
+    try {
+      final order = await ref.read(checkoutServiceProvider).payOrder(orderId);
+      if (!context.mounted) return;
+      final url = order.paymentRedirectUrl;
+      if (url == null) throw Exception('Link pembayaran tidak tersedia.');
+      await context.push('/orders/$orderId/pay', extra: url);
+      ref.invalidate(orderDetailProvider(orderId));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal membuka pembayaran. Coba lagi.'), behavior: SnackBarBehavior.floating),
       );
     }
   }
@@ -192,8 +210,18 @@ class OrderDetailScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-            if (order.isPending) ...[
+            if (order.needsOnlinePayment) ...[
               const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => _pay(context, ref),
+                  child: const Text('Bayar Sekarang'),
+                ),
+              ),
+            ],
+            if (order.isPending) ...[
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(

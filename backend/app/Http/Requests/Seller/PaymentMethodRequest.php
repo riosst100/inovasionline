@@ -15,7 +15,7 @@ class PaymentMethodRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', 'string', Rule::in(['cash', 'bank_transfer', 'cash_on_delivery'])],
+            'type' => ['required', 'string', Rule::in(['cash', 'bank_transfer', 'cash_on_delivery', 'payment_gateway'])],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'instructions' => ['nullable', 'string'],

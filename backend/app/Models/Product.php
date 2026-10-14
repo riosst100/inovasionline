@@ -74,6 +74,13 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function warehouses(): BelongsToMany
+    {
+        return $this->belongsToMany(Warehouse::class, 'product_warehouse_stocks')
+            ->withPivot('quantity')
+            ->withTimestamps();
+    }
+
     public function images(): HasMany
     {
         return $this->hasMany(ProductImage::class)->orderBy('sort_order');

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\V1\Admin\ProductAttributeController as AdminProductAttributeController;
 use App\Http\Controllers\Api\V1\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\V1\Admin\ProductStockController as AdminProductStockController;
 use App\Http\Controllers\Api\V1\Admin\SearchSuggestionController as AdminSearchSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FlashSaleSlotController as AdminFlashSaleSlotController;
 use App\Http\Controllers\Api\V1\Admin\NotificationController as AdminNotificationController;
@@ -34,6 +35,7 @@ use App\Http\Controllers\Api\V1\FaceProfileController;
 use App\Http\Controllers\Api\V1\FlashSaleSlotController;
 use App\Http\Controllers\Api\V1\MatchedPhotoController;
 use App\Http\Controllers\Api\V1\OrderController;
+use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\Photographer\PhotoController as PhotographerPhotoController;
 use App\Http\Controllers\Api\V1\Photographer\PhotoEventController as PhotographerPhotoEventController;
 use App\Http\Controllers\Api\V1\PhotographerApplicationController;
@@ -196,7 +198,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/', [OrderController::class, 'index']);
         Route::get('/{order}', [OrderController::class, 'show']);
         Route::post('/{order}/cancel', [OrderController::class, 'cancel']);
+        Route::post('/{order}/pay', [PaymentController::class, 'pay']);
     });
+
+    Route::post('/payments/midtrans/notification', [PaymentController::class, 'notification']);
 
     Route::prefix('seller')->middleware(['auth:sanctum', 'seller', 'store.owner'])->group(function () {
         Route::prefix('products')->group(function () {
@@ -459,6 +464,9 @@ Route::prefix('admin')->group(function () {
             Route::put('/{warehouse}', [AdminWarehouseController::class, 'update']);
             Route::delete('/{warehouse}', [AdminWarehouseController::class, 'destroy']);
         });
+
+        Route::get('product-stocks', [AdminProductStockController::class, 'index']);
+        Route::put('product-stocks/{product}', [AdminProductStockController::class, 'update']);
 
         Route::get('products', [AdminProductController::class, 'index']);
         Route::post('products/bulk-status', [AdminProductController::class, 'bulkUpdateStatus']);

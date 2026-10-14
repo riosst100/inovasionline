@@ -44,6 +44,13 @@ return [
         'api_key' => env('WHATSAPP_OTP_API_KEY'),
     ],
 
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
+        'expiry_minutes' => (int) env('MIDTRANS_EXPIRY_MINUTES', 1440),
+    ],
+
     'potocandid' => [
         'base_url' => env('POTOCANDID_SERVICE_BASE_URL', 'http://127.0.0.1:3200'),
         'api_key' => env('POTOCANDID_SERVICE_API_KEY'),

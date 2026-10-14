@@ -29,6 +29,11 @@ class CheckoutService {
         .toList();
   }
 
+  Future<Order> payOrder(String orderId) async {
+    final response = await _apiClient.dio.post('/orders/$orderId/pay');
+    return Order.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
   Future<Order> checkout({
     required String storeId,
     required List<String> cartItemIds,

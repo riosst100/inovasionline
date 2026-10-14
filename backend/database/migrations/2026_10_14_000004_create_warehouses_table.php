@@ -12,7 +12,6 @@ return new class extends Migration
             $table->ulid('id')->primary();
             $table->string('code', 30)->unique();
             $table->string('name', 120);
-            $table->string('type', 20)->default('warehouse'); // warehouse | hub
             $table->string('address')->nullable();
             $table->string('city', 100)->nullable();
             $table->string('province', 100)->nullable();

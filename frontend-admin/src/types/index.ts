@@ -147,13 +147,10 @@ export interface ProductAttribute {
   sort_order: number;
 }
 
-export type WarehouseType = 'warehouse' | 'hub';
-
 export interface Warehouse {
   id: string;
   code: string;
   name: string;
-  type: WarehouseType;
   address: string | null;
   city: string | null;
   province: string | null;
@@ -164,4 +161,14 @@ export interface Warehouse {
   contact_phone: string | null;
   notes: string | null;
   is_active: boolean;
+}
+
+export interface ProductStockRow {
+  id: string;
+  name: string;
+  sku: string | null;
+  min_stock: number;
+  image_url: string | null;
+  total: number;
+  stocks: { warehouse_id: string; warehouse_code: string; warehouse_name: string; quantity: number }[];
 }

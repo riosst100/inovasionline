@@ -18,6 +18,8 @@ import {
   Boxes,
   Package,
   Warehouse,
+  Layers,
+  PackageSearch,
   SlidersHorizontal,
   ChevronDown,
   MonitorSmartphone,
@@ -56,7 +58,6 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
       items: [
         { name: 'Pesanan', href: '/dashboard/orders', icon: ShoppingBag },
         { name: 'Kurir', href: '/dashboard/drivers', icon: Truck },
-        { name: 'Gudang / Hub', href: '/dashboard/warehouses', icon: Warehouse },
         {
           name: 'Katalog',
           href: '/dashboard/catalog',
@@ -65,6 +66,15 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
             { name: 'Produk', href: '/dashboard/products', icon: Package },
             { name: 'Kategori', href: '/dashboard/categories', icon: FolderTree },
             { name: 'Atribut Produk', href: '/dashboard/attributes', icon: SlidersHorizontal },
+          ],
+        },
+        {
+          name: 'Stok',
+          href: '/dashboard/stock',
+          icon: Layers,
+          children: [
+            { name: 'Gudang', href: '/dashboard/warehouses', icon: Warehouse },
+            { name: 'Stok Produk', href: '/dashboard/product-stocks', icon: PackageSearch },
           ],
         },
         {
@@ -153,7 +163,7 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
                   const Icon = item.icon;
 
                   if (item.children) {
-                    const childActive = item.children.some((c) => pathname === c.href);
+                    const childActive = item.children.some((c) => pathname.startsWith(c.href));
                     const open = openGroups[item.name] ?? childActive;
 
                     return (
@@ -181,7 +191,7 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
                         {open && (
                           <div className="animate-fade-in ml-[21px] mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
                             {item.children.map((child) => {
-                              const active = pathname === child.href;
+                              const active = pathname.startsWith(child.href);
                               const ChildIcon = child.icon;
                               return (
                                 <Link

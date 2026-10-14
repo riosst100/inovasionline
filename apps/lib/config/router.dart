@@ -13,6 +13,7 @@ import '../features/flash_sale/flash_sale_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
+import '../features/orders/payment_webview_screen.dart';
 import '../features/posts/posts_screen.dart';
 import '../features/products/product_detail_screen.dart';
 import '../features/search/search_screen.dart';
@@ -104,6 +105,11 @@ final router = GoRouter(
       path: '/orders/:id',
       builder: (context, state) =>
           OrderDetailScreen(orderId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/orders/:id/pay',
+      builder: (context, state) =>
+          PaymentWebViewScreen(redirectUrl: state.extra as String),
     ),
   ],
 );

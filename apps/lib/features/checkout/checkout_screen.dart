@@ -175,6 +175,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       if (order != null) {
         context.go('/orders/${order.id}');
         _showSnack('Pesanan berhasil dibuat!');
+        if (order.needsOnlinePayment && order.paymentRedirectUrl != null) {
+          context.push('/orders/${order.id}/pay', extra: order.paymentRedirectUrl);
+        }
       }
     } else {
       final error = ref.read(checkoutProvider).error;
@@ -252,7 +255,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          // 1. Store & Purchased Products Card
+          // 1. Purchased Products Card
           _StoreItemsCard(group: widget.group),
           const SizedBox(height: 14),
 
@@ -342,7 +345,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           ),
           const SizedBox(height: 14),
 
-          // 5. Notes to Seller
+          // 5. Notes
           _CustomerNotesCard(
             controller: _notesController,
             onPresetSelected: (text) {
@@ -476,7 +479,7 @@ class _StoreItemsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Store Header
+          // Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
@@ -492,7 +495,7 @@ class _StoreItemsCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Center(
-                    child: Icon(Icons.storefront_rounded, size: 18, color: Color(0xFF0D9488)),
+                    child: Icon(Icons.shopping_bag_outlined, size: 18, color: Color(0xFF0D9488)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -500,29 +503,9 @@ class _StoreItemsCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              group.store.name,
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0FDF4),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Resmi',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        'Produk Dipesan',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
                       ),
                       Text(
                         '${group.items.length} Barang dipesan',
@@ -1012,6 +995,8 @@ class _SelectedPaymentTile extends StatelessWidget {
       iconData = Icons.payments_rounded;
       iconColor = const Color(0xFFEA580C);
       bgIcon = const Color(0xFFFFEDD5);
+    } else if (method.type == 'payment_gateway') {
+      iconData = Icons.credit_card_rounded;
     } else if (method.type == 'bank_transfer') {
       iconData = Icons.account_balance_rounded;
       iconColor = const Color(0xFF2563EB);
@@ -1109,7 +1094,7 @@ class _CustomerNotesCard extends StatelessWidget {
               Icon(Icons.edit_note_rounded, size: 20, color: Color(0xFF0D9488)),
               SizedBox(width: 8),
               Text(
-                'Catatan untuk Penjual / Kurir (opsional)',
+                'Catatan untuk Kurir (opsional)',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
               ),
             ],
@@ -1542,7 +1527,9 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                   subtitle: method.type == 'bank_transfer' && method.bankName != null
                       ? method.bankName
                       : method.description,
-                  badge: method.type == 'cod' ? 'COD' : (method.type == 'bank_transfer' ? 'Transfer' : null),
+                  badge: method.type == 'cod'
+                      ? 'COD'
+                      : (method.type == 'bank_transfer' ? 'Transfer' : (method.type == 'payment_gateway' ? 'Online' : null)),
                   selected: selected?.id == method.id,
                   onTap: () => Navigator.of(context).pop(method),
                 ),

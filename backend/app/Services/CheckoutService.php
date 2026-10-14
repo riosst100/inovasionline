@@ -11,6 +11,7 @@ use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
 use App\Models\User;
 use App\Support\Enums\OrderStatus;
+use App\Support\Enums\PaymentMethodType;
 use App\Support\Enums\PaymentStatus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -26,6 +27,7 @@ class CheckoutService
         private readonly CartService $cartService,
         private readonly ShippingRateResolver $rateResolver,
         private readonly NotificationService $notificationService,
+        private readonly MidtransService $midtransService,
     ) {}
 
     public function checkout(User $user, array $validated): Order
@@ -95,7 +97,7 @@ class CheckoutService
         $taxTotal = 0.0;
         $grandTotal = $subtotal - $discountTotal + $shippingFee + $taxTotal;
 
-        return DB::transaction(function () use ($user, $validated, $items, $paymentMethod, $shippingMethod, $subtotal, $discountTotal, $shippingFee, $taxTotal, $grandTotal) {
+        $order = DB::transaction(function () use ($user, $validated, $items, $paymentMethod, $shippingMethod, $subtotal, $discountTotal, $shippingFee, $taxTotal, $grandTotal) {
             $order = Order::create([
                 'order_number' => $this->generateOrderNumber(),
                 'store_id' => $validated['store_id'],
@@ -150,6 +152,19 @@ class CheckoutService
 
             return $order;
         });
+
+        if ($paymentMethod->type === PaymentMethodType::PAYMENT_GATEWAY) {
+            // The order is already persisted; if the gateway is unreachable the buyer
+            // can retry through POST /orders/{order}/pay.
+            try {
+                $order = $this->midtransService->createSnapTransaction($order)
+                    ->load(['items', 'paymentMethod', 'shippingMethod', 'store']);
+            } catch (RuntimeException) {
+                // intentionally ignored, see above
+            }
+        }
+
+        return $order;
     }
 
     private function notifyStoreOfNewOrder(Order $order): void

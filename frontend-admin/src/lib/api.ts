@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -289,6 +289,22 @@ export const adminApi = {
     return apiRequest<any[]>(
       `/admin/products?per_page=100&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`
     );
+  },
+
+  async getProductStocks(search = '', warehouseId = ''): Promise<ProductStockRow[]> {
+    return apiRequest<ProductStockRow[]>(
+      `/admin/product-stocks?per_page=100&search=${encodeURIComponent(search)}&warehouse_id=${encodeURIComponent(warehouseId)}`
+    );
+  },
+
+  async updateProductStock(
+    id: string,
+    stocks: { warehouse_id: string; quantity: number }[]
+  ): Promise<ProductStockRow> {
+    return apiRequest<ProductStockRow>(`/admin/product-stocks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ stocks }),
+    });
   },
 
   async getProduct(id: string): Promise<any> {

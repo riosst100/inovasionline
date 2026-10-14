@@ -14,7 +14,7 @@ export default function NewWarehousePage() {
           <Link href="/dashboard/warehouses" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
             <ArrowLeft className="h-4 w-4" /> Kembali
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900">Tambah Gudang / Hub</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Tambah Gudang</h1>
         </div>
         <WarehouseForm warehouse={null} />
       </div>

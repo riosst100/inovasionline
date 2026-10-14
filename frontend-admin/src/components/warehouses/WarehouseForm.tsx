@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { adminApi, ApiError } from '../../lib/api';
-import { Warehouse, WarehouseType } from '../../types';
+import { Warehouse } from '../../types';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 const MapPicker = dynamic(() => import('../ui/MapPicker'), {
@@ -13,15 +13,10 @@ const MapPicker = dynamic(() => import('../ui/MapPicker'), {
   loading: () => <div className="h-72 animate-pulse rounded-xl bg-slate-100" />,
 });
 
-const TYPE_LABELS: Record<WarehouseType, string> = {
-  warehouse: 'Gudang',
-  hub: 'Hub',
-};
 
 type FormState = {
   code: string;
   name: string;
-  type: WarehouseType;
   address: string;
   city: string;
   province: string;
@@ -37,7 +32,6 @@ type FormState = {
 const toForm = (w: Warehouse | null): FormState => ({
   code: w?.code ?? '',
   name: w?.name ?? '',
-  type: w?.type ?? 'warehouse',
   address: w?.address ?? '',
   city: w?.city ?? '',
   province: w?.province ?? '',
@@ -77,7 +71,6 @@ export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | nu
         {
           code: form.code.trim().toUpperCase(),
           name: form.name.trim(),
-          type: form.type,
           address: orNull(form.address),
           city: orNull(form.city),
           province: orNull(form.province),
@@ -94,7 +87,7 @@ export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | nu
       router.push('/dashboard/warehouses');
     } catch (err) {
       const first = err instanceof ApiError && err.errors ? Object.values(err.errors)[0]?.[0] : null;
-      setError(first || (err instanceof ApiError ? err.message : 'Gagal menyimpan gudang / hub.'));
+      setError(first || (err instanceof ApiError ? err.message : 'Gagal menyimpan gudang.'));
       setSaving(false);
     }
   };
@@ -109,7 +102,7 @@ export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | nu
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Informasi Umum</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3">
           <div>
             <label className={labelCls}>Kode</label>
             <input
@@ -121,16 +114,6 @@ export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | nu
               placeholder="mis. GDG-JKT"
               className={`${inputCls} font-mono`}
             />
-          </div>
-          <div>
-            <label className={labelCls}>Tipe</label>
-            <select value={form.type} onChange={(e) => set('type', e.target.value as WarehouseType)} className={inputCls}>
-              {Object.entries(TYPE_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
         <div>

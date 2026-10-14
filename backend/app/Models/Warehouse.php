@@ -9,10 +9,8 @@ class Warehouse extends Model
 {
     use HasUlids;
 
-    public const TYPES = ['warehouse', 'hub'];
-
     protected $fillable = [
-        'code', 'name', 'type', 'address', 'city', 'province', 'postal_code',
+        'code', 'name', 'address', 'city', 'province', 'postal_code',
         'latitude', 'longitude', 'contact_name', 'contact_phone', 'notes', 'is_active',
     ];
 
