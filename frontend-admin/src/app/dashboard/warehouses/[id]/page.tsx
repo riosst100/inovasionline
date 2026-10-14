@@ -9,7 +9,7 @@ import { adminApi, ApiError } from '../../../../lib/api';
 import { Warehouse } from '../../../../types';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
-function EditWarehouse() {
+function EditWarehousePageContent() {
   const { id } = useParams<{ id: string }>();
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,18 +46,11 @@ function EditWarehouse() {
   );
 }
 
+// useParams() must sit inside <Suspense> or prerendering the dynamic route fails the build.
 export default function EditWarehousePage() {
   return (
-    <Suspense
-      fallback={
-        <AdminLayout>
-          <div className="flex justify-center p-10">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-          </div>
-        </AdminLayout>
-      }
-    >
-      <EditWarehouse />
+    <Suspense>
+      <EditWarehousePageContent />
     </Suspense>
   );
 }

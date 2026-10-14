@@ -25,7 +25,7 @@ const initPrice = (v: unknown) => (v == null || v === '' ? '' : String(Math.roun
 
 const inputCls = 'mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm';
 
-function EditProduct() {
+function EditProductPageContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [product, setProduct] = useState<any | null>(null);
@@ -326,18 +326,11 @@ function EditProduct() {
   );
 }
 
+// useParams() must sit inside <Suspense> or prerendering the dynamic route fails the build.
 export default function EditProductPage() {
   return (
-    <Suspense
-      fallback={
-        <AdminLayout>
-          <div className="flex justify-center p-10">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-          </div>
-        </AdminLayout>
-      }
-    >
-      <EditProduct />
+    <Suspense>
+      <EditProductPageContent />
     </Suspense>
   );
 }
