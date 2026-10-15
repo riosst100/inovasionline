@@ -18,6 +18,10 @@ final checkoutStorePaymentMethodsProvider =
   return ref.watch(checkoutServiceProvider).paymentMethods(storeSlug);
 });
 
+final checkoutServiceFeeConfigProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+  return ref.watch(checkoutServiceProvider).serviceFeeConfig();
+});
+
 typedef ShippingMethodsQuery = ({String storeSlug, String districtCode, String? villageCode});
 
 final checkoutStoreShippingMethodsProvider =

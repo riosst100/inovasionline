@@ -40,6 +40,39 @@ class ApiResponse
         );
     }
 
+    /**
+     * 403 response the mobile app recognises (via `code`) to lock itself down.
+     */
+    public static function blocked(\App\Models\User $user): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Akun Anda telah diblokir.',
+            'code' => 'ACCOUNT_BLOCKED',
+            'data' => [
+                'block_reason' => $user->block_reason,
+                'contact_url' => config('services.support.contact_url'),
+            ],
+        ], 403);
+    }
+
+    /**
+     * 403 response for a feature-level ban (chat / posts / purchase).
+     */
+    public static function banned(\App\Models\User $user, string $feature): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Anda dibatasi untuk menggunakan fitur ini.',
+            'code' => 'FEATURE_BANNED',
+            'data' => [
+                'feature' => $feature,
+                'ban_reason' => $user->ban_reason,
+                'contact_url' => config('services.support.contact_url'),
+            ],
+        ], 403);
+    }
+
     public static function error(string $message = 'An error occurred.', array $errors = [], int $status = 400): JsonResponse
     {
         $payload = [

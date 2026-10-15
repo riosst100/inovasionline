@@ -83,6 +83,7 @@ class Order {
     required this.subtotal,
     required this.discountTotal,
     required this.shippingFee,
+    this.serviceFee = 0,
     required this.taxTotal,
     required this.grandTotal,
     required this.status,
@@ -111,6 +112,7 @@ class Order {
         subtotal: double.tryParse(json['subtotal'].toString()) ?? 0,
         discountTotal: double.tryParse(json['discount_total'].toString()) ?? 0,
         shippingFee: double.tryParse(json['shipping_fee'].toString()) ?? 0,
+        serviceFee: double.tryParse(json['service_fee']?.toString() ?? '') ?? 0,
         taxTotal: double.tryParse(json['tax_total'].toString()) ?? 0,
         grandTotal: double.tryParse(json['grand_total'].toString()) ?? 0,
         status: json['status'] as String? ?? 'pending',
@@ -135,6 +137,7 @@ class Order {
   final double subtotal;
   final double discountTotal;
   final double shippingFee;
+  final double serviceFee;
   final double taxTotal;
   final double grandTotal;
   final String status;

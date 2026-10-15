@@ -23,6 +23,8 @@ class CategoryController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        $this->attachProductCounts($categories);
+
         return ApiResponse::success(CategoryResource::collection($categories), 'Categories retrieved successfully.');
     }
 
@@ -54,5 +56,33 @@ class CategoryController extends Controller
             'per_page' => $products->perPage(),
             'total' => $products->total(),
         ]);
+    }
+
+    /**
+     * Sets `products_count` on each category: active products in the category
+     * itself plus its direct children, matching what show() lists.
+     */
+    private function attachProductCounts($categories): void
+    {
+        $perCategory = Product::query()
+            ->where('status', ProductStatus::ACTIVE)
+            ->selectRaw('category_id, count(*) as total')
+            ->groupBy('category_id')
+            ->pluck('total', 'category_id');
+
+        $parentById = Category::query()->whereNotNull('parent_id')->pluck('parent_id', 'id');
+
+        $totals = [];
+        foreach ($perCategory as $categoryId => $total) {
+            $totals[$categoryId] = ($totals[$categoryId] ?? 0) + $total;
+            $parentId = $parentById[$categoryId] ?? null;
+            if ($parentId !== null) {
+                $totals[$parentId] = ($totals[$parentId] ?? 0) + $total;
+            }
+        }
+
+        foreach ($categories as $category) {
+            $category->setAttribute('products_count', (int) ($totals[$category->id] ?? 0));
+        }
     }
 }

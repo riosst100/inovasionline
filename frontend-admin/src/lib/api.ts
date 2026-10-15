@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -20,6 +20,9 @@ export function clearSession(): void {
     localStorage.removeItem('admin_user');
   }
 }
+
+// Region codes are stored in char() columns, so the API returns them space-padded.
+const trimCodes = (items: RegionItem[]): RegionItem[] => items.map((i) => ({ ...i, code: i.code.trim() }));
 
 export async function apiRequest<T = any>(
   endpoint: string,
@@ -238,6 +241,28 @@ export const adminApi = {
     return apiRequest<PaginatedData<Customer>>(`/admin/customers?${query.toString()}`);
   },
 
+  async blockCustomer(id: string, reason?: string): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/block`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || null }),
+    });
+  },
+
+  async banCustomer(id: string, features: string[], reason?: string): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/ban`, {
+      method: 'POST',
+      body: JSON.stringify({ features, reason: reason || null }),
+    });
+  },
+
+  async unbanCustomer(id: string): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/unban`, { method: 'POST' });
+  },
+
+  async unblockCustomer(id: string): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/unblock`, { method: 'POST' });
+  },
+
   // Operational & Banners
   async getBanners(): Promise<Banner[]> {
     return apiRequest<Banner[]>('/admin/banners');
@@ -325,6 +350,13 @@ export const adminApi = {
     return apiRequest<any>(`/admin/products/${id}/images/${imageId}`, { method: 'DELETE' });
   },
 
+  async createProduct(data: Record<string, any>): Promise<any> {
+    return apiRequest<any>('/admin/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   async updateProduct(id: string, data: Record<string, any>): Promise<any> {
     return apiRequest<any>(`/admin/products/${id}`, {
       method: 'PUT',
@@ -350,6 +382,21 @@ export const adminApi = {
     return apiRequest<any>(`/admin/products/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    });
+  },
+
+  async toggleCategory(id: string): Promise<any> {
+    return apiRequest<any>(`/admin/categories/${id}/toggle`, { method: 'POST' });
+  },
+
+  async deleteCategory(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/categories/${id}`, { method: 'DELETE' });
+  },
+
+  async reorderCategories(ids: string[]): Promise<void> {
+    return apiRequest<void>('/admin/categories/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
     });
   },
 
@@ -392,6 +439,22 @@ export const adminApi = {
     return apiRequest<void>(`/admin/product-attributes/${id}`, { method: 'DELETE' });
   },
 
+  async getRegionProvinces(): Promise<RegionItem[]> {
+    return trimCodes(await apiRequest<RegionItem[]>('/v1/regions/provinces'));
+  },
+
+  async getRegionCities(provinceCode: string): Promise<RegionItem[]> {
+    return trimCodes(await apiRequest<RegionItem[]>(`/v1/regions/provinces/${provinceCode}/cities`));
+  },
+
+  async getRegionDistricts(cityCode: string): Promise<RegionItem[]> {
+    return trimCodes(await apiRequest<RegionItem[]>(`/v1/regions/cities/${cityCode}/districts`));
+  },
+
+  async getRegionVillages(districtCode: string): Promise<RegionItem[]> {
+    return trimCodes(await apiRequest<RegionItem[]>(`/v1/regions/districts/${districtCode}/villages`));
+  },
+
   async getWarehouses(): Promise<Warehouse[]> {
     return apiRequest<Warehouse[]>('/admin/warehouses');
   },
@@ -409,6 +472,36 @@ export const adminApi = {
 
   async deleteWarehouse(id: string): Promise<void> {
     return apiRequest<void>(`/admin/warehouses/${id}`, { method: 'DELETE' });
+  },
+
+  async getServiceCities(): Promise<ServiceCityOptions> {
+    const data = await apiRequest<ServiceCityOptions>('/admin/service-cities');
+    return {
+      selected: data.selected.map((c) => c.trim()),
+      provinces: data.provinces.map((p) => ({
+        ...p,
+        code: p.code.trim(),
+        cities: trimCodes(p.cities),
+      })),
+    };
+  },
+
+  async saveServiceCities(cities: string[]): Promise<void> {
+    return apiRequest<void>('/admin/service-cities', {
+      method: 'PUT',
+      body: JSON.stringify({ cities }),
+    });
+  },
+
+  async getServiceFee(): Promise<ServiceFeeSettings> {
+    return apiRequest<ServiceFeeSettings>('/admin/service-fee');
+  },
+
+  async saveServiceFee(payload: ServiceFeeSettings): Promise<ServiceFeeSettings> {
+    return apiRequest<ServiceFeeSettings>('/admin/service-fee', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
   },
 
   async getOrders(): Promise<PaginatedData<any>> {

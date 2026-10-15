@@ -145,100 +145,352 @@ class AccountScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Akun')),
+      backgroundColor: const Color(0xFFF8FAFC),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(bottom: 100),
         children: [
-          Center(
-            child: GestureDetector(
-              onTap: () => _showAvatarOptions(context, ref, user),
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 36,
+          _ProfileHeader(
+            user: user,
+            onAvatarTap: () => _showAvatarOptions(context, ref, user),
+            onEditTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SectionLabel('Aktivitas'),
+                _MenuGroup(
+                  children: [
+                    _MenuTile(
+                      icon: Icons.receipt_long_rounded,
+                      color: const Color(0xFF0284C7),
+                      title: 'Pesanan Saya',
+                      subtitle: 'Lacak dan lihat riwayat pesanan',
+                      onTap: () => context.push('/orders'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                const _SectionLabel('Info Akun'),
+                _MenuGroup(
+                  children: [
+                    _MenuTile(
+                      icon: Icons.phone_rounded,
+                      color: AppColors.primary,
+                      title: 'Nomor Telepon',
+                      subtitle: user.phone ?? '-',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                const _SectionLabel('Bantuan'),
+                _MenuGroup(
+                  children: [
+                    _MenuTile(
+                      icon: Icons.headset_mic_rounded,
+                      color: const Color(0xFFF59E0B),
+                      title: 'Chat CS',
+                      subtitle: 'Butuh bantuan? Hubungi customer service',
+                      onTap: () => context.push('/chat'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFFECACA)),
+                      backgroundColor: const Color(0xFFFEF2F2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () async {
+                      final name = user.name;
+                      await ref.read(authProvider.notifier).logout();
+                      ref.read(pendingWelcomeProvider.notifier).state =
+                          WelcomeMessage(
+                        name: name,
+                        type: WelcomeType.logout,
+                      );
+                      if (context.mounted) context.go('/');
+                    },
+                    icon: const Icon(Icons.logout_rounded, size: 20),
+                    label: const Text(
+                      'Keluar',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.user,
+    required this.onAvatarTap,
+    required this.onEditTap,
+  });
+
+  final User user;
+  final VoidCallback onAvatarTap;
+  final VoidCallback onEditTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, topPadding + 20, 20, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0D9488), Color(0xFF115E59)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: onAvatarTap,
+            child: Stack(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: CircleAvatar(
+                    radius: 34,
                     backgroundColor: const Color(0xFFF3F4F6),
                     backgroundImage: user.avatarUrl != null
                         ? CachedNetworkImageProvider(user.avatarUrl!)
                         : null,
                     child: user.avatarUrl == null
-                        ? const Icon(Icons.person_outline, size: 36)
+                        ? const Icon(
+                            Icons.person_rounded,
+                            size: 36,
+                            color: Color(0xFF94A3B8),
+                          )
                         : null,
                   ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                        border: Border.fromBorderSide(
-                          BorderSide(color: Colors.white, width: 2),
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF59E0B),
+                      shape: BoxShape.circle,
+                      border: Border.fromBorderSide(
+                        BorderSide(color: Colors.white, width: 2),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  user.email ?? user.phone ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: onEditTap,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.edit_rounded, size: 14, color: Colors.white),
+                        SizedBox(width: 6),
+                        Text(
+                          'Edit Profil',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        size: 12,
-                        color: Colors.white,
-                      ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.3,
+          color: Color(0xFF64748B),
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuGroup extends StatelessWidget {
+  const _MenuGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
+    );
+  }
+}
+
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 21, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            user.name,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          Text(
-            user.email ?? user.phone ?? '',
-            style: const TextStyle(color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Center(
-            child: OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+            if (onTap != null)
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFFCBD5E1),
               ),
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('Edit Profil'),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.phone_outlined),
-              title: const Text('Nomor Telepon'),
-              subtitle: Text(user.phone ?? '-'),
-            ),
-          ),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.receipt_long_outlined),
-              title: const Text('Pesanan Saya'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/orders'),
-            ),
-          ),
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final name = user.name;
-              await ref.read(authProvider.notifier).logout();
-              ref.read(pendingWelcomeProvider.notifier).state = WelcomeMessage(
-                name: name,
-                type: WelcomeType.logout,
-              );
-              if (context.mounted) context.go('/');
-            },
-            icon: const Icon(Icons.logout),
-            label: const Text('Keluar'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

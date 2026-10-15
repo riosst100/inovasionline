@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\ServiceFeeSetting;
 use App\Models\ShippingMethod;
 use App\Models\User;
 use App\Support\Enums\OrderStatus;
@@ -95,9 +96,10 @@ class CheckoutService
         }
 
         $taxTotal = 0.0;
-        $grandTotal = $subtotal - $discountTotal + $shippingFee + $taxTotal;
+        $serviceFee = ServiceFeeSetting::current()->calculate((float) $subtotal);
+        $grandTotal = $subtotal - $discountTotal + $shippingFee + $serviceFee + $taxTotal;
 
-        $order = DB::transaction(function () use ($user, $validated, $items, $paymentMethod, $shippingMethod, $subtotal, $discountTotal, $shippingFee, $taxTotal, $grandTotal) {
+        $order = DB::transaction(function () use ($user, $validated, $items, $paymentMethod, $shippingMethod, $subtotal, $discountTotal, $shippingFee, $serviceFee, $taxTotal, $grandTotal) {
             $order = Order::create([
                 'order_number' => $this->generateOrderNumber(),
                 'store_id' => $validated['store_id'],
@@ -108,6 +110,7 @@ class CheckoutService
                 'subtotal' => $subtotal,
                 'discount_total' => $discountTotal,
                 'shipping_fee' => $shippingFee,
+                'service_fee' => $serviceFee,
                 'tax_total' => $taxTotal,
                 'grand_total' => $grandTotal,
                 'status' => OrderStatus::PENDING,

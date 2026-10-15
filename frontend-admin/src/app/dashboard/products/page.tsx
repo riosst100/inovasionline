@@ -4,7 +4,7 @@ import Link from 'next/link';
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi } from '../../../lib/api';
-import { Loader2, Package, Pencil, Trash2, EyeOff } from 'lucide-react';
+import { Loader2, Package, Pencil, Plus, Trash2, EyeOff } from 'lucide-react';
 
 const STATUSES: Record<string, { label: string; badge: string }> = {
   active: { label: 'Aktif', badge: 'bg-emerald-100 text-emerald-700' },
@@ -112,6 +112,12 @@ export default function AdminProductsPage() {
             </p>
           </div>
           <div className="flex w-full gap-2 sm:w-auto">
+            <Link
+              href="/dashboard/products/new"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              <Plus className="h-4 w-4" /> Tambah Produk
+            </Link>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}

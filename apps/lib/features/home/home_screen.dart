@@ -10,6 +10,7 @@ import '../../config/theme.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/delivery_address_provider.dart';
 import '../../widgets/banner_carousel.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/skeleton.dart';
@@ -29,6 +30,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _locationKey = GlobalKey();
   final _searchKey = GlobalKey();
   int _selectedTab = 0;
+  bool _defaultAddressAttempted = false;
   double _offset = 0;
   double _locationHeight = 50;
   double _searchHeight = 42;
@@ -40,6 +42,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final offset = _scrollController.hasClients ? _scrollController.offset : 0.0;
       if ((offset - _offset).abs() > 0.5) setState(() => _offset = offset.clamp(0.0, 400.0));
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeSetDefaultAddress());
+  }
+
+  /// First open with no saved address: default it to the user's current
+  /// location. Tried once per home screen; failures are silent because the
+  /// user can still pick an address by hand.
+  Future<void> _maybeSetDefaultAddress() async {
+    if (_defaultAddressAttempted || !mounted) return;
+    final auth = ref.read(authProvider);
+    final user = auth.user;
+    if (auth.status != AuthStatus.authenticated || user == null || user.hasAddress) return;
+
+    _defaultAddressAttempted = true;
+    final applied = await ref.read(authProvider.notifier).setDefaultAddressFromLocation();
+    if (!applied || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Alamat pengiriman diatur sesuai lokasi Anda.'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 
   double _measure(GlobalKey key, double current) {
@@ -66,6 +90,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Auth restores asynchronously (and users may log in from here), so the
+    // initState check alone can run before the user is known.
+    ref.listen<AuthState>(authProvider, (previous, next) => _maybeSetDefaultAddress());
     ref.listen<WelcomeMessage?>(pendingWelcomeProvider, (previous, next) {
       if (next == null) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,6 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onRefresh: () async {
                 Future<void> silent(Future<void> future) => future.catchError((_) {});
                 await Future.wait([
+                  silent(ref.read(authProvider.notifier).checkBlockStatus()),
                   silent(ref.refresh(bannersProvider.future)),
                   silent(ref.refresh(rootCategoriesProvider.future)),
                   silent(ref.refresh(flashSaleProvider.future)),
@@ -127,7 +155,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       children: [
                         SizedBox(height: topPadding + 6),
                         KeyedSubtree(key: _locationKey, child: _TopLocationHeader()),
-                        SizedBox(height: 6 + _searchHeight + 14),
+                        SizedBox(height: 6 + _searchHeight + 6),
 
                         // 3. Hero Promo Banner Carousel
                         banners.when(
@@ -145,12 +173,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
 
                   // Quick Highlight Bubbles (Astro-style 4 highlights)
                   const _QuickHighlightsRow(),
 
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 8),
 
                   // 5. Promo Gercep (Flash Sale with Live Countdown Timer)
                   flashSale.when(
@@ -172,7 +200,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     error: (_, _) => const SizedBox.shrink(),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 10),
 
                   // 6. Semua Kategori Grid (4 Columns Clean Pastel Cards)
                   categories.when(
@@ -239,14 +267,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 // ==========================================
 // 1. TOP LOCATION & CS HEADER
 // ==========================================
+/// "Village, District, City" -> "Village, District" (the header leaves out
+/// the city); null when there is no label.
+String? _villageAndDistrict(String? label) {
+  if (label == null) return null;
+  return label.split(', ').take(2).join(', ');
+}
+
 class _TopLocationHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+    final guestAddress = ref.watch(guestAddressProvider);
+    final failureLabel = locationFailureLabel(ref.watch(locationFailureProvider));
+    final hasAddress = user != null ? user.hasAddress : guestAddress != null;
     final addressLine = user != null
-        ? (user.hasAddress ? 'Alamat Utama (${user.name})' : 'Atur Alamat Pengiriman')
-        : 'Pilih Alamat Pengiriman';
+        ? (user.hasAddress
+            ? (_villageAndDistrict(user.addressLabel) ?? 'Alamat Utama (${user.name})')
+            : (failureLabel ?? 'Atur Alamat Pengiriman'))
+        : (_villageAndDistrict(guestAddress?.label) ??
+            (failureLabel ?? 'Pilih Alamat Pengiriman'));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
@@ -266,39 +307,54 @@ class _TopLocationHeader extends ConsumerWidget {
               borderRadius: BorderRadius.circular(8),
               child: Row(
                 children: [
+                  if (hasAddress) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                    padding: const EdgeInsets.fromLTRB(6, 4, 9, 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFDE047), Color(0xFFF59E0B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.bolt, size: 14, color: Colors.amberAccent),
+                        _ExpressCarIcon(),
                         SizedBox(width: 3),
                         Text(
                           '15 Menit',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF78350F),
+                            letterSpacing: 0.1,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
+                  ],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Cepat sampai',
+                          'Dikirim ke',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.88),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.82),
+                            height: 1.2,
                           ),
                         ),
                         Row(
@@ -309,7 +365,7 @@ class _TopLocationHeader extends ConsumerWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
@@ -325,42 +381,81 @@ class _TopLocationHeader extends ConsumerWidget {
               ),
             ),
           ),
-
-          // Chat CS Button Pill
-          InkWell(
-            onTap: () => context.push('/chat'),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.headset_mic_outlined, size: 15, color: AppColors.primary),
-                  SizedBox(width: 5),
-                  Text(
-                    'Chat CS',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Stopwatch icon with looping speed lines streaming out behind it ("express" feel).
+class _ExpressCarIcon extends StatefulWidget {
+  const _ExpressCarIcon();
+
+  @override
+  State<_ExpressCarIcon> createState() => _ExpressCarIconState();
+}
+
+class _ExpressCarIconState extends State<_ExpressCarIcon>
+    with SingleTickerProviderStateMixin {
+  static const _ink = Color(0xFF78350F);
+  // (vertical offset, line width, phase offset 0..1)
+  static const _lines = [
+    (-5.0, 6.0, 0.0),
+    (0.0, 9.0, 0.35),
+    (5.0, 5.0, 0.7),
+  ];
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 30,
+      height: 18,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final t = _controller.value;
+          return Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              for (final (dy, width, phase) in _lines)
+                Builder(builder: (context) {
+                  final p = (t + phase) % 1.0;
+                  return Positioned(
+                    left: 12 - p * 12,
+                    top: 9 + dy - 0.75,
+                    child: Opacity(
+                      opacity: (1 - p).clamp(0.0, 1.0),
+                      child: Container(
+                        width: width,
+                        height: 1.5,
+                        decoration: BoxDecoration(
+                          color: _ink,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              Positioned(
+                right: 0,
+                top: 0.5,
+                child: const Icon(Icons.timer_outlined, size: 17, color: _ink),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -452,7 +547,7 @@ class _TopSearchBar extends StatelessWidget {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  const Icon(Icons.shopping_bag_outlined, size: 20, color: AppColors.primary),
+                  const Icon(Icons.shopping_bag_rounded, size: 22, color: Color(0xFF115E59)),
                   if (cartItemCount > 0)
                     Positioned(
                       top: 4,
@@ -657,58 +752,97 @@ class _QuickHighlightsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: _highlights.map((item) {
-          final color = item['color'] as Color;
-          final textColor = item['textColor'] as Color;
-          final icon = item['icon'] as IconData;
-          final title = item['title'] as String;
-          final subtitle = item['subtitle'] as String;
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: _highlights.map((item) {
+            final color = item['color'] as Color;
+            final textColor = item['textColor'] as Color;
+            final icon = item['icon'] as IconData;
+            final title = item['title'] as String;
+            final subtitle = item['subtitle'] as String;
 
-          return Expanded(
-            child: Column(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.6),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
+            return Expanded(
+              child: InkWell(
+                onTap: () {},
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white,
+                              color,
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: textColor.withValues(alpha: 0.15),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: textColor.withValues(alpha: 0.14),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Icon(icon, color: textColor, size: 24),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E293B),
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                          height: 1.2,
+                        ),
                       ),
                     ],
                   ),
-                  child: Icon(icon, color: textColor, size: 26),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  title,
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E293B),
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -891,15 +1025,17 @@ class _CategoriesSection extends StatelessWidget {
     final displayCategories = categories.take(12).toList();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Semua Kategori',
+                'Kategori Pilihan',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -920,18 +1056,20 @@ class _CategoriesSection extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 14),
+          ),
+          const SizedBox(height: 15),
 
           // 4 Columns Grid
           GridView.builder(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: displayCategories.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.72,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 4,
+              childAspectRatio: 0.8,
             ),
             itemBuilder: (context, index) {
               final cat = displayCategories[index];
@@ -941,10 +1079,12 @@ class _CategoriesSection extends StatelessWidget {
                 onTap: () => context.push('/categories/${cat.slug}', extra: cat.name),
                 borderRadius: BorderRadius.circular(14),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      width: 62,
-                      height: 62,
+                      width: 66,
+                      height: 66,
                       decoration: BoxDecoration(
                         color: bg,
                         borderRadius: BorderRadius.circular(16),
@@ -958,17 +1098,22 @@ class _CategoriesSection extends StatelessWidget {
                         ],
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: cat.imageUrl != null && cat.imageUrl!.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: cat.imageUrl!,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, _, _) => Center(
-                                child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 26)),
-                              ),
-                            )
-                          : Center(
-                              child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 26)),
-                            ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          cat.imageUrl != null && cat.imageUrl!.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: cat.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, _, _) => Center(
+                                    child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 26)),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 26)),
+                                ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -977,7 +1122,7 @@ class _CategoriesSection extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1E293B),
                         height: 1.2,
@@ -1054,16 +1199,21 @@ class _CategoriesSection extends StatelessWidget {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: cat.imageUrl != null
-                                ? CachedNetworkImage(imageUrl: cat.imageUrl!, fit: BoxFit.cover)
-                                : Center(child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 24))),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                cat.imageUrl != null
+                                    ? CachedNetworkImage(imageUrl: cat.imageUrl!, fit: BoxFit.cover)
+                                    : Center(child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 24))),
+                                    ],
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             cat.name,
                             maxLines: 2,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -1211,6 +1361,7 @@ class _InspirasiUntukmuSection extends StatelessWidget {
                 final product = activeProducts[index];
                 return ProductCard(
                   product: product,
+                  compact: true,
                   badgeText: selectedTab == 1 ? 'Terlaris' : 'Premium',
                   onTap: () => context.push('/products/${product.slug}'),
                 );

@@ -62,6 +62,8 @@ export interface DriverOrder {
   completed_at: string | null;
 }
 
+export type BannableFeature = 'chat' | 'posts' | 'purchase';
+
 export interface Customer {
   id: string;
   name: string;
@@ -71,6 +73,11 @@ export interface Customer {
   avatar_url: string | null;
   is_seller: boolean;
   is_verified: boolean;
+  is_blocked: boolean;
+  blocked_at: string | null;
+  block_reason: string | null;
+  banned_features: BannableFeature[];
+  ban_reason: string | null;
   created_at: string;
 }
 
@@ -161,6 +168,7 @@ export interface Warehouse {
   contact_phone: string | null;
   notes: string | null;
   is_active: boolean;
+  coverage?: WarehouseCoverage[];
 }
 
 export interface ProductStockRow {
@@ -171,4 +179,32 @@ export interface ProductStockRow {
   image_url: string | null;
   total: number;
   stocks: { warehouse_id: string; warehouse_code: string; warehouse_name: string; quantity: number }[];
+}
+
+export interface RegionItem {
+  code: string;
+  name: string;
+}
+
+export interface WarehouseCoverage {
+  district_code: string;
+  district_name: string;
+  /** null = seluruh desa di kecamatan tersebut */
+  village_code: string | null;
+  village_name: string | null;
+}
+
+export interface ServiceFeeSettings {
+  is_active: boolean;
+  label: string;
+  type: 'fixed' | 'percent';
+  value: number;
+  min_fee: number | null;
+  max_fee: number | null;
+}
+
+export interface ServiceCityOptions {
+  /** Kode kota yang dijangkau aplikasi */
+  selected: string[];
+  provinces: { code: string; name: string; cities: RegionItem[] }[];
 }

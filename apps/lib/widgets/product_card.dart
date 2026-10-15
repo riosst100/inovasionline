@@ -13,27 +13,37 @@ import '../providers/auth_provider.dart';
 class ProductGridDelegate extends SliverGridDelegate {
   const ProductGridDelegate({
     required this.textScale,
-    this.crossAxisCount = 2,
-    this.spacing = 12,
+    this.crossAxisCount = 3,
+    this.spacing = 8,
+    this.compact = true,
   });
 
   final double textScale;
   final int crossAxisCount;
   final double spacing;
 
+  /// Tighter card used for narrow (3 per row) grids; must match
+  /// [ProductCard.compact].
+  final bool compact;
+
   // Non-text padding/margins in the details area + scalable text area.
   static const double _fixedDetails = 34;
   static const double _textDetails = 100;
+  static const double _compactFixedDetails = 28;
+  static const double _compactTextDetails = 92;
 
   /// Card height for a given card width (used by horizontal lists).
-  static double tileHeight(double width, double textScale) =>
-      width + _fixedDetails + _textDetails * textScale;
+  static double tileHeight(double width, double textScale, {bool compact = false}) =>
+      compact
+          ? width + _compactFixedDetails + _compactTextDetails * textScale
+          : width + _fixedDetails + _textDetails * textScale;
 
   @override
   SliverGridLayout getLayout(SliverConstraints constraints) {
     final tileWidth =
         (constraints.crossAxisExtent - spacing * (crossAxisCount - 1)) / crossAxisCount;
-    final tileHeight = ProductGridDelegate.tileHeight(tileWidth, textScale);
+    final tileHeight =
+        ProductGridDelegate.tileHeight(tileWidth, textScale, compact: compact);
     return SliverGridRegularTileLayout(
       crossAxisCount: crossAxisCount,
       mainAxisStride: tileHeight + spacing,
@@ -48,6 +58,7 @@ class ProductGridDelegate extends SliverGridDelegate {
   bool shouldRelayout(ProductGridDelegate old) =>
       old.textScale != textScale ||
       old.crossAxisCount != crossAxisCount ||
+      old.compact != compact ||
       old.spacing != spacing;
 }
 
@@ -58,6 +69,7 @@ class ProductCard extends ConsumerWidget {
     required this.onTap,
     this.badgeText,
     this.etaText = '15 Menit',
+    this.compact = false,
   });
 
   final Product product;
@@ -65,8 +77,13 @@ class ProductCard extends ConsumerWidget {
   final String? badgeText;
   final String etaText;
 
+  /// Smaller type and padding for 3-per-row grids.
+  final bool compact;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final edge = compact ? 6.0 : 8.0;
+    final addSize = compact ? 26.0 : 32.0;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -95,7 +112,7 @@ class ProductCard extends ConsumerWidget {
                 children: [
                   Container(
                     color: const Color(0xFFF8FAFC),
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(edge),
                     child: product.imageUrl != null
                         ? CachedNetworkImage(
                             imageUrl: product.imageUrl!,
@@ -110,10 +127,10 @@ class ProductCard extends ConsumerWidget {
                   ),
                   // Quality / Halal Badge on Top Left
                   Positioned(
-                    top: 8,
-                    left: 8,
+                    top: edge,
+                    left: edge,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 2.5 : 3.5),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFF14B8A6), Color(0xFF0D9488)],
@@ -131,8 +148,8 @@ class ProductCard extends ConsumerWidget {
                       ),
                       child: Text(
                         badgeText ?? 'Fresh',
-                        style: const TextStyle(
-                          fontSize: 9.5,
+                        style: TextStyle(
+                          fontSize: compact ? 8.5 : 9.5,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.3,
                           color: Colors.white,
@@ -142,8 +159,8 @@ class ProductCard extends ConsumerWidget {
                   ),
                   // Quick Add (+) Button on Top Right
                   Positioned(
-                    top: 8,
-                    right: 8,
+                    top: edge,
+                    right: edge,
                     child: Material(
                       color: Colors.white,
                       shape: const CircleBorder(),
@@ -186,16 +203,16 @@ class ProductCard extends ConsumerWidget {
                           }
                         },
                         child: Container(
-                          width: 32,
-                          height: 32,
+                          width: addSize,
+                          height: addSize,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3), width: 1.2),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.add,
-                            size: 18,
+                            size: compact ? 16 : 18,
                             color: Color(0xFF0D9488),
                           ),
                         ),
@@ -209,7 +226,9 @@ class ProductCard extends ConsumerWidget {
             // Product Details
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                padding: compact
+                    ? const EdgeInsets.fromLTRB(8, 6, 8, 8)
+                    : const EdgeInsets.fromLTRB(10, 8, 10, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -219,7 +238,10 @@ class ProductCard extends ConsumerWidget {
                       children: [
                         // Discount row if available
                         if (product.hasDiscount) ...[
-                          Row(
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 5,
+                            runSpacing: 1,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
@@ -229,18 +251,17 @@ class ProductCard extends ConsumerWidget {
                                 ),
                                 child: Text(
                                   '${product.discountPercent}%',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 10,
+                                    fontSize: compact ? 9 : 10,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 5),
                               Text(
                                 formatCurrency(product.regularPrice),
-                                style: const TextStyle(
-                                  fontSize: 11,
+                                style: TextStyle(
+                                  fontSize: compact ? 10 : 11,
                                   color: Color(0xFF94A3B8),
                                   decoration: TextDecoration.lineThrough,
                                 ),
@@ -251,13 +272,18 @@ class ProductCard extends ConsumerWidget {
                         ],
 
                         // Main Price
-                        Text(
-                          formatCurrency(product.displayPrice),
-                          style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                            letterSpacing: -0.2,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            formatCurrency(product.displayPrice),
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: compact ? 13 : 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF0F172A),
+                              letterSpacing: -0.2,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -267,8 +293,8 @@ class ProductCard extends ConsumerWidget {
                           product.name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12.5,
+                          style: TextStyle(
+                            fontSize: compact ? 11.5 : 12.5,
                             fontWeight: FontWeight.w500,
                             height: 1.25,
                             color: Color(0xFF334155),
@@ -280,7 +306,7 @@ class ProductCard extends ConsumerWidget {
                     // Delivery ETA Badge
                     Container(
                       margin: const EdgeInsets.only(top: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                      padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 6, vertical: 2.5),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(6),
@@ -288,12 +314,12 @@ class ProductCard extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.timer_outlined, size: 12, color: Color(0xFF0D9488)),
-                          const SizedBox(width: 4),
+                          Icon(Icons.timer_outlined, size: compact ? 11 : 12, color: const Color(0xFF0D9488)),
+                          const SizedBox(width: 3),
                           Text(
                             etaText,
-                            style: const TextStyle(
-                              fontSize: 10.5,
+                            style: TextStyle(
+                              fontSize: compact ? 9.5 : 10.5,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF0D9488),
                             ),

@@ -30,7 +30,8 @@ class PushNotificationHandler {
   Future<void> initialize() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    await FirebaseMessaging.instance.requestPermission();
+    // Permission is requested by PermissionGate once the splash is gone, not
+    // here, so the system dialog doesn't fire over the native splash.
     await FirebaseMessaging.instance.subscribeToTopic(_broadcastTopic);
 
     await _localNotifications.initialize(

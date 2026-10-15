@@ -4,8 +4,35 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi, ApiError } from '../../../lib/api';
+import { titleCase } from '../../../lib/text';
 import { Warehouse } from '../../../types';
 import { AlertCircle, CheckCircle2, ExternalLink, Loader2, MapPin, Pencil, Phone, Plus, Trash2 } from 'lucide-react';
+
+function CoverageCell({ w }: { w: Warehouse }) {
+  const rows = w.coverage ?? [];
+  if (rows.length === 0) return <span className="text-slate-400">-</span>;
+
+  const groups = new Map<string, { name: string; whole: boolean; villages: string[] }>();
+  rows.forEach((r) => {
+    const g = groups.get(r.district_code) ?? { name: r.district_name, whole: false, villages: [] };
+    if (r.village_name) g.villages.push(r.village_name);
+    else g.whole = true;
+    groups.set(r.district_code, g);
+  });
+
+  return (
+    <div className="max-h-36 min-w-[220px] space-y-1.5 overflow-y-auto pr-1">
+      {[...groups.entries()].map(([code, g]) => (
+        <div key={code}>
+          <div className="font-medium text-slate-700">Kecamatan {titleCase(g.name)}</div>
+          <div className="text-slate-500">
+            {g.whole ? 'Semua desa' : g.villages.map(titleCase).join(', ')}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function WarehousesPage() {
   const [items, setItems] = useState<Warehouse[]>([]);
@@ -106,6 +133,7 @@ export default function WarehousesPage() {
                   <th className="px-4 py-3">Nama</th>
                   <th className="px-4 py-3">Kode</th>
                   <th className="px-4 py-3">Lokasi</th>
+                  <th className="px-4 py-3">Cakupan</th>
                   <th className="px-4 py-3">Kontak</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3" />
@@ -138,6 +166,7 @@ export default function WarehousesPage() {
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-xs text-slate-600"><CoverageCell w={w} /></td>
                     <td className="px-4 py-3 text-slate-600">
                       {w.contact_name || w.contact_phone ? (
                         <div>

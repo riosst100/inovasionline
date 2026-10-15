@@ -25,6 +25,9 @@ import {
   MonitorSmartphone,
   Search,
   TextSearch,
+  Settings,
+  MapPinned,
+  Receipt,
   X,
 } from 'lucide-react';
 
@@ -103,6 +106,20 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
           href: '/dashboard/roles',
           icon: ShieldCheck,
           badge: isSuperAdmin ? 'Super' : undefined,
+        },
+      ],
+    },
+    {
+      title: 'Pengaturan',
+      items: [
+        {
+          name: 'Pengaturan',
+          href: '/dashboard/settings',
+          icon: Settings,
+          children: [
+            { name: 'Cakupan Kota', href: '/dashboard/settings/service-cities', icon: MapPinned },
+            { name: 'Biaya Layanan', href: '/dashboard/settings/service-fee', icon: Receipt },
+          ],
         },
       ],
     },

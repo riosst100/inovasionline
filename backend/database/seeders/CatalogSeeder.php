@@ -29,113 +29,15 @@ class CatalogSeeder extends Seeder
             $store = Store::first();
         }
 
-        // 2. Seed Categories with clean photos
-        $categoriesData = [
-            [
-                'name' => 'Buah Segar',
-                'slug' => 'buah-segar',
-                'icon' => '🥭',
-                'image_path' => 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 1,
-            ],
-            [
-                'name' => 'Sayur Segar',
-                'slug' => 'sayur-segar',
-                'icon' => '🥦',
-                'image_path' => 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 2,
-            ],
-            [
-                'name' => 'Daging & Unggas',
-                'slug' => 'daging-unggas',
-                'icon' => '🥩',
-                'image_path' => 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 3,
-            ],
-            [
-                'name' => 'Seafood Segar',
-                'slug' => 'seafood-segar',
-                'icon' => '🦐',
-                'image_path' => 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 4,
-            ],
-            [
-                'name' => 'Telur, Tahu & Tempe',
-                'slug' => 'telur-tahu-tempe',
-                'icon' => '🥚',
-                'image_path' => 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 5,
-            ],
-            [
-                'name' => 'Susu & Olahan Susu',
-                'slug' => 'susu-olahan-susu',
-                'icon' => '🥛',
-                'image_path' => 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 6,
-            ],
-            [
-                'name' => 'Bakery & Roti',
-                'slug' => 'bakery-roti',
-                'icon' => '🥐',
-                'image_path' => 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 7,
-            ],
-            [
-                'name' => 'Kebutuhan Dapur',
-                'slug' => 'kebutuhan-dapur',
-                'icon' => '🧂',
-                'image_path' => 'https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 8,
-            ],
-            [
-                'name' => 'Snack & Biskuit',
-                'slug' => 'snack-biskuit',
-                'icon' => '🍪',
-                'image_path' => 'https://images.unsplash.com/photo-1621996346565-e3d5d6281745?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 9,
-            ],
-            [
-                'name' => 'Minuman',
-                'slug' => 'minuman',
-                'icon' => '🧃',
-                'image_path' => 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 10,
-            ],
-            [
-                'name' => 'Makanan Beku',
-                'slug' => 'makanan-beku',
-                'icon' => '🧊',
-                'image_path' => 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 11,
-            ],
-            [
-                'name' => 'Perawatan Rumah',
-                'slug' => 'perawatan-rumah',
-                'icon' => '🧼',
-                'image_path' => 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=400&auto=format&fit=crop&q=80',
-                'sort_order' => 12,
-            ],
-        ];
-
-        $categories = [];
-        foreach ($categoriesData as $cat) {
-            $categories[$cat['slug']] = Category::updateOrCreate(
-                ['slug' => $cat['slug']],
-                [
-                    'name' => $cat['name'],
-                    'icon' => $cat['icon'],
-                    'image_path' => $cat['image_path'],
-                    'sort_order' => $cat['sort_order'],
-                    'is_active' => true,
-                ]
-            );
-        }
+        // 2. Seed Categories (data & images from CategorySeeder)
+        $this->call(CategorySeeder::class);
+        $categories = Category::query()->get()->keyBy('slug')->all();
 
         // 3. Seed Products
         $productsData = [
             // Daging & Unggas
             [
-                'category' => 'daging-unggas',
+                'category' => 'daging-segar',
                 'name' => 'Daging Picanha Wagyu Steak MB5+ 150g',
                 'slug' => 'daging-picanha-wagyu-steak-mb5-150g',
                 'short_description' => 'Daging sapi Wagyu cut Picanha kualitas MB5+ empuk dan juicy.',
@@ -145,7 +47,7 @@ class CatalogSeeder extends Seeder
                 'image' => 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop&q=80',
             ],
             [
-                'category' => 'daging-unggas',
+                'category' => 'daging-segar',
                 'name' => 'Karubi Wagyu Beef Slice AUS Meatboy 250g',
                 'slug' => 'karubi-wagyu-beef-slice-aus-meatboy-250g',
                 'short_description' => 'Slice wagyu short plate Karubi impor Australia cocok untuk shabu & yakiniku.',
@@ -155,7 +57,7 @@ class CatalogSeeder extends Seeder
                 'image' => 'https://images.unsplash.com/photo-1558030006-450675393462?w=600&auto=format&fit=crop&q=80',
             ],
             [
-                'category' => 'daging-unggas',
+                'category' => 'daging-segar',
                 'name' => 'Sirloin Angus MB3+ Steak AUS Meatboy 200g',
                 'slug' => 'sirloin-angus-mb3-steak-aus-meatboy-200g',
                 'short_description' => 'Steak Sirloin Black Angus Australia dengan marbling MB3+.',
@@ -165,7 +67,7 @@ class CatalogSeeder extends Seeder
                 'image' => 'https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=600&auto=format&fit=crop&q=80',
             ],
             [
-                'category' => 'daging-unggas',
+                'category' => 'daging-segar',
                 'name' => 'Dada Ayam Fillet Segar Tanpa Tulang 500g',
                 'slug' => 'dada-ayam-fillet-segar-500g',
                 'short_description' => 'Dada ayam segar higienis tanpa lemak dan kulit, tinggi protein.',

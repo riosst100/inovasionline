@@ -3,13 +3,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi } from '../../../lib/api';
-import { FolderTree, Loader2, Plus, X } from 'lucide-react';
+import { FolderTree, GripVertical, Loader2, Plus, X } from 'lucide-react';
 
 type CategoryForm = {
   id?: string;
   name: string;
   icon: string;
-  sort_order: string;
   is_active: boolean;
   image: File | null;
   preview: string | null;
@@ -18,7 +17,6 @@ type CategoryForm = {
 const emptyForm: CategoryForm = {
   name: '',
   icon: '',
-  sort_order: '',
   is_active: true,
   image: null,
   preview: null,
@@ -42,16 +40,64 @@ export default function AdminCategoriesPage() {
 
   useEffect(load, [load]);
 
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  const drop = async (targetId: string) => {
+    const from = categories.findIndex((c) => c.id === dragId);
+    const to = categories.findIndex((c) => c.id === targetId);
+    setDragId(null);
+    setOverId(null);
+    if (from < 0 || to < 0 || from === to) return;
+
+    const previous = categories;
+    const next = [...categories];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    setCategories(next);
+    try {
+      await adminApi.reorderCategories(next.map((c) => c.id));
+    } catch (err: any) {
+      setCategories(previous);
+      setError(err?.message || 'Gagal menyimpan urutan.');
+    }
+  };
+
   const openEdit = (c: any) =>
     setForm({
       id: c.id,
       name: c.name,
       icon: c.icon ?? '',
-      sort_order: c.sort_order != null ? String(c.sort_order) : '',
       is_active: !!c.is_active,
       image: null,
       preview: c.image_url ?? null,
     });
+
+  const toggle = async (c: any) => {
+    const previous = categories;
+    setCategories(categories.map((x) => (x.id === c.id ? { ...x, is_active: !x.is_active } : x)));
+    try {
+      await adminApi.toggleCategory(c.id);
+    } catch (err: any) {
+      setCategories(previous);
+      setError(err?.message || 'Gagal mengubah status kategori.');
+    }
+  };
+
+  const remove = async () => {
+    if (!form?.id) return;
+    if (!window.confirm(`Hapus kategori "${form.name}"?`)) return;
+    setSaving(true);
+    setError('');
+    try {
+      await adminApi.deleteCategory(form.id);
+      setForm(null);
+      load();
+    } catch (err: any) {
+      setError(err?.message || 'Gagal menghapus kategori.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,14 +108,14 @@ export default function AdminCategoriesPage() {
       const body = new FormData();
       body.append('name', form.name);
       body.append('icon', form.icon);
-      if (form.sort_order !== '') body.append('sort_order', form.sort_order);
       body.append('is_active', form.is_active ? '1' : '0');
       if (form.image) body.append('image', form.image);
       await adminApi.saveCategory(body, form.id);
       setForm(null);
       load();
     } catch (err: any) {
-      setError(err?.message || 'Gagal menyimpan kategori.');
+      const details = err?.errors ? Object.values(err.errors).flat().join(' ') : '';
+      setError(`${err?.message || 'Gagal menyimpan kategori.'} ${details}`.trim());
     } finally {
       setSaving(false);
     }
@@ -87,8 +133,9 @@ export default function AdminCategoriesPage() {
               </h2>
             </div>
             <p className="mt-1 text-xs md:text-sm text-slate-500">
-              Kategori dan gambar di sini tampil langsung di aplikasi.
+              Kategori dan gambar di sini tampil langsung di aplikasi. Seret kartu untuk mengatur urutan.
             </p>
+            {error && !form && <p className="mt-1 text-xs text-red-600">{error}</p>}
           </div>
           <button
             onClick={() => {
@@ -113,24 +160,67 @@ export default function AdminCategoriesPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {categories.map((c) => (
-                <button
+                <div
                   key={c.id}
-                  onClick={() => openEdit(c)}
-                  className={`flex flex-col items-center justify-center p-4 rounded-xl border border-slate-100 bg-slate-50 hover:border-emerald-300 transition-colors text-center ${
-                    c.is_active ? '' : 'opacity-50'
-                  }`}
+                  onDragOver={(e) => {
+                    if (!dragId) return;
+                    e.preventDefault();
+                    setOverId(c.id);
+                  }}
+                  onDrop={() => drop(c.id)}
+                  className={`relative rounded-xl border bg-slate-50 hover:border-emerald-300 transition-colors ${
+                    overId === c.id && dragId !== c.id ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-slate-100'
+                  } ${dragId === c.id ? 'opacity-40' : c.is_active ? '' : 'opacity-50'}`}
                 >
-                  <div className="h-14 w-14 rounded-xl bg-emerald-100 flex items-center justify-center overflow-hidden text-2xl mb-2">
-                    {c.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" />
-                    ) : (
-                      c.icon || c.name.slice(0, 2)
-                    )}
-                  </div>
-                  <span className="text-xs font-bold text-slate-800 line-clamp-1">{c.name}</span>
-                  {!c.is_active && <span className="text-[10px] text-slate-400">Nonaktif</span>}
-                </button>
+                  <span
+                    draggable
+                    title="Seret untuk mengubah urutan"
+                    onDragStart={(e) => {
+                      const card = e.currentTarget.parentElement;
+                      if (card) e.dataTransfer.setDragImage(card, 20, 20);
+                      e.dataTransfer.effectAllowed = 'move';
+                      setDragId(c.id);
+                    }}
+                    onDragEnd={() => {
+                      setDragId(null);
+                      setOverId(null);
+                    }}
+                    className="absolute right-1.5 top-1.5 z-10 cursor-grab rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 active:cursor-grabbing"
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!c.is_active}
+                    title={c.is_active ? 'Nonaktifkan kategori' : 'Aktifkan kategori'}
+                    onClick={() => toggle(c)}
+                    className={`absolute left-2 top-2 z-10 h-4 w-7 rounded-full transition-colors ${
+                      c.is_active ? 'bg-emerald-500' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all ${
+                        c.is_active ? 'left-3.5' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
+                  <button
+                    onClick={() => openEdit(c)}
+                    className="flex w-full flex-col items-center justify-center p-4 text-center"
+                  >
+                    <div className="h-14 w-14 rounded-xl bg-emerald-100 flex items-center justify-center overflow-hidden text-2xl mb-2">
+                      {c.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" draggable={false} />
+                      ) : (
+                        c.icon || c.name.slice(0, 2)
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 line-clamp-1">{c.name}</span>
+                    {!c.is_active && <span className="text-[10px] text-slate-400">Nonaktif</span>}
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -157,26 +247,14 @@ export default function AdminCategoriesPage() {
               />
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-xs font-bold text-slate-700">
-                Ikon (emoji)
-                <input
-                  value={form.icon}
-                  onChange={(e) => setForm({ ...form, icon: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="block text-xs font-bold text-slate-700">
-                Urutan
-                <input
-                  type="number"
-                  min={0}
-                  value={form.sort_order}
-                  onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                />
-              </label>
-            </div>
+            <label className="block text-xs font-bold text-slate-700">
+              Ikon (emoji)
+              <input
+                value={form.icon}
+                onChange={(e) => setForm({ ...form, icon: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+            </label>
 
             <label className="block text-xs font-bold text-slate-700">
               Gambar
@@ -212,6 +290,16 @@ export default function AdminCategoriesPage() {
             >
               {saving ? 'Menyimpan...' : 'Simpan'}
             </button>
+            {form.id && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={remove}
+                className="w-full rounded-xl border border-red-200 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-60"
+              >
+                Hapus Kategori
+              </button>
+            )}
           </form>
         </div>
       )}

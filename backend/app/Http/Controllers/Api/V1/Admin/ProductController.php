@@ -11,7 +11,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use App\Models\Store;
 
 class ProductController extends Controller
 {
@@ -42,6 +45,62 @@ class ProductController extends Controller
     public function show(Product $product): JsonResponse
     {
         return $this->freshResponse($product, 'Product retrieved successfully.');
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'store_id' => ['nullable', 'exists:stores,id'],
+            'category_id' => ['nullable', 'exists:categories,id'],
+            'short_description' => ['nullable', 'string', 'max:500'],
+            'description' => ['nullable', 'string'],
+            'regular_price' => ['required', 'numeric', 'min:0'],
+            'sale_price' => ['nullable', 'numeric', 'min:0', 'lte:regular_price'],
+            'stock' => ['nullable', 'integer', 'min:0'],
+            'stocks' => ['nullable', 'array'],
+            'stocks.*.warehouse_id' => ['required', 'distinct', 'exists:warehouses,id'],
+            'stocks.*.quantity' => ['required', 'integer', 'min:0'],
+            'sku' => ['nullable', 'string', 'max:100'],
+            'status' => ['required', Rule::enum(ProductStatus::class)],
+        ]);
+
+        $store = isset($data['store_id']) ? Store::find($data['store_id']) : Store::query()->oldest()->first();
+        abort_if(! $store, 422, 'Belum ada toko. Buat toko terlebih dahulu.');
+
+        if (! empty($data['sku']) && $store->products()->where('sku', $data['sku'])->exists()) {
+            throw ValidationException::withMessages(['sku' => 'SKU sudah digunakan.']);
+        }
+
+        $stocks = $data['stocks'] ?? null;
+        unset($data['stocks'], $data['store_id']);
+
+        $slug = Str::slug($data['name']) ?: 'produk';
+        $unique = $slug;
+        for ($i = 1; $store->products()->withTrashed()->where('slug', $unique)->exists(); $i++) {
+            $unique = "{$slug}-{$i}";
+        }
+
+        $product = DB::transaction(function () use ($store, $data, $stocks, $unique) {
+            if ($stocks !== null) {
+                $data['stock'] = collect($stocks)->sum('quantity');
+            }
+            $data['stock'] ??= 0;
+
+            $product = $store->products()->create([...$data, 'slug' => $unique]);
+
+            if ($stocks !== null) {
+                $product->warehouses()->sync(
+                    collect($stocks)->mapWithKeys(fn ($row) => [
+                        $row['warehouse_id'] => ['quantity' => $row['quantity']],
+                    ])->all()
+                );
+            }
+
+            return $product;
+        });
+
+        return $this->freshResponse($product, 'Product created successfully.');
     }
 
     public function update(Request $request, Product $product): JsonResponse

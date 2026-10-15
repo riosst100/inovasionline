@@ -7,7 +7,8 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'config/router.dart';
 import 'config/theme.dart';
-import 'features/shell/notification_permission_gate.dart';
+import 'features/shell/blocked_account_gate.dart';
+import 'features/shell/permission_gate.dart';
 import 'firebase_options.dart';
 import 'services/push_notification_handler.dart';
 
@@ -49,7 +50,9 @@ class InovasiOnlineApp extends StatelessWidget {
       theme: AppTheme.light(),
       routerConfig: router,
       builder: (context, child) =>
-          NotificationPermissionGate(child: child ?? const SizedBox.shrink()),
+          PermissionGate(
+            child: BlockedAccountGate(child: child ?? const SizedBox.shrink()),
+          ),
     );
   }
 }

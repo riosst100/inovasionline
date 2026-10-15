@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RegionResource;
+use App\Models\ServiceCity;
+use App\Services\RegionLocator;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,25 +17,57 @@ use Laravolt\Indonesia\Models\Village;
 class RegionController extends Controller
 {
     /**
-     * Only DKI Jakarta and Jawa Tengah are supported for now.
+     * Built-in defaults, used until an admin configures Pengaturan > Cakupan Kota:
+     * all of DKI Jakarta (31) plus Kabupaten Brebes (3329).
      *
-     * @var list<string>
+     * @return list<string>
      */
-    private const ACTIVE_PROVINCE_CODES = ['31', '33'];
+    public static function defaultCityCodes(): array
+    {
+        return City::query()
+            ->where('province_code', '31')
+            ->orWhere('code', '3329')
+            ->pluck('code')
+            ->map(fn ($c) => trim($c))
+            ->all();
+    }
+
+    /** @return list<string> */
+    private function activeCityCodes(): array
+    {
+        return ServiceCity::activeCodes() ?? self::defaultCityCodes();
+    }
 
     /**
-     * Within Jawa Tengah (33), only Kabupaten Brebes is supported for now.
-     *
-     * @var list<string>
+     * Nearest served village to the given coordinates, so the app can default
+     * a delivery address (also for guests, who have no account to save it on).
      */
-    private const ACTIVE_CITY_CODES_BY_PROVINCE = [
-        '33' => ['3329'],
-    ];
+    public function nearest(Request $request, RegionLocator $locator): JsonResponse
+    {
+        $data = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $village = $locator->nearest((float) $data['latitude'], (float) $data['longitude']);
+
+        if ($village === null) {
+            return ApiResponse::error('Lokasi Anda berada di luar area layanan.', [], 422);
+        }
+
+        return ApiResponse::success($village, 'Nearest village retrieved successfully.');
+    }
 
     public function provinces(): JsonResponse
     {
+        $provinceCodes = City::query()
+            ->whereIn('code', $this->activeCityCodes())
+            ->pluck('province_code')
+            ->map(fn ($c) => trim($c))
+            ->unique();
+
         $provinces = Province::query()
-            ->whereIn('code', self::ACTIVE_PROVINCE_CODES)
+            ->whereIn('code', $provinceCodes)
             ->orderBy('name')
             ->get();
 
@@ -42,16 +76,9 @@ class RegionController extends Controller
 
     public function cities(Request $request, string $provinceCode): JsonResponse
     {
-        if (! in_array($provinceCode, self::ACTIVE_PROVINCE_CODES, true)) {
-            return ApiResponse::success([], 'Cities retrieved successfully.');
-        }
-
         $cities = City::query()
             ->where('province_code', $provinceCode)
-            ->when(
-                isset(self::ACTIVE_CITY_CODES_BY_PROVINCE[$provinceCode]),
-                fn ($query) => $query->whereIn('code', self::ACTIVE_CITY_CODES_BY_PROVINCE[$provinceCode])
-            )
+            ->whereIn('code', $this->activeCityCodes())
             ->orderBy('name')
             ->get();
 

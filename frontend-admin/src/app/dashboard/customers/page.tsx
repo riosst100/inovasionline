@@ -3,28 +3,43 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi } from '../../../lib/api';
-import { Customer } from '../../../types';
+import { BannableFeature, Customer } from '../../../types';
 import {
   Users2,
   Search,
   Loader2,
   CheckCircle,
   XCircle,
-  Store
+  Store,
+  Ban,
+  ShieldCheck,
+  MessageSquareOff
 } from 'lucide-react';
+
+const FEATURE_OPTIONS: { value: BannableFeature; label: string }[] = [
+  { value: 'chat', label: 'Chat' },
+  { value: 'posts', label: 'Postingan' },
+  { value: 'purchase', label: 'Pembelian' },
+];
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [total, setTotal] = useState(0);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [banTarget, setBanTarget] = useState<Customer | null>(null);
+  const [banFeatures, setBanFeatures] = useState<BannableFeature[]>([]);
+  const [banReason, setBanReason] = useState('');
 
   const fetchCustomers = async () => {
     try {
       setLoading(true);
       const res = await adminApi.getCustomers({ search: search || undefined });
-      setCustomers(res.data || []);
-      setTotal(res.total || 0);
+      // apiRequest unwraps to `data`, which the backend returns as a plain array.
+      const rows = (Array.isArray(res) ? res : res.data) || [];
+      setCustomers(rows);
+      setTotal(Array.isArray(res) ? rows.length : res.total || 0);
     } catch {
       setCustomers([]);
     } finally {
@@ -35,6 +50,58 @@ export default function CustomersPage() {
   useEffect(() => {
     fetchCustomers();
   }, []);
+
+  const openBanModal = (c: Customer) => {
+    setBanTarget(c);
+    setBanFeatures(c.banned_features ?? []);
+    setBanReason(c.ban_reason ?? '');
+  };
+
+  const toggleFeature = (f: BannableFeature) =>
+    setBanFeatures((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
+
+  const allSelected = banFeatures.length === FEATURE_OPTIONS.length;
+
+  const applyUpdated = (id: string, updated: Customer) =>
+    setCustomers((prev) => prev.map((x) => (x.id === id ? { ...x, ...updated } : x)));
+
+  const handleSaveBan = async () => {
+    if (!banTarget) return;
+    try {
+      setBusyId(banTarget.id);
+      const updated = banFeatures.length
+        ? await adminApi.banCustomer(banTarget.id, banFeatures, banReason)
+        : await adminApi.unbanCustomer(banTarget.id);
+      applyUpdated(banTarget.id, updated);
+      setBanTarget(null);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Gagal menyimpan pembatasan fitur.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleToggleBlock = async (c: Customer) => {
+    let reason: string | null | undefined;
+    if (c.is_blocked) {
+      if (!window.confirm(`Buka blokir ${c.name}?`)) return;
+    } else {
+      reason = window.prompt(`Blokir ${c.name}? Isi alasan (opsional):`, '');
+      if (reason === null) return;
+    }
+
+    try {
+      setBusyId(c.id);
+      const updated = c.is_blocked
+        ? await adminApi.unblockCustomer(c.id)
+        : await adminApi.blockCustomer(c.id, reason || undefined);
+      applyUpdated(c.id, updated);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Gagal memperbarui status blokir.');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,12 +151,14 @@ export default function CustomersPage() {
                   <th className="py-3.5 px-5">Status Verifikasi</th>
                   <th className="py-3.5 px-5">Tipe Akun</th>
                   <th className="py-3.5 px-5">Terdaftar Sejak</th>
+                  <th className="py-3.5 px-5">Status</th>
+                  <th className="py-3.5 px-5 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                         <span>Memuat data pelanggan...</span>
@@ -98,7 +167,7 @@ export default function CustomersPage() {
                   </tr>
                 ) : customers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       Belum ada data pelanggan yang terdaftar.
                     </td>
                   </tr>
@@ -148,6 +217,50 @@ export default function CustomersPage() {
                           year: 'numeric',
                         })}
                       </td>
+                      <td className="py-4 px-5">
+                        {c.is_blocked ? (
+                          <span
+                            title={c.block_reason || undefined}
+                            className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700"
+                          >
+                            <Ban className="h-3.5 w-3.5" /> Diblokir
+                          </span>
+                        ) : (
+                          <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                            Aktif
+                          </span>
+                        )}
+                        {(c.banned_features ?? []).length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1" title={c.ban_reason || undefined}>
+                            {c.banned_features.map((f) => (
+                              <span key={f} className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                                Banned: {FEATURE_OPTIONS.find((o) => o.value === f)?.label ?? f}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-5 text-right space-x-2 whitespace-nowrap">
+                        <button
+                          onClick={() => openBanModal(c)}
+                          disabled={busyId === c.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                        >
+                          <MessageSquareOff className="h-3.5 w-3.5" /> Banned
+                        </button>
+                        <button
+                          onClick={() => handleToggleBlock(c)}
+                          disabled={busyId === c.id}
+                          className={`inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                            c.is_blocked
+                              ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                              : 'border-red-200 text-red-700 hover:bg-red-50'
+                          }`}
+                        >
+                          {c.is_blocked ? <ShieldCheck className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
+                          {c.is_blocked ? 'Buka Blokir' : 'Blokir'}
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -156,6 +269,62 @@ export default function CustomersPage() {
           </div>
         </div>
       </div>
+
+      {banTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-extrabold text-slate-900">Banned fitur: {banTarget.name}</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Pilih fitur yang dilarang. Kosongkan semua lalu simpan untuk mencabut pembatasan.
+            </p>
+
+            <div className="mt-4 space-y-2 text-sm">
+              <label className="flex items-center gap-2 font-semibold text-slate-900">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={() => setBanFeatures(allSelected ? [] : FEATURE_OPTIONS.map((o) => o.value))}
+                />
+                Semua fitur
+              </label>
+              {FEATURE_OPTIONS.map((o) => (
+                <label key={o.value} className="flex items-center gap-2 pl-5 text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={banFeatures.includes(o.value)}
+                    onChange={() => toggleFeature(o.value)}
+                  />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+
+            <textarea
+              value={banReason}
+              onChange={(e) => setBanReason(e.target.value)}
+              placeholder="Alasan (opsional)"
+              rows={3}
+              className="mt-4 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-emerald-500"
+            />
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setBanTarget(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveBan}
+                disabled={busyId === banTarget.id}
+                className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

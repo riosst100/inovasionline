@@ -30,7 +30,11 @@ class ProductGrid extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         final product = products[index];
-        return ProductCard(product: product, onTap: () => onProductTap(product));
+        return ProductCard(
+          product: product,
+          compact: true,
+          onTap: () => onProductTap(product),
+        );
       },
     );
   }

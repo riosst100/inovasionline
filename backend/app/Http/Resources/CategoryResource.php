@@ -20,6 +20,10 @@ class CategoryResource extends JsonResource
             'sort_order' => $this->sort_order,
             'is_active' => $this->is_active,
             'created_by' => $this->created_by,
+            'products_count' => $this->when(
+                array_key_exists('products_count', $this->resource->getAttributes()),
+                fn () => (int) $this->products_count,
+            ),
         ];
     }
 }

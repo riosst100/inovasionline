@@ -28,6 +28,8 @@
 		<true/>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Inovasi Online membutuhkan akses galeri untuk memilih foto postingan.</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Lokasi dipakai untuk mengatur alamat pengiriman awal Anda.</string>
 		<key>NSCameraUsageDescription</key>
 		<string>Inovasi Online membutuhkan akses kamera untuk mengambil foto postingan.</string>
 		<key>UIApplicationSceneManifest</key>

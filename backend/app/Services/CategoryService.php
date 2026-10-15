@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -27,7 +29,7 @@ class CategoryService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function createFromAdmin(User $admin, array $data, ?UploadedFile $image = null): Category
+    public function createFromAdmin(User|AdminUser $admin, array $data, ?UploadedFile $image = null): Category
     {
         unset($data['image']);
 
@@ -37,8 +39,41 @@ class CategoryService
             'is_active' => $data['is_active'] ?? true,
             'sort_order' => $data['sort_order'] ?? ((int) Category::query()->max('sort_order')) + 1,
             'image_path' => $image?->store('categories', 'public'),
-            'created_by' => $admin->id,
+            // created_by has a FK to users; admin accounts live in admin_users.
+            'created_by' => $admin instanceof User ? $admin->id : null,
         ]);
+    }
+
+    public function toggleActive(Category $category): Category
+    {
+        $category->update(['is_active' => ! $category->is_active]);
+
+        return $category->fresh();
+    }
+
+    public function delete(Category $category): void
+    {
+        if ($category->children()->exists()) {
+            throw new RuntimeException('Kategori masih memiliki subkategori. Hapus atau pindahkan subkategorinya dulu.');
+        }
+
+        if ($category->products()->exists()) {
+            throw new RuntimeException('Kategori masih dipakai oleh produk. Pindahkan produknya ke kategori lain dulu.');
+        }
+
+        $category->delete();
+    }
+
+    /**
+     * @param  array<int, string>  $ids  Category ids in their new order.
+     */
+    public function reorder(array $ids): void
+    {
+        DB::transaction(function () use ($ids) {
+            foreach (array_values($ids) as $position => $id) {
+                Category::query()->whereKey($id)->update(['sort_order' => $position + 1]);
+            }
+        });
     }
 
     public function approve(Category $category): Category

@@ -51,6 +51,39 @@ class CategoryController extends Controller
         return ApiResponse::success(new CategoryResource($category), 'Category updated successfully.');
     }
 
+    public function toggle(Category $category): JsonResponse
+    {
+        $category = $this->categoryService->toggleActive($category);
+
+        return ApiResponse::success(
+            new CategoryResource($category),
+            $category->is_active ? 'Category enabled successfully.' : 'Category disabled successfully.'
+        );
+    }
+
+    public function destroy(Category $category): JsonResponse
+    {
+        try {
+            $this->categoryService->delete($category);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), [], 422);
+        }
+
+        return ApiResponse::success(null, 'Category deleted successfully.');
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['string', 'exists:categories,id'],
+        ]);
+
+        $this->categoryService->reorder($data['ids']);
+
+        return ApiResponse::success(null, 'Categories reordered successfully.');
+    }
+
     public function approve(Category $category): JsonResponse
     {
         try {

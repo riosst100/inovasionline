@@ -5,7 +5,8 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { adminApi, ApiError } from '../../lib/api';
-import { Warehouse } from '../../types';
+import { Warehouse, WarehouseCoverage } from '../../types';
+import CoveragePicker from './CoveragePicker';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 const MapPicker = dynamic(() => import('../ui/MapPicker'), {
@@ -54,6 +55,7 @@ const labelCls = 'mb-1 block text-xs font-medium text-slate-600';
 export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | null }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => toForm(warehouse));
+  const [coverage, setCoverage] = useState<WarehouseCoverage[]>(() => warehouse?.coverage ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +83,7 @@ export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | nu
           contact_phone: orNull(form.contact_phone),
           notes: orNull(form.notes),
           is_active: form.is_active,
+          coverage: coverage.map(({ district_code, village_code }) => ({ district_code, village_code })) as unknown as WarehouseCoverage[],
         },
         warehouse?.id
       );
@@ -174,6 +177,16 @@ export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | nu
             <input type="number" step="any" min={-180} max={180} value={form.longitude} onChange={(e) => set('longitude', e.target.value)} className={inputCls} />
           </div>
         </div>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Area Cakupan</h2>
+          <p className="text-xs text-slate-500">
+            Pilih kecamatan atau desa yang dilayani gudang ini. Satu desa boleh dicakup oleh lebih dari satu gudang.
+          </p>
+        </div>
+        <CoveragePicker value={coverage} onChange={setCoverage} />
       </section>
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

@@ -8,6 +8,7 @@ use App\Http\Resources\PublicProductResource;
 use App\Http\Resources\PublicStoreDetailResource;
 use App\Http\Resources\PublicStoreResource;
 use App\Http\Resources\ShippingMethodResource;
+use App\Models\ServiceFeeSetting;
 use App\Models\Store;
 use App\Services\ShippingRateResolver;
 use App\Support\Enums\OrderStatus;
@@ -82,6 +83,11 @@ class PublicStoreController extends Controller
             'per_page' => $products->perPage(),
             'total' => $products->total(),
         ]);
+    }
+
+    public function serviceFee(): JsonResponse
+    {
+        return ApiResponse::success(ServiceFeeSetting::current()->toPayload(), 'Service fee retrieved successfully.');
     }
 
     public function paymentMethods(Request $request, Store $store): JsonResponse

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Warehouse extends Model
 {
@@ -21,5 +22,10 @@ class Warehouse extends Model
             'latitude' => 'float',
             'longitude' => 'float',
         ];
+    }
+
+    public function coverage(): HasMany
+    {
+        return $this->hasMany(WarehouseCoverageArea::class);
     }
 }

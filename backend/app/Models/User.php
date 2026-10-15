@@ -49,6 +49,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
+            'blocked_at' => 'datetime',
+            'banned_features' => 'array',
             'date_of_birth' => 'date',
             'password' => 'hashed',
             'role' => UserRole::class,
@@ -142,6 +144,19 @@ class User extends Authenticatable
     public function isPlatformAdmin(): bool
     {
         return $this->role === UserRole::PLATFORM_ADMIN;
+    }
+
+    /** Features an admin can ban a user from individually. */
+    public const BANNABLE_FEATURES = ['chat', 'posts', 'purchase'];
+
+    public function isBannedFrom(string $feature): bool
+    {
+        return in_array($feature, $this->banned_features ?? [], true);
+    }
+
+    public function isBlocked(): bool
+    {
+        return $this->blocked_at !== null;
     }
 
     public function isVerified(): bool

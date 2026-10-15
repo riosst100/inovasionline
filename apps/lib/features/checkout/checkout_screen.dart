@@ -54,7 +54,23 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _recipientPhoneController.text.trim().isNotEmpty &&
       _addressDetailController.text.trim().isNotEmpty;
 
-  double get _total => widget.group.subtotal + (_shippingMethod?.displayFee ?? 0);
+  double get _serviceFee {
+    final cfg = ref.watch(checkoutServiceFeeConfigProvider).valueOrNull;
+    if (cfg == null || cfg['is_active'] != true) return 0;
+    final value = (cfg['value'] as num?)?.toDouble() ?? 0;
+    if (value <= 0) return 0;
+    var fee = cfg['type'] == 'percent' ? widget.group.subtotal * value / 100 : value;
+    final min = (cfg['min_fee'] as num?)?.toDouble();
+    final max = (cfg['max_fee'] as num?)?.toDouble();
+    if (min != null && fee < min) fee = min;
+    if (max != null && fee > max) fee = max;
+    return fee.roundToDouble();
+  }
+
+  String get _serviceFeeLabel =>
+      ref.watch(checkoutServiceFeeConfigProvider).valueOrNull?['label'] as String? ?? 'Biaya Layanan';
+
+  double get _total => widget.group.subtotal + (_shippingMethod?.displayFee ?? 0) + _serviceFee;
 
   bool get _canSubmit => _paymentMethod != null && _shippingMethod != null && _addressStepDone;
 
@@ -363,6 +379,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           _OrderSummaryCard(
             subtotal: widget.group.subtotal,
             shippingFee: _shippingMethod?.displayFee,
+            serviceFee: _serviceFee,
+            serviceFeeLabel: _serviceFeeLabel,
             total: _total,
           ),
         ],
@@ -1167,11 +1185,15 @@ class _OrderSummaryCard extends StatelessWidget {
   const _OrderSummaryCard({
     required this.subtotal,
     required this.shippingFee,
+    required this.serviceFee,
+    required this.serviceFeeLabel,
     required this.total,
   });
 
   final double subtotal;
   final double? shippingFee;
+  final double serviceFee;
+  final String serviceFeeLabel;
   final double total;
 
   @override
@@ -1213,10 +1235,10 @@ class _OrderSummaryCard extends StatelessWidget {
             valueColor: shippingFee != null ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
           ),
           const SizedBox(height: 8),
-          const _SummaryLine(
-            label: 'Biaya Layanan Aplikasi',
-            value: 'GRATIS',
-            valueColor: Color(0xFF16A34A),
+          _SummaryLine(
+            label: serviceFeeLabel,
+            value: serviceFee > 0 ? formatCurrency(serviceFee) : 'GRATIS',
+            valueColor: serviceFee > 0 ? const Color(0xFF0F172A) : const Color(0xFF16A34A),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),

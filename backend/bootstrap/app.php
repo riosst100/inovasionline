@@ -56,7 +56,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'store.owner' => \App\Http\Middleware\EnsureStoreOwnership::class,
             'seller' => \App\Http\Middleware\EnsureUserIsSeller::class,
-            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'feature.ban' => \App\Http\Middleware\EnsureFeatureNotBanned::class,
+            'not.blocked' => \App\Http\Middleware\EnsureUserNotBlocked::class,
+            'admin' =>\App\Http\Middleware\EnsureUserIsAdmin::class,
             'admin.auth' => \App\Http\Middleware\EnsureAdminAuthenticated::class,
             'photographer' => \App\Http\Middleware\EnsureUserIsPhotographer::class,
         ]);

@@ -8,6 +8,12 @@ class CheckoutService {
 
   final ApiClient _apiClient;
 
+  /// Returns {is_active, label, type: fixed|percent, value, min_fee, max_fee}.
+  Future<Map<String, dynamic>> serviceFeeConfig() async {
+    final response = await _apiClient.dio.get('/service-fee');
+    return (response.data['data'] as Map).cast<String, dynamic>();
+  }
+
   Future<List<PaymentMethod>> paymentMethods(String storeSlug) async {
     final response = await _apiClient.dio.get('/stores/$storeSlug/payment-methods');
     return (response.data['data'] as List<dynamic>)

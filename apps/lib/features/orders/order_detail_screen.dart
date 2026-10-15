@@ -131,6 +131,7 @@ class OrderDetailScreen extends ConsumerWidget {
                   _SummaryRow('Subtotal', order.subtotal),
                   if (order.discountTotal > 0) _SummaryRow('Diskon', -order.discountTotal),
                   _SummaryRow('Ongkos Kirim', order.shippingFee),
+                  if (order.serviceFee > 0) _SummaryRow('Biaya Layanan', order.serviceFee),
                   if (order.taxTotal > 0) _SummaryRow('Pajak', order.taxTotal),
                   const Divider(height: 20),
                   _SummaryRow('Total', order.grandTotal, bold: true),

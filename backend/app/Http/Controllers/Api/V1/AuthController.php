@@ -16,12 +16,14 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\AuthService;
 use App\Services\ChatService;
+use App\Services\RegionLocator;
 use App\Services\WhatsAppOtpService;
 use App\Support\PhoneNumber;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -34,6 +36,7 @@ class AuthController extends Controller
         private readonly AuthService $authService,
         private readonly ChatService $chatService,
         private readonly WhatsAppOtpService $whatsAppOtpService,
+        private readonly RegionLocator $regionLocator,
     ) {}
 
     public function register(RegisterRequest $request): JsonResponse
@@ -208,6 +211,36 @@ class AuthController extends Controller
         $user = $request->user();
         $user->update($request->validated());
 
+        $this->chatService->syncMembershipsForUser($user->fresh());
+
+        return ApiResponse::success(new UserResource($user->fresh()->load('seller')), 'Address updated successfully.');
+    }
+
+    /**
+     * Sets the user's address to the village nearest to the given coordinates.
+     * Used for the one-time default when the app opens with no address saved;
+     * an address the user already has is never overwritten.
+     */
+    public function setAddressFromLocation(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $user = $request->user();
+
+        if ($user->hasAddress()) {
+            return ApiResponse::success(new UserResource($user->load('seller')), 'Address already set.');
+        }
+
+        $village = $this->regionLocator->nearest((float) $data['latitude'], (float) $data['longitude']);
+
+        if ($village === null) {
+            return ApiResponse::error('Lokasi Anda berada di luar area layanan.', [], 422);
+        }
+
+        $user->update(Arr::except($village, 'label'));
         $this->chatService->syncMembershipsForUser($user->fresh());
 
         return ApiResponse::success(new UserResource($user->fresh()->load('seller')), 'Address updated successfully.');

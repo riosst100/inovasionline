@@ -51,6 +51,11 @@ return [
         'expiry_minutes' => (int) env('MIDTRANS_EXPIRY_MINUTES', 1440),
     ],
 
+    'support' => [
+        // Link opened by the "Hubungi Admin" button on the blocked-account screen.
+        'contact_url' => env('SUPPORT_CONTACT_URL'),
+    ],
+
     'potocandid' => [
         'base_url' => env('POTOCANDID_SERVICE_BASE_URL', 'http://127.0.0.1:3200'),
         'api_key' => env('POTOCANDID_SERVICE_API_KEY'),

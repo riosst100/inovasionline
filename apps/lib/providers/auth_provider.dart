@@ -8,9 +8,12 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../config/env.dart';
+import '../core/api/account_block.dart';
 import '../core/api/api_exception.dart';
 import '../models/user.dart';
+import '../services/location_service.dart';
 import 'core_providers.dart';
+import 'delivery_address_provider.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
@@ -36,9 +39,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   final Ref _ref;
 
+  /// Re-reads the user from the server. Used by the blocked-account screen to
+  /// pick up an unblock without forcing the user to log in again.
+  Future<void> refreshAccount() => _restore();
+
+  /// Background re-check of the block status. Unlike [refreshAccount] it never
+  /// touches the auth state on failure, so a flaky connection can't make the
+  /// app look logged out.
+  Future<void> checkBlockStatus() async {
+    if (state.status != AuthStatus.authenticated) return;
+    try {
+      final user = await _ref.read(authServiceProvider).currentUser();
+      if (user != null) _syncBlock(user);
+    } catch (_) {}
+  }
+
   Future<void> _restore() async {
     try {
       final user = await _ref.read(authServiceProvider).currentUser();
+      if (user != null) _syncBlock(user);
       state = AuthState(
         status: user != null
             ? AuthStatus.authenticated
@@ -57,6 +76,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .read(authServiceProvider)
           .login(login: login, password: password);
       state = AuthState(status: AuthStatus.authenticated, user: user);
+      _syncBlock(user);
       await _syncDeviceToken();
       return true;
     } on DioException catch (e) {
@@ -87,6 +107,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             passwordConfirmation: passwordConfirmation,
           );
       state = AuthState(status: AuthStatus.authenticated, user: user);
+      _syncBlock(user);
       await _syncDeviceToken();
       return true;
     } on DioException catch (e) {
@@ -149,6 +170,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .loginWithGoogle(idToken);
       debugPrint('[GOOGLE_AUTH] Step 7: login success, user: ${user.name}');
       state = AuthState(status: AuthStatus.authenticated, user: user);
+      _syncBlock(user);
       await _syncDeviceToken();
       return true;
     } on DioException catch (e) {
@@ -171,6 +193,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  void _syncBlock(User user) {
+    AccountBlock.notifier.value = user.isBlocked
+        ? AccountBlockInfo(
+            reason: user.blockReason,
+            contactUrl: user.contactUrl,
+          )
+        : null;
+  }
+
   Future<void> logout() async {
     try {
       final token = await FirebaseMessaging.instance.getToken();
@@ -181,6 +212,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Best-effort: an unreachable backend shouldn't block logout.
     }
     await _ref.read(authServiceProvider).logout();
+    AccountBlock.notifier.value = null;
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
@@ -231,6 +263,43 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return true;
     } on DioException catch (e) {
       state = state.copyWith(error: _errorMessage(e));
+      return false;
+    }
+  }
+
+  /// One-time default: when the signed-in user has no address, uses the
+  /// device's current location to pick the nearest served village. Returns
+  /// true only when an address was actually set. Never surfaces errors, since
+  /// the user can always pick an address manually.
+  Future<bool> setDefaultAddressFromLocation() async {
+    final user = state.user;
+    if (state.status != AuthStatus.authenticated ||
+        user == null ||
+        user.hasAddress) {
+      return false;
+    }
+
+    final result = await LocationService.currentPosition();
+    final position = result.position;
+    if (position == null) {
+      _ref.read(locationFailureProvider.notifier).state = result.serviceDisabled
+          ? LocationFailure.serviceOff
+          : LocationFailure.noFix;
+      return false;
+    }
+
+    try {
+      final updated = await _ref
+          .read(authServiceProvider)
+          .setAddressFromLocation(
+            latitude: position.latitude,
+            longitude: position.longitude,
+          );
+      state = state.copyWith(status: AuthStatus.authenticated, user: updated);
+      _ref.read(locationFailureProvider.notifier).state = null;
+      return updated.hasAddress;
+    } catch (e) {
+      _ref.read(locationFailureProvider.notifier).state = failureFor(e);
       return false;
     }
   }

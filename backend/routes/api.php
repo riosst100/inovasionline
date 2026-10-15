@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\V1\Admin\PaymentMethodController as AdminPaymentMet
 use App\Http\Controllers\Api\V1\Admin\PhotographerApplicationController as AdminPhotographerApplicationController;
 use App\Http\Controllers\Api\V1\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Api\V1\Admin\SellerApplicationController as AdminSellerApplicationController;
+use App\Http\Controllers\Api\V1\Admin\ServiceCityController as AdminServiceCityController;
+use App\Http\Controllers\Api\V1\Admin\ServiceFeeController as AdminServiceFeeController;
 use App\Http\Controllers\Api\V1\Admin\ShippingMethodController as AdminShippingMethodController;
 use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateController as AdminShippingRateTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateRowController as AdminShippingRateTemplateRowController;
@@ -82,10 +84,12 @@ Route::prefix('v1')->group(function () {
             Route::put('/user', [AuthController::class, 'updateProfile']);
             Route::post('/user', [AuthController::class, 'updateProfile']);
             Route::put('/user/address', [AuthController::class, 'updateAddress']);
+            Route::post('/user/address/from-location', [AuthController::class, 'setAddressFromLocation'])
+                ->middleware('throttle:6,1');
         });
     });
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'not.blocked'])->group(function () {
         Route::prefix('seller-applications')->group(function () {
             Route::post('/', [SellerApplicationController::class, 'store']);
             Route::get('/me', [SellerApplicationController::class, 'show']);
@@ -134,6 +138,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/stores', [PublicStoreController::class, 'index']);
     Route::get('/stores/{slug}', [PublicStoreController::class, 'show']);
     Route::get('/stores/{store}/payment-methods', [PublicStoreController::class, 'paymentMethods']);
+    Route::get('/service-fee', [PublicStoreController::class, 'serviceFee']);
     Route::get('/stores/{store}/shipping-methods', [PublicStoreController::class, 'shippingMethods']);
 
     Route::prefix('search')->group(function () {
@@ -144,6 +149,7 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::prefix('regions')->group(function () {
+        Route::get('/nearest', [RegionController::class, 'nearest'])->middleware('throttle:20,1');
         Route::get('/provinces', [RegionController::class, 'provinces']);
         Route::get('/provinces/{provinceCode}/cities', [RegionController::class, 'cities']);
         Route::get('/cities/{cityCode}/districts', [RegionController::class, 'districts']);
@@ -158,7 +164,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/', [PostController::class, 'index']);
         Route::get('/{post}/comments', [PostController::class, 'comments']);
 
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'not.blocked', 'feature.ban:posts'])->group(function () {
             Route::post('/', [PostController::class, 'store']);
             Route::post('/{post}/share', [PostController::class, 'share']);
             Route::delete('/{post}', [PostController::class, 'destroy']);
@@ -171,7 +177,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('chat')->group(function () {
         Route::get('/global-preview', [ChatController::class, 'globalPreview']);
 
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'not.blocked', 'feature.ban:chat'])->group(function () {
             Route::get('/threads', [ChatController::class, 'index']);
             Route::get('/threads/{thread}', [ChatController::class, 'show']);
             Route::get('/threads/{thread}/messages', [ChatController::class, 'messages']);
@@ -183,27 +189,27 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-    Route::prefix('cart')->middleware('auth:sanctum')->group(function () {
+    Route::prefix('cart')->middleware(['auth:sanctum', 'not.blocked', 'feature.ban:purchase'])->group(function () {
         Route::get('/', [CartController::class, 'index']);
         Route::post('/items', [CartController::class, 'store']);
         Route::patch('/items/{cartItem}', [CartController::class, 'update']);
         Route::delete('/items/{cartItem}', [CartController::class, 'destroy']);
     });
 
-    Route::prefix('checkout')->middleware('auth:sanctum')->group(function () {
+    Route::prefix('checkout')->middleware(['auth:sanctum', 'not.blocked', 'feature.ban:purchase'])->group(function () {
         Route::post('/', [CheckoutController::class, 'store']);
     });
 
-    Route::prefix('orders')->middleware('auth:sanctum')->group(function () {
+    Route::prefix('orders')->middleware(['auth:sanctum', 'not.blocked'])->group(function () {
         Route::get('/', [OrderController::class, 'index']);
         Route::get('/{order}', [OrderController::class, 'show']);
         Route::post('/{order}/cancel', [OrderController::class, 'cancel']);
-        Route::post('/{order}/pay', [PaymentController::class, 'pay']);
+        Route::post('/{order}/pay', [PaymentController::class, 'pay'])->middleware('feature.ban:purchase');
     });
 
     Route::post('/payments/midtrans/notification', [PaymentController::class, 'notification']);
 
-    Route::prefix('seller')->middleware(['auth:sanctum', 'seller', 'store.owner'])->group(function () {
+    Route::prefix('seller')->middleware(['auth:sanctum', 'not.blocked', 'seller', 'store.owner'])->group(function () {
         Route::prefix('products')->group(function () {
             Route::get('/', [SellerProductController::class, 'index']);
             Route::post('/', [SellerProductController::class, 'store']);
@@ -257,7 +263,7 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-    Route::prefix('photographer')->middleware(['auth:sanctum', 'photographer'])->group(function () {
+    Route::prefix('photographer')->middleware(['auth:sanctum', 'not.blocked', 'photographer'])->group(function () {
         Route::prefix('events')->group(function () {
             Route::get('/', [PhotographerPhotoEventController::class, 'index']);
             Route::post('/', [PhotographerPhotoEventController::class, 'store']);
@@ -327,8 +333,11 @@ Route::prefix('v1')->group(function () {
         Route::prefix('categories')->group(function () {
             Route::get('/', [AdminCategoryController::class, 'index']);
             Route::post('/', [AdminCategoryController::class, 'store']);
+            Route::post('/reorder', [AdminCategoryController::class, 'reorder']);
             Route::put('/{category}', [AdminCategoryController::class, 'update']);
             Route::post('/{category}/approve', [AdminCategoryController::class, 'approve']);
+            Route::post('/{category}/toggle', [AdminCategoryController::class, 'toggle']);
+            Route::delete('/{category}', [AdminCategoryController::class, 'destroy']);
         });
 
         Route::post('/notifications/broadcast', [AdminNotificationController::class, 'broadcast']);
@@ -425,6 +434,10 @@ Route::prefix('admin')->group(function () {
         Route::prefix('customers')->group(function () {
             Route::get('/', [CustomerController::class, 'index']);
             Route::get('/{user}', [CustomerController::class, 'show']);
+            Route::post('/{user}/block', [CustomerController::class, 'block']);
+            Route::post('/{user}/unblock', [CustomerController::class, 'unblock']);
+            Route::post('/{user}/ban', [CustomerController::class, 'ban']);
+            Route::post('/{user}/unban', [CustomerController::class, 'unban']);
         });
 
         // Operational Marketplace Management
@@ -440,8 +453,11 @@ Route::prefix('admin')->group(function () {
         Route::prefix('categories')->group(function () {
             Route::get('/', [AdminCategoryController::class, 'index']);
             Route::post('/', [AdminCategoryController::class, 'store']);
+            Route::post('/reorder', [AdminCategoryController::class, 'reorder']);
+            Route::post('/{category}/toggle', [AdminCategoryController::class, 'toggle']);
             Route::put('/{category}', [AdminCategoryController::class, 'update']);
             Route::post('/{category}', [AdminCategoryController::class, 'update']);
+            Route::delete('/{category}', [AdminCategoryController::class, 'destroy']);
         });
 
         Route::prefix('search-suggestions')->group(function () {
@@ -465,10 +481,17 @@ Route::prefix('admin')->group(function () {
             Route::delete('/{warehouse}', [AdminWarehouseController::class, 'destroy']);
         });
 
+        Route::get('service-cities', [AdminServiceCityController::class, 'index']);
+        Route::put('service-cities', [AdminServiceCityController::class, 'update']);
+
+        Route::get('service-fee', [AdminServiceFeeController::class, 'show']);
+        Route::put('service-fee', [AdminServiceFeeController::class, 'update']);
+
         Route::get('product-stocks', [AdminProductStockController::class, 'index']);
         Route::put('product-stocks/{product}', [AdminProductStockController::class, 'update']);
 
         Route::get('products', [AdminProductController::class, 'index']);
+        Route::post('products', [AdminProductController::class, 'store']);
         Route::post('products/bulk-status', [AdminProductController::class, 'bulkUpdateStatus']);
         Route::post('products/bulk-delete', [AdminProductController::class, 'bulkDestroy']);
         Route::post('products/{product}/images', [AdminProductController::class, 'storeImages']);

@@ -135,4 +135,15 @@ class AuthService {
     );
     return User.fromJson(response.data['data'] as Map<String, dynamic>);
   }
+
+  Future<User> setAddressFromLocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final response = await _apiClient.dio.post(
+      '/auth/user/address/from-location',
+      data: {'latitude': latitude, 'longitude': longitude},
+    );
+    return User.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
 }

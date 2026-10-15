@@ -1,10 +1,24 @@
 import '../core/api/api_client.dart';
+import '../models/nearest_address.dart';
 import '../models/region.dart';
 
 class RegionService {
   RegionService(this._apiClient);
 
   final ApiClient _apiClient;
+
+  /// Nearest served village to the coordinates. Throws (422) when the
+  /// location is outside the service area.
+  Future<NearestAddress> nearest({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final response = await _apiClient.dio.get(
+      '/regions/nearest',
+      queryParameters: {'latitude': latitude, 'longitude': longitude},
+    );
+    return NearestAddress.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
 
   Future<List<Region>> provinces() async {
     final response = await _apiClient.dio.get('/regions/provinces');
