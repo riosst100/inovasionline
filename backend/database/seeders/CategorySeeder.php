@@ -14,7 +14,7 @@ class CategorySeeder extends Seeder
             ['name' => 'Makanan & Minuman', 'slug' => 'makanan-minuman', 'icon' => '🧊', 'is_active' => true],
             ['name' => 'Sayur Segar', 'slug' => 'sayur-segar', 'icon' => '🥦', 'is_active' => false],
             ['name' => 'Daging Segar', 'slug' => 'daging-segar', 'icon' => '🥩', 'is_active' => true],
-            ['name' => 'Seafood Segar', 'slug' => 'seafood-segar', 'icon' => '🦐', 'is_active' => false],
+            ['name' => 'Ikan & Seafood', 'slug' => 'ikan-seafood', 'icon' => '🦐', 'is_active' => true],
             ['name' => 'Kebutuhan Dapur', 'slug' => 'kebutuhan-dapur', 'icon' => '🧂', 'is_active' => true],
             ['name' => 'Frozen Food', 'slug' => 'frozen-food', 'icon' => null, 'is_active' => true],
             ['name' => 'Buah Segar', 'slug' => 'buah-segar', 'icon' => '🥭', 'is_active' => true],
@@ -24,7 +24,7 @@ class CategorySeeder extends Seeder
             ['name' => 'Alat Tulis Kantor', 'slug' => 'alat-tulis-kantor', 'icon' => null, 'is_active' => true],
             ['name' => 'Hadiah & Kado', 'slug' => 'hadiah-kado', 'icon' => null, 'is_active' => true],
             ['name' => 'Perlengkapan Pesta', 'slug' => 'perlengkapan-pesta', 'icon' => null, 'is_active' => true],
-            ['name' => 'Tanaman & Bunga', 'slug' => 'tanaman-bunga', 'icon' => null, 'is_active' => true],
+            ['name' => 'Tanaman & Bunga', 'slug' => 'tanaman-bunga', 'icon' => null, 'is_active' => false],
             ['name' => 'Hewan Peliharaan', 'slug' => 'hewan-peliharaan', 'icon' => null, 'is_active' => true],
         ];
 
