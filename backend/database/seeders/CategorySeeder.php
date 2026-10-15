@@ -12,14 +12,20 @@ class CategorySeeder extends Seeder
     {
         $categories = [
             ['name' => 'Makanan & Minuman', 'slug' => 'makanan-minuman', 'icon' => '🧊', 'is_active' => true],
-            ['name' => 'Sayur Segar', 'slug' => 'sayur-segar', 'icon' => '🥦', 'is_active' => true],
+            ['name' => 'Sayur Segar', 'slug' => 'sayur-segar', 'icon' => '🥦', 'is_active' => false],
             ['name' => 'Daging Segar', 'slug' => 'daging-segar', 'icon' => '🥩', 'is_active' => true],
             ['name' => 'Seafood Segar', 'slug' => 'seafood-segar', 'icon' => '🦐', 'is_active' => false],
             ['name' => 'Kebutuhan Dapur', 'slug' => 'kebutuhan-dapur', 'icon' => '🧂', 'is_active' => true],
             ['name' => 'Frozen Food', 'slug' => 'frozen-food', 'icon' => null, 'is_active' => true],
             ['name' => 'Buah Segar', 'slug' => 'buah-segar', 'icon' => '🥭', 'is_active' => true],
-            ['name' => 'Telur, Tahu & Tempe', 'slug' => 'telur-tahu-tempe', 'icon' => '🥚', 'is_active' => true],
-            ['name' => 'Elektronik', 'slug' => 'elektronik', 'icon' => null, 'is_active' => true],
+            ['name' => 'Telur, Tahu & Tempe', 'slug' => 'telur-tahu-tempe', 'icon' => '🥚', 'is_active' => false],
+            ['name' => 'Elektronik', 'slug' => 'elektronik', 'icon' => null, 'is_active' => false],
+            ['name' => 'Percetakan', 'slug' => 'percetakan', 'icon' => null, 'is_active' => true],
+            ['name' => 'Alat Tulis Kantor', 'slug' => 'alat-tulis-kantor', 'icon' => null, 'is_active' => true],
+            ['name' => 'Hadiah & Kado', 'slug' => 'hadiah-kado', 'icon' => null, 'is_active' => true],
+            ['name' => 'Perlengkapan Pesta', 'slug' => 'perlengkapan-pesta', 'icon' => null, 'is_active' => true],
+            ['name' => 'Tanaman & Bunga', 'slug' => 'tanaman-bunga', 'icon' => null, 'is_active' => true],
+            ['name' => 'Hewan Peliharaan', 'slug' => 'hewan-peliharaan', 'icon' => null, 'is_active' => true],
         ];
 
         $disk = Storage::disk('public');
