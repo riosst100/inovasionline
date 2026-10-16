@@ -5,7 +5,7 @@ setlocal enabledelayedexpansion
 
 set SSH_KEY=%USERPROFILE%\.ssh\remote_recorder_vps
 set SERVER=root@173.212.232.54
-set REMOTE_DIR=/var/www/html/inovasionline/inovasionline-frontend-nextjs/public/downloads
+set REMOTE_DIR=/var/www/html/inovasionline/download
 set REMOTE_APK_NAME=inovasionline.apk
 set LOCAL_APK=build\app\outputs\flutter-apk\app-prod-release.apk
 
@@ -64,14 +64,6 @@ if errorlevel 1 (
     exit /b 1
 )
 del "%LOCAL_JSON%" >nul 2>&1
-
-echo.
-echo === Restarting frontend so the new file is served ===
-ssh -i "%SSH_KEY%" %SERVER% "pm2 restart inovasionline"
-if errorlevel 1 (
-    echo Failed to restart frontend on server.
-    exit /b 1
-)
 
 echo.
 echo === Done ===
