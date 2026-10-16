@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Production deploy for api.inovasionline.com (backend) and admin.inovasionline.com (frontend-admin).
+# Production deploy for api.inovasionline.com (backend), admin.inovasionline.com (frontend-admin)
+# and inovasionline.com (frontend).
 # Run on the VPS from the repo root after the code has been updated (see .github/workflows/deploy.yml).
 set -euo pipefail
 
@@ -7,6 +8,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.3-fpm}"
 PM2_APP_NAME="${PM2_APP_NAME:-inovasionline-admin}"
 ADMIN_PORT="${ADMIN_PORT:-3040}"
+WEB_PM2_APP_NAME="${WEB_PM2_APP_NAME:-inovasionline-web}"
+WEB_PORT="${WEB_PORT:-3050}"
 
 echo "==> Backend"
 cd "$ROOT/backend"
@@ -18,25 +21,37 @@ chown -R www-data:www-data storage bootstrap/cache
 php artisan queue:restart
 systemctl reload "$PHP_FPM_SERVICE"
 
+# Build a Next.js app in $1 and (re)start it under pm2 as $2 on 127.0.0.1:$3.
+deploy_next_app() {
+  local dir="$1" name="$2" port="$3"
+  cd "$ROOT/$dir"
+  export NEXT_TELEMETRY_DISABLED=1
+  npm ci --no-audit --no-fund
+  # Keep the last good build so a failed build doesn't leave the running app without one.
+  rm -rf .next.prev
+  [ -d .next ] && cp -a .next .next.prev
+  if ! npm run build; then
+    echo "!! Build failed, restoring previous .next" >&2
+    rm -rf .next
+    [ -d .next.prev ] && mv .next.prev .next
+    exit 1
+  fi
+  rm -rf .next.prev
+  if pm2 describe "$name" >/dev/null 2>&1; then
+    pm2 restart "$name" --update-env
+  else
+    pm2 start npm --name "$name" -- start -- -p "$port" -H 127.0.0.1
+  fi
+}
+
 echo "==> Frontend admin"
-cd "$ROOT/frontend-admin"
-export NEXT_TELEMETRY_DISABLED=1
-npm ci --no-audit --no-fund
-# Keep the last good build so a failed build doesn't leave the running app without one.
-rm -rf .next.prev
-[ -d .next ] && cp -a .next .next.prev
-if ! npm run build; then
-  echo "!! Build failed, restoring previous .next" >&2
-  rm -rf .next
-  [ -d .next.prev ] && mv .next.prev .next
-  exit 1
-fi
-rm -rf .next.prev
-if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
-  pm2 restart "$PM2_APP_NAME" --update-env
-else
-  pm2 start npm --name "$PM2_APP_NAME" -- start -- -p "$ADMIN_PORT" -H 127.0.0.1
-fi
+deploy_next_app frontend-admin "$PM2_APP_NAME" "$ADMIN_PORT"
+
+echo "==> Frontend (inovasionline.com)"
+NEXT_PUBLIC_SITE_URL=https://inovasionline.com \
+NEXT_PUBLIC_API_URL=https://api.inovasionline.com/api/v1 \
+  deploy_next_app frontend "$WEB_PM2_APP_NAME" "$WEB_PORT"
+
 pm2 save
 
 echo "==> Deploy finished: $(git -C "$ROOT" rev-parse --short HEAD)"
