@@ -11,6 +11,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apps == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            apps:
+              - 'apps/**'
+
   frontend-admin:
     name: Frontend admin build
     runs-on: ubuntu-latest
@@ -64,3 +78,102 @@ jobs:
             git fetch --prune origin main
             git reset --hard origin/main
             bash scripts/deploy.sh
+
+  apk:
+    name: Android APK build
+    needs: changes
+    if: needs.changes.outputs.apps == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Write env files
+        env:
+          APP_ENV_PROD: ${{ secrets.APP_ENV_PROD }}
+        run: |
+          # All three are declared as assets in pubspec.yaml, so they must exist.
+          cp .env.example .env
+          cp .env.dev.example .env.dev
+          if [ -n "$APP_ENV_PROD" ]; then
+            printf '%s\n' "$APP_ENV_PROD" > .env.prod
+          else
+            echo "::error::APP_ENV_PROD secret not set; refusing to publish an APK without the prod config"
+            exit 1
+          fi
+      - name: Set up release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 not set; a debug-signed APK can't update over a previous install"
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          cat > android/key.properties <<PROPS
+          storeFile=release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          PROPS
+      - name: Resolve version
+        id: version
+        run: |
+          # versionName comes from pubspec.yaml; versionCode must always increase, so derive it from the run number.
+          echo "name=$(sed -nE 's/^version:[[:space:]]*([^+]+)\+.*/\1/p' pubspec.yaml)" >> "$GITHUB_OUTPUT"
+          echo "code=$((GITHUB_RUN_NUMBER + 100))" >> "$GITHUB_OUTPUT"
+      - run: flutter pub get
+      - run: >
+          flutter build apk --release --flavor prod -t lib/main_prod.dart
+          --build-name=${{ steps.version.outputs.name }}
+          --build-number=${{ steps.version.outputs.code }}
+      - run: mv build/app/outputs/flutter-apk/app-prod-release.apk build/inovasionline.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inovasionline-apk
+          path: apps/build/inovasionline.apk
+          retention-days: 14
+    outputs:
+      version: ${{ steps.version.outputs.name }}
+      build: ${{ steps.version.outputs.code }}
+
+  publish-apk:
+    name: Publish APK to inovasionline.com/download
+    needs: [apk, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: inovasionline-apk
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: inovasionline.apk
+          target: /tmp/inovasionline-apk-${{ github.run_id }}
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            bash /var/www/html/inovasionline/scripts/publish-apk.sh \
+              /tmp/inovasionline-apk-${{ github.run_id }}/inovasionline.apk \
+              "${{ needs.apk.outputs.version }}" "${{ needs.apk.outputs.build }}"
+            rm -rf /tmp/inovasionline-apk-${{ github.run_id }}

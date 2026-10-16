@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download Inovasi Online</title>
+<meta name="description" content="Download aplikasi Android Inovasi Online.">
+<link rel="icon" href="/download/logo.png">
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --text:#141824; --muted:#5b6275; --line:#e4e7ef; --accent:#2563eb; --accent-text:#fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0e1118; --card:#171b25; --text:#eef0f6; --muted:#9aa2b6; --line:#2a3040; --accent:#3b82f6; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px 16px;
+         background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .card { width:100%; max-width:420px; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:32px 24px; text-align:center; }
+  img { width:88px; height:88px; border-radius:20px; }
+  h1 { font-size:1.5rem; margin:16px 0 4px; }
+  p { margin:0; color:var(--muted); }
+  .btn { display:block; margin:24px 0 12px; padding:14px 20px; border-radius:12px; background:var(--accent); color:var(--accent-text);
+         font-weight:600; text-decoration:none; }
+  .btn[aria-disabled="true"] { opacity:.5; pointer-events:none; }
+  .meta { font-size:.875rem; }
+  .steps { text-align:left; margin:24px 0 0; padding:16px 16px 16px 36px; border-top:1px solid var(--line); font-size:.875rem; color:var(--muted); }
+  .steps li + li { margin-top:6px; }
+</style>
+</head>
+<body>
+<main class="card">
+  <img src="/download/logo.png" alt="">
+  <h1>Inovasi Online</h1>
+  <p data-i18n="tagline"></p>
+  <a id="dl" class="btn" href="/download/inovasionline.apk" aria-disabled="true" data-i18n="download"></a>
+  <p id="meta" class="meta"></p>
+  <ol class="steps">
+    <li data-i18n="step1"></li>
+    <li data-i18n="step2"></li>
+    <li data-i18n="step3"></li>
+  </ol>
+</main>
+<script>
+  var dict = {
+    id: { tagline: "Aplikasi Android", download: "Download APK", version: "Versi {v} (build {b})", updated: "Diperbarui {d}",
+          size: "{s} MB", unavailable: "APK belum tersedia.",
+          step1: "Tekan tombol Download APK di atas.", step2: "Buka file yang terunduh, izinkan instalasi dari sumber ini jika diminta.",
+          step3: "Tekan Install, lalu buka aplikasinya." },
+    en: { tagline: "Android app", download: "Download APK", version: "Version {v} (build {b})", updated: "Updated {d}",
+          size: "{s} MB", unavailable: "APK not available yet.",
+          step1: "Tap the Download APK button above.", step2: "Open the downloaded file and allow installs from this source if asked.",
+          step3: "Tap Install, then open the app." }
+  };
+  var m = document.cookie.match(/(?:^|; )locale=(id|en)/);
+  var locale = m ? m[1] : (navigator.language || "id").slice(0, 2) === "id" ? "id" : "en";
+  var t = dict[locale];
+  document.documentElement.lang = locale;
+  document.querySelectorAll("[data-i18n]").forEach(function (el) { el.textContent = t[el.dataset.i18n]; });
+  function fmt(s, o) { return s.replace(/\{(\w)\}/g, function (_, k) { return o[k]; }); }
+
+  var meta = document.getElementById("meta");
+  var dl = document.getElementById("dl");
+  fetch("/download/release.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+    .then(function (r) {
+      // Versioned URL so Cloudflare never serves a stale APK after a release.
+      dl.href = "/download/" + r.filename + "?v=" + r.buildNumber;
+      dl.removeAttribute("aria-disabled");
+      var date = new Date(r.date).toLocaleDateString(locale === "id" ? "id-ID" : "en-US", { day: "numeric", month: "long", year: "numeric" });
+      var parts = [fmt(t.version, { v: r.version, b: r.buildNumber }), fmt(t.updated, { d: date })];
+      if (r.size) parts.push(fmt(t.size, { s: (r.size / 1048576).toFixed(1) }));
+      meta.textContent = parts.join(" · ");
+    })
+    .catch(function () { meta.textContent = t.unavailable; });
+</script>
+</body>
+</html>

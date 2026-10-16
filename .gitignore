@@ -45,3 +45,8 @@ apps/android/app/debug/
 apps/android/app/profile/
 apps/android/app/release/
 apps/.widget_preview/
+
+# Published APK (written by scripts/publish-apk.sh, served at /download)
+download/*.apk
+download/release.json
+download/.*.tmp
