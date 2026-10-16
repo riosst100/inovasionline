@@ -26,7 +26,7 @@ export default function PrivacyPolicyPage() {
       <p className="mt-6 text-slate-700 leading-relaxed">
         Kebijakan Privasi ini menjelaskan bagaimana aplikasi {SITE_NAME} (&quot;Aplikasi&quot;, &quot;kami&quot;)
         mengumpulkan, menggunakan, membagikan, dan melindungi data Anda saat menggunakan Aplikasi Android
-        dan layanan terkait (package <code>com.inovasionline.twa</code>). Dengan menggunakan Aplikasi, Anda
+        dan layanan terkait (package <code>com.inovasionline.app</code>). Dengan menggunakan Aplikasi, Anda
         menyetujui praktik yang dijelaskan di sini.
       </p>
 

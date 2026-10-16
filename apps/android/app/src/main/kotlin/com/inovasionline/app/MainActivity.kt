@@ -1,4 +1,4 @@
-package com.inovasionline.twa
+package com.inovasionline.app
 
 import io.flutter.embedding.android.FlutterActivity
 

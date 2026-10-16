@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatf
 class DefaultFirebaseOptions {
   /// [isDev] must match the running flavor: main_dev.dart -> true (flavor
   /// `dev`, package com.inovasionline.twa.dev), main_prod.dart -> false
-  /// (flavor `prod`, package com.inovasionline.twa). Each is a distinct
+  /// (flavor `prod`, package com.inovasionline.app). Each is a distinct
   /// Firebase Android app with its own appId in google-services.json.
   static FirebaseOptions currentPlatform({required bool isDev}) {
     if (kIsWeb) {
@@ -32,7 +32,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions androidProd = FirebaseOptions(
     apiKey: 'AIzaSyBUClz3FZvWgB12VQiKMRO9hOObW6KVtvo',
-    appId: '1:962366033380:android:42f6e938e7a33e8e7f4bf1',
+    appId: '1:962366033380:android:6c9e226fdf90ace37f4bf1',
     messagingSenderId: '962366033380',
     projectId: 'inovasi-online-b56b6',
     storageBucket: 'inovasi-online-b56b6.firebasestorage.app',
