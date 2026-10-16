@@ -46,6 +46,9 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   bool _locationGranted = false;
   bool _locationPermanentlyDenied = false;
 
+  /// No default address yet, so location permission/GPS is required.
+  bool _locationNeeded = true;
+
   /// Notifications and location are both granted, so the app can proceed.
   bool _permissionsDone = false;
   bool _locatingStarted = false;
@@ -136,13 +139,34 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
       await _requestNotification();
     }
 
-    if (!_locationGranted && !_locationPermanentlyDenied) {
+    // Location is only needed to pick the default address. Once one exists
+    // the GPS is never touched again (the user changes it by hand instead).
+    _locationNeeded = await _needsDefaultAddress();
+    if (!mounted) return;
+
+    if (_locationNeeded && !_locationGranted && !_locationPermanentlyDenied) {
       await _requestLocation();
     }
 
     if (!mounted) return;
     setState(() => _checking = false);
     _evaluate();
+  }
+
+  /// Waits for auth and the saved guest address to load, then reports whether
+  /// there is still no default address.
+  Future<bool> _needsDefaultAddress() async {
+    while (mounted && ref.read(authProvider).status == AuthStatus.unknown) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (!mounted) return false;
+    final auth = ref.read(authProvider);
+    final user = auth.user;
+    if (auth.status == AuthStatus.authenticated && user != null) {
+      return !user.hasAddress;
+    }
+    await ref.read(guestAddressProvider.notifier).ready;
+    return ref.read(guestAddressProvider) == null;
   }
 
   /// Re-reads the permission status without prompting.
@@ -152,7 +176,8 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   }
 
   void _evaluate() {
-    setState(() => _permissionsDone = _notificationGranted && _locationGranted);
+    setState(() => _permissionsDone =
+        _notificationGranted && (_locationGranted || !_locationNeeded));
   }
 
   Future<void> _requestNotification() async {

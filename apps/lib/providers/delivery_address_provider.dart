@@ -52,13 +52,16 @@ final guestAddressProvider =
 
 class GuestAddressNotifier extends StateNotifier<NearestAddress?> {
   GuestAddressNotifier(this._ref) : super(null) {
-    _load();
+    ready = _load();
   }
 
   static const _key = 'guest_delivery_address';
 
   final Ref _ref;
   final _storage = const FlutterSecureStorage();
+
+  /// Completes once the saved address (if any) has been read from storage.
+  late final Future<void> ready;
 
   Future<void> _load() async {
     try {
