@@ -13,7 +13,8 @@ import {
   Store,
   Ban,
   ShieldCheck,
-  MessageSquareOff
+  MessageSquareOff,
+  UserPlus
 } from 'lucide-react';
 
 const FEATURE_OPTIONS: { value: BannableFeature; label: string }[] = [
@@ -31,6 +32,32 @@ export default function CustomersPage() {
   const [banTarget, setBanTarget] = useState<Customer | null>(null);
   const [banFeatures, setBanFeatures] = useState<BannableFeature[]>([]);
   const [banReason, setBanReason] = useState('');
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', email: '', phone: '', password: '' });
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
+
+  const openAddModal = () => {
+    setAddForm({ name: '', email: '', phone: '', password: '' });
+    setAddError('');
+    setShowAdd(true);
+  };
+
+  const handleAddCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setAdding(true);
+      setAddError('');
+      await adminApi.createCustomer(addForm);
+      setShowAdd(false);
+      await fetchCustomers();
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'Gagal menambahkan pelanggan.');
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -124,6 +151,12 @@ export default function CustomersPage() {
               Daftar pembeli dan pengguna yang mendaftar melalui aplikasi mobile Inovasi Online ({total} pelanggan).
             </p>
           </div>
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs md:text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            <UserPlus className="h-4 w-4" /> Tambah Customer
+          </button>
         </div>
 
         {/* Search */}
@@ -269,6 +302,54 @@ export default function CustomersPage() {
           </div>
         </div>
       </div>
+
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form onSubmit={handleAddCustomer} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-extrabold text-slate-900">Tambah Customer</h3>
+            <p className="mt-1 text-xs text-slate-500">Akun langsung aktif dan terverifikasi.</p>
+
+            <div className="mt-4 space-y-3">
+              {([
+                ['name', 'Nama', 'text', true],
+                ['email', 'Email', 'email', true],
+                ['phone', 'No. Telepon (opsional)', 'tel', false],
+                ['password', 'Password (min. 8 karakter)', 'password', true],
+              ] as const).map(([key, label, type, required]) => (
+                <input
+                  key={key}
+                  type={type}
+                  required={required}
+                  minLength={key === 'password' ? 8 : undefined}
+                  value={addForm[key]}
+                  onChange={(e) => setAddForm((p) => ({ ...p, [key]: e.target.value }))}
+                  placeholder={label}
+                  className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-emerald-500"
+                />
+              ))}
+            </div>
+
+            {addError && <p className="mt-3 text-xs font-semibold text-red-600">{addError}</p>}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAdd(false)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={adding}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {adding ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {banTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

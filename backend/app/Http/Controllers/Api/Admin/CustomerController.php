@@ -29,6 +29,29 @@ class CustomerController extends Controller
         return ApiResponse::paginated($paginator, UserResource::class, 'Daftar customer berhasil dimuat.');
     }
 
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email',
+            'phone' => 'nullable|string|max:30|unique:users,phone',
+            'password' => 'required|string|min:8',
+        ]);
+
+        $user = new User([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'password' => $validated['password'],
+        ]);
+        $user->forceFill([
+            'role' => UserRole::CUSTOMER,
+            'email_verified_at' => now(),
+        ])->save();
+
+        return ApiResponse::success(new UserResource($user), 'Customer berhasil ditambahkan.', [], 201);
+    }
+
     public function show(User $user): JsonResponse
     {
         return ApiResponse::success(new UserResource($user), 'Detail customer berhasil dimuat.');

@@ -433,6 +433,7 @@ Route::prefix('admin')->group(function () {
         // Customer Listing (users table)
         Route::prefix('customers')->group(function () {
             Route::get('/', [CustomerController::class, 'index']);
+            Route::post('/', [CustomerController::class, 'store']);
             Route::get('/{user}', [CustomerController::class, 'show']);
             Route::post('/{user}/block', [CustomerController::class, 'block']);
             Route::post('/{user}/unblock', [CustomerController::class, 'unblock']);

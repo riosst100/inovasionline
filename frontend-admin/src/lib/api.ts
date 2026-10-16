@@ -241,6 +241,13 @@ export const adminApi = {
     return apiRequest<PaginatedData<Customer>>(`/admin/customers?${query.toString()}`);
   },
 
+  async createCustomer(data: { name: string; email: string; phone?: string; password: string }): Promise<Customer> {
+    return apiRequest<Customer>('/admin/customers', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, phone: data.phone || null }),
+    });
+  },
+
   async blockCustomer(id: string, reason?: string): Promise<Customer> {
     return apiRequest<Customer>(`/admin/customers/${id}/block`, {
       method: 'POST',
