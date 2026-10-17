@@ -88,6 +88,17 @@ type FormState = {
   products: PickedProduct[];
 };
 
+const blankForm: FormState = {
+  name: '',
+  start_date: '',
+  start_time: '',
+  end_date: '',
+  end_time: '',
+  is_active: true,
+  products: [],
+};
+
+/** Reads the clock, so only call it from event handlers (not during render/prerender). */
 function emptyForm(): FormState {
   const today = splitLocal(new Date().toISOString()).date;
   return {
@@ -113,7 +124,7 @@ export default function FlashSalesPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [modal, setModal] = useState<{ editingId: string | null } | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<FormState>(blankForm);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
