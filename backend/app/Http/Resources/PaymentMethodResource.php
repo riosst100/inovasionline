@@ -11,13 +11,8 @@ class PaymentMethodResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'store_id' => $this->store_id,
-            'store' => $this->whenLoaded('store', fn () => [
-                'id' => $this->store->id,
-                'name' => $this->store->name,
-                'slug' => $this->store->slug,
-            ]),
             'type' => $this->type?->value,
+            'gateway_channel' => $this->gateway_channel,
             'name' => $this->name,
             'description' => $this->description,
             'instructions' => $this->instructions,

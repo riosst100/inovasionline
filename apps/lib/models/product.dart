@@ -9,7 +9,6 @@ class Product {
     this.stock = 0,
     this.soldCount = 0,
     this.imageUrl,
-    this.storeName,
     this.promotionEndsAt,
   });
 
@@ -23,7 +22,6 @@ class Product {
         stock: json['stock'] as int? ?? 0,
         soldCount: json['sold_count'] as int? ?? 0,
         imageUrl: json['image_url'] as String?,
-        storeName: json['store_name'] as String?,
         promotionEndsAt: json['promotion_ends_at'] as String?,
       );
 
@@ -36,7 +34,6 @@ class Product {
   final int stock;
   final int soldCount;
   final String? imageUrl;
-  final String? storeName;
   final String? promotionEndsAt;
 
   double get displayPrice => salePrice ?? regularPrice;
@@ -55,36 +52,6 @@ class ProductImage {
   final String url;
   final bool isPrimary;
   final int sortOrder;
-}
-
-class ProductStoreSummary {
-  ProductStoreSummary({
-    required this.id,
-    required this.name,
-    required this.slug,
-    this.logoUrl,
-    this.city,
-    this.deliveryAvailable = false,
-    this.ownerUserId,
-  });
-
-  factory ProductStoreSummary.fromJson(Map<String, dynamic> json) => ProductStoreSummary(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        slug: json['slug'] as String,
-        logoUrl: json['logo_url'] as String?,
-        city: json['city'] as String?,
-        deliveryAvailable: json['delivery_available'] as bool? ?? false,
-        ownerUserId: json['owner_user_id'] as String?,
-      );
-
-  final String id;
-  final String name;
-  final String slug;
-  final String? logoUrl;
-  final String? city;
-  final bool deliveryAvailable;
-  final String? ownerUserId;
 }
 
 class ProductVariant {
@@ -136,7 +103,6 @@ class ProductDetail {
     this.images = const [],
     this.variants = const [],
     this.category,
-    this.store,
     this.createdAt,
   });
 
@@ -164,9 +130,6 @@ class ProductDetail {
         category: json['category'] != null
             ? ProductCategorySummary.fromJson(json['category'] as Map<String, dynamic>)
             : null,
-        store: json['store'] != null
-            ? ProductStoreSummary.fromJson(json['store'] as Map<String, dynamic>)
-            : null,
         createdAt: json['created_at'] as String?,
       );
 
@@ -187,7 +150,6 @@ class ProductDetail {
   final List<ProductImage> images;
   final List<ProductVariant> variants;
   final ProductCategorySummary? category;
-  final ProductStoreSummary? store;
   final String? createdAt;
 
   double get displayPrice => salePrice ?? regularPrice;

@@ -13,7 +13,6 @@ class ChatParticipantResource extends JsonResource
             'id' => $this->user->id,
             'name' => $this->user->name,
             'avatar_url' => $this->user->avatar_path ? asset('storage/'.$this->user->avatar_path) : null,
-            'is_seller' => $this->user->isSeller(),
         ];
     }
 }

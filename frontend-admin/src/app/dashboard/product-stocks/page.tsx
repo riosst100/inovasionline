@@ -1,9 +1,20 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
+import ImportExportActions from '../../../components/data-transfer/ImportExportActions';
+import DataTransferProgress from '../../../components/data-transfer/DataTransferProgress';
 import { adminApi, ApiError } from '../../../lib/api';
-import { ProductStockRow, Warehouse } from '../../../types';
+import { useDataTransfers } from '../../../lib/dataTransfer';
+import { DataTransfer, ProductStockRow, Warehouse } from '../../../types';
+
+const IMPORT_HINT = (
+  <>
+    Satu baris per produk per gudang. Kolom: <b>product_id</b> atau <b>sku</b>, <b>warehouse_code</b>, dan{' '}
+    <b>quantity</b> (wajib). product_name & warehouse_name hanya informasi. Stok gudang yang tidak ada di file tidak
+    berubah; total stok produk dihitung ulang otomatis.
+  </>
+);
 import SearchableSelect from '../../../components/ui/SearchableSelect';
 import { AlertCircle, Loader2, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
 
@@ -19,6 +30,12 @@ export default function ProductStocksPage() {
   const [editRows, setEditRows] = useState<{ warehouse_id: string; quantity: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const onTransferFinished = useCallback((t: DataTransfer) => {
+    if (t.type === 'import' && t.status === 'completed') setReloadKey((k) => k + 1);
+  }, []);
+  const transfers = useDataTransfers({ resource: 'product-stocks', perPage: 5 }, onTransferFinished);
 
   useEffect(() => {
     adminApi.getWarehouses().then(setWarehouses).catch(() => {});
@@ -45,7 +62,7 @@ export default function ProductStocksPage() {
     return () => {
       cancelled = true;
     };
-  }, [debounced, warehouseId]);
+  }, [debounced, warehouseId, reloadKey]);
 
   const activeWarehouses = warehouses.filter((w) => w.is_active !== false);
 
@@ -92,12 +109,22 @@ export default function ProductStocksPage() {
   return (
     <AdminLayout>
       <div className="mx-auto max-w-6xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Stok Produk</h1>
-          <p className="text-sm text-slate-500">
-            Produk yang stoknya sudah diatur di gudang. Klik ikon pensil untuk mengubah stok per gudang.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Stok Produk</h1>
+            <p className="text-sm text-slate-500">
+              Produk yang stoknya sudah diatur di gudang. Klik ikon pensil untuk mengubah stok per gudang.
+            </p>
+          </div>
+          <ImportExportActions
+            resource="product-stocks"
+            onStarted={transfers.track}
+            exportFilters={{ search: debounced, warehouse_id: warehouseId }}
+            importHint={IMPORT_HINT}
+          />
         </div>
+
+        <DataTransferProgress items={transfers.items} resource="product-stocks" />
 
         {error && (
           <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">

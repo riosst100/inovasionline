@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import NoWarehouseNotice from '../../../../components/warehouses/NoWarehouseNotice';
 import AdminLayout from '../../../../components/layout/AdminLayout';
 import SearchableSelect from '../../../../components/ui/SearchableSelect';
 import { adminApi } from '../../../../lib/api';
@@ -29,7 +30,6 @@ const EMPTY_FORM = {
   description: '',
   regular_price: '',
   sale_price: '',
-  stock: 0,
   sku: '',
   status: 'draft',
 };
@@ -217,10 +217,7 @@ export default function NewProductPage() {
             </div>
 
             {warehouses.length === 0 ? (
-              <label className="block text-xs font-semibold text-slate-600">
-                Stok tersedia
-                <input type="number" min={0} required value={form.stock} onChange={(e) => setField('stock', e.target.value)} className={inputCls} />
-              </label>
+              <NoWarehouseNotice />
             ) : (
               <>
                 {rows.length === 0 && (

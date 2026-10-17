@@ -32,7 +32,6 @@ class ChatThreadResource extends JsonResource
                 'id' => $otherUser->id,
                 'name' => $otherUser->name,
                 'avatar_url' => $otherUser->avatar_path ? asset('storage/'.$otherUser->avatar_path) : null,
-                'is_seller' => $otherUser->isSeller(),
             ] : null,
             'latest_message' => $this->whenLoaded('latestMessage', fn () => $this->latestMessage ? [
                 'body' => $this->latestMessage->body,

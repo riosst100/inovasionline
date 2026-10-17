@@ -20,6 +20,7 @@ use App\Services\RegionLocator;
 use App\Services\WhatsAppOtpService;
 use App\Support\PhoneNumber;
 use App\Support\Responses\ApiResponse;
+use App\Support\UserAgent;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,7 +57,7 @@ class AuthController extends Controller
             $this->whatsAppOtpService->clearVerification($phone);
 
             return ApiResponse::success(
-                $this->tokenPayload($user, $request),
+                $this->tokenPayload($user, $request, 'register'),
                 'Registration successful.',
                 [],
                 201
@@ -65,6 +66,7 @@ class AuthController extends Controller
 
         Auth::login($user);
         $request->session()->regenerate();
+        $this->recordLogin($user, $request, 'register');
 
         return ApiResponse::success(new UserResource($user), 'Registration successful.', [], 201);
     }
@@ -112,7 +114,7 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            return ApiResponse::success($this->tokenPayload(Auth::user(), $request), 'Login successful.');
+            return ApiResponse::success($this->tokenPayload(Auth::user(), $request, 'password'), 'Login successful.');
         }
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
@@ -122,6 +124,7 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+        $this->recordLogin(Auth::user(), $request, 'password');
 
         return ApiResponse::success(new UserResource(Auth::user()), 'Login successful.');
     }
@@ -137,11 +140,12 @@ class AuthController extends Controller
         }
 
         if ($this->wantsToken($request)) {
-            return ApiResponse::success($this->tokenPayload($user, $request), 'Login successful.');
+            return ApiResponse::success($this->tokenPayload($user, $request, 'google'), 'Login successful.');
         }
 
         Auth::login($user);
         $request->session()->regenerate();
+        $this->recordLogin($user, $request, 'google');
 
         return ApiResponse::success(new UserResource($user), 'Login successful.');
     }
@@ -172,21 +176,40 @@ class AuthController extends Controller
             || $request->is('api/*');
     }
 
-    private function tokenPayload(User $user, Request $request): array
+    private function tokenPayload(User $user, Request $request, string $method): array
     {
-        $deviceName = $request->string('device_name')->toString() ?: 'mobile-device';
+        $deviceName = mb_substr($request->string('device_name')->toString(), 0, 255)
+            ?: UserAgent::label($request->userAgent());
 
-        $token = $user->createToken($deviceName)->plainTextToken;
+        $token = $user->createToken($deviceName);
+        $token->accessToken->forceFill([
+            'ip_address' => $request->ip(),
+            'user_agent' => mb_substr((string) $request->userAgent(), 0, 500),
+        ])->save();
+
+        $this->recordLogin($user, $request, $method, $deviceName);
 
         return [
             'user' => new UserResource($user),
-            'token' => $token,
+            'token' => $token->plainTextToken,
         ];
+    }
+
+    /** Appends to the login history the admin panel shows on the customer detail page. */
+    private function recordLogin(User $user, Request $request, string $method, ?string $deviceName = null): void
+    {
+        $user->loginLogs()->create([
+            'method' => $method,
+            'client' => $request->header('X-Client') === 'mobile' ? 'mobile' : 'web',
+            'device_name' => $deviceName ?? UserAgent::label($request->userAgent()),
+            'ip_address' => $request->ip(),
+            'user_agent' => mb_substr((string) $request->userAgent(), 0, 500),
+        ]);
     }
 
     public function user(Request $request): JsonResponse
     {
-        return ApiResponse::success(new UserResource($request->user()->load('seller')), 'User retrieved successfully.');
+        return ApiResponse::success(new UserResource($request->user()), 'User retrieved successfully.');
     }
 
     public function updateProfile(UpdateProfileRequest $request): JsonResponse
@@ -203,7 +226,7 @@ class AuthController extends Controller
 
         $user->update($data);
 
-        return ApiResponse::success(new UserResource($user->fresh()->load('seller')), 'Profile updated successfully.');
+        return ApiResponse::success(new UserResource($user->fresh()), 'Profile updated successfully.');
     }
 
     public function updateAddress(UpdateAddressRequest $request): JsonResponse
@@ -213,7 +236,7 @@ class AuthController extends Controller
 
         $this->chatService->syncMembershipsForUser($user->fresh());
 
-        return ApiResponse::success(new UserResource($user->fresh()->load('seller')), 'Address updated successfully.');
+        return ApiResponse::success(new UserResource($user->fresh()), 'Address updated successfully.');
     }
 
     /**
@@ -231,7 +254,7 @@ class AuthController extends Controller
         $user = $request->user();
 
         if ($user->hasAddress()) {
-            return ApiResponse::success(new UserResource($user->load('seller')), 'Address already set.');
+            return ApiResponse::success(new UserResource($user), 'Address already set.');
         }
 
         $village = $this->regionLocator->nearest((float) $data['latitude'], (float) $data['longitude']);
@@ -243,7 +266,7 @@ class AuthController extends Controller
         $user->update(Arr::except($village, 'label'));
         $this->chatService->syncMembershipsForUser($user->fresh());
 
-        return ApiResponse::success(new UserResource($user->fresh()->load('seller')), 'Address updated successfully.');
+        return ApiResponse::success(new UserResource($user->fresh()), 'Address updated successfully.');
     }
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse

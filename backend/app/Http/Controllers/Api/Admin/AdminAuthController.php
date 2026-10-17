@@ -7,6 +7,7 @@ use App\Http\Middleware\AdminTokenFromCookie;
 use App\Http\Resources\AdminUserResource;
 use App\Models\AdminUser;
 use App\Support\Responses\ApiResponse;
+use App\Support\UserAgent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
@@ -39,7 +40,7 @@ class AdminAuthController extends Controller
 
         $days = (int) config('admin.session_days');
         $token = $adminUser->createToken(
-            $this->deviceLabel($request),
+            UserAgent::label($request->userAgent()),
             ['admin'],
             now()->addDays($days),
         );
@@ -151,31 +152,5 @@ class AdminAuthController extends Controller
     private function forgetCookie(): SymfonyCookie
     {
         return Cookie::forget(AdminTokenFromCookie::COOKIE, '/', config('admin.cookie_domain'));
-    }
-
-    /** Human readable "Browser · OS" label from the User-Agent. */
-    private function deviceLabel(Request $request): string
-    {
-        $ua = (string) $request->userAgent();
-
-        $browser = match (true) {
-            str_contains($ua, 'Edg/') => 'Edge',
-            str_contains($ua, 'OPR/') || str_contains($ua, 'Opera') => 'Opera',
-            str_contains($ua, 'Firefox/') => 'Firefox',
-            str_contains($ua, 'Chrome/') => 'Chrome',
-            str_contains($ua, 'Safari/') => 'Safari',
-            default => 'Browser',
-        };
-
-        $os = match (true) {
-            str_contains($ua, 'Windows') => 'Windows',
-            str_contains($ua, 'Android') => 'Android',
-            str_contains($ua, 'iPhone') || str_contains($ua, 'iPad') => 'iOS',
-            str_contains($ua, 'Mac OS') => 'macOS',
-            str_contains($ua, 'Linux') => 'Linux',
-            default => 'Unknown OS',
-        };
-
-        return "{$browser} · {$os}";
     }
 }

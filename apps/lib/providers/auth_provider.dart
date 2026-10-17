@@ -12,6 +12,7 @@ import '../core/api/account_block.dart';
 import '../core/api/api_exception.dart';
 import '../models/user.dart';
 import '../services/location_service.dart';
+import '../services/push_notification_handler.dart';
 import 'core_providers.dart';
 import 'delivery_address_provider.dart';
 
@@ -74,7 +75,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final user = await _ref
           .read(authServiceProvider)
-          .login(login: login, password: password);
+          .login(login: login, password: password)
+          .then(_adoptGuestAddress);
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
       await _syncDeviceToken();
@@ -105,7 +107,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
             dateOfBirth: dateOfBirth,
             password: password,
             passwordConfirmation: passwordConfirmation,
-          );
+          )
+          .then(_adoptGuestAddress);
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
       await _syncDeviceToken();
@@ -167,7 +170,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[GOOGLE_AUTH] Step 6: sending idToken to backend...');
       final user = await _ref
           .read(authServiceProvider)
-          .loginWithGoogle(idToken);
+          .loginWithGoogle(idToken)
+          .then(_adoptGuestAddress);
       debugPrint('[GOOGLE_AUTH] Step 7: login success, user: ${user.name}');
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
@@ -193,6 +197,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Carries the address picked while browsing as a guest over to an account
+  /// that has none yet, so signing in doesn't reset the delivery address. An
+  /// address already saved on the account wins. Best-effort: on failure the
+  /// account is returned unchanged and the usual GPS default still applies.
+  Future<User> _adoptGuestAddress(User user) async {
+    if (user.hasAddress) return user;
+    final guestNotifier = _ref.read(guestAddressProvider.notifier);
+    await guestNotifier.ready;
+    final guest = _ref.read(guestAddressProvider);
+    if (guest == null) return user;
+
+    try {
+      return await _ref
+          .read(authServiceProvider)
+          .updateAddress(
+            provinceCode: guest.provinceCode,
+            cityCode: guest.cityCode,
+            districtCode: guest.districtCode,
+            villageCode: guest.villageCode,
+          );
+    } catch (_) {
+      return user;
+    }
+  }
+
   void _syncBlock(User user) {
     AccountBlock.notifier.value = user.isBlocked
         ? AccountBlockInfo(
@@ -204,6 +233,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     try {
+      await firebaseReady.future;
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
         await _ref.read(notificationServiceProvider).unregisterToken(token);
@@ -218,6 +248,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _syncDeviceToken() async {
     try {
+      await firebaseReady.future;
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
         await _ref.read(notificationServiceProvider).registerToken(token);

@@ -13,6 +13,8 @@ interface HeaderProps {
 const LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   drivers: 'Kurir',
+  'delivery-schedules': 'Jadwal Pengiriman',
+  'shipping-methods': 'Metode Pengiriman',
   roles: 'Hak Akses & Role',
   users: 'User Admin & Staff',
   customers: 'Pelanggan',
@@ -23,6 +25,7 @@ const LABELS: Record<string, string> = {
   suggestions: 'Saran Pencarian',
   orders: 'Pesanan',
   sessions: 'Sesi & Perangkat',
+  'data-transfers': 'Import / Export',
 };
 
 export default function AdminHeader({ onMenuToggle }: HeaderProps) {

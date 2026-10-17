@@ -7,8 +7,12 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Support\Enums\UserRole;
 use App\Support\Responses\ApiResponse;
+use App\Support\UserAgent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class CustomerController extends Controller
 {
@@ -52,9 +56,127 @@ class CustomerController extends Controller
         return ApiResponse::success(new UserResource($user), 'Customer berhasil ditambahkan.', [], 201);
     }
 
-    public function show(User $user): JsonResponse
+    public function show(Request $request, User $user): JsonResponse
     {
-        return ApiResponse::success(new UserResource($user), 'Detail customer berhasil dimuat.');
+        $tokens = $user->tokens()
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->orderByDesc('last_used_at')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $webSessions = config('session.driver') === 'database'
+            ? DB::table(config('session.table', 'sessions'))
+                ->where('user_id', $user->id)
+                ->orderByDesc('last_activity')
+                ->get(['id', 'ip_address', 'user_agent', 'last_activity'])
+            : collect();
+
+        $sessions = $tokens->map(fn (PersonalAccessToken $t) => [
+            'id' => (string) $t->id,
+            'type' => 'token',
+            'device' => $t->name,
+            'ip_address' => $t->ip_address,
+            'user_agent' => $t->user_agent,
+            'last_active_at' => ($t->last_used_at ?? $t->created_at)?->toIso8601String(),
+            'created_at' => $t->created_at?->toIso8601String(),
+            'expires_at' => $t->expires_at?->toIso8601String(),
+        ])->concat($webSessions->map(fn ($s) => [
+            'id' => $s->id,
+            'type' => 'web',
+            'device' => UserAgent::label($s->user_agent),
+            'ip_address' => $s->ip_address,
+            'user_agent' => $s->user_agent,
+            'last_active_at' => Carbon::createFromTimestamp($s->last_activity)->toIso8601String(),
+            'created_at' => null,
+            'expires_at' => null,
+        ]))->sortByDesc('last_active_at')->values();
+
+        $history = $user->loginLogs()->latest('id')->limit(50)->get();
+        $lastLogin = $history->first();
+
+        // Every IP seen for this customer, from login history plus currently active sessions.
+        $ipAddresses = $user->loginLogs()
+            ->whereNotNull('ip_address')
+            ->selectRaw('ip_address, count(*) as login_count, min(created_at) as first_seen_at, max(created_at) as last_seen_at')
+            ->groupBy('ip_address')
+            ->get()
+            ->keyBy('ip_address')
+            ->map(fn ($row) => [
+                'ip_address' => $row->ip_address,
+                'login_count' => (int) $row->login_count,
+                'first_seen_at' => Carbon::parse($row->first_seen_at)->toIso8601String(),
+                'last_seen_at' => Carbon::parse($row->last_seen_at)->toIso8601String(),
+                'active_sessions' => 0,
+            ]);
+
+        foreach ($sessions as $s) {
+            if (! $s['ip_address']) {
+                continue;
+            }
+            $row = $ipAddresses->get($s['ip_address'], [
+                'ip_address' => $s['ip_address'],
+                'login_count' => 0,
+                'first_seen_at' => $s['created_at'] ?? $s['last_active_at'],
+                'last_seen_at' => $s['last_active_at'],
+                'active_sessions' => 0,
+            ]);
+            $row['active_sessions']++;
+            if ($s['last_active_at'] > $row['last_seen_at']) {
+                $row['last_seen_at'] = $s['last_active_at'];
+            }
+            $ipAddresses->put($s['ip_address'], $row);
+        }
+
+        return ApiResponse::success([
+            'customer' => (new UserResource($user))->toArray($request) + [
+                'wallet_balance' => $user->wallet_balance,
+                'phone_verified_at' => $user->phone_verified_at,
+            ],
+            'login' => [
+                'has_password' => $user->password !== null,
+                'google_linked' => $user->google_id !== null,
+                'email_verified_at' => $user->email_verified_at,
+                'phone_verified_at' => $user->phone_verified_at,
+                'last_login_at' => $lastLogin?->created_at?->toIso8601String(),
+                'last_login_ip' => $lastLogin?->ip_address,
+                'last_login_method' => $lastLogin?->method,
+                'login_count' => $user->loginLogs()->count(),
+                'active_session_count' => $sessions->count(),
+            ],
+            'sessions' => $sessions,
+            'push_devices' => $user->deviceTokens()->latest('updated_at')->get()->map(fn ($d) => [
+                'id' => $d->id,
+                'platform' => $d->platform,
+                'token_preview' => mb_substr($d->token, 0, 12).'…'.mb_substr($d->token, -6),
+                'registered_at' => $d->created_at?->toIso8601String(),
+                'updated_at' => $d->updated_at?->toIso8601String(),
+            ]),
+            'ip_addresses' => $ipAddresses->sortByDesc('last_seen_at')->values(),
+            'login_history' => $history->map(fn ($log) => [
+                'id' => $log->id,
+                'method' => $log->method,
+                'client' => $log->client,
+                'device' => $log->device_name,
+                'ip_address' => $log->ip_address,
+                'user_agent' => $log->user_agent,
+                'created_at' => $log->created_at?->toIso8601String(),
+            ]),
+        ], 'Detail customer berhasil dimuat.');
+    }
+
+    public function revokeSession(User $user, string $session): JsonResponse
+    {
+        $deleted = ctype_digit($session)
+            ? $user->tokens()->whereKey((int) $session)->delete()
+            : (config('session.driver') === 'database'
+                ? DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->where('id', $session)->delete()
+                : 0);
+
+        if (! $deleted) {
+            return ApiResponse::error('Sesi tidak ditemukan.', [], 404);
+        }
+
+        return ApiResponse::success(null, 'Sesi customer berhasil dihentikan.');
     }
 
     public function block(Request $request, User $user): JsonResponse

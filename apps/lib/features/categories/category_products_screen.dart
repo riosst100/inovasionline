@@ -6,6 +6,7 @@ import '../../models/product.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/product_grid.dart';
 import '../../widgets/skeleton.dart';
+import '../cart/cart_providers.dart';
 
 class CategoryProductsScreen extends ConsumerStatefulWidget {
   const CategoryProductsScreen({super.key, required this.slug, this.categoryName});
@@ -70,8 +71,28 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final cartItemCount = ref.watch(cartProvider).cart?.itemCount ?? 0;
+
     return Scaffold(
-      appBar: AppBar(title: Text(_title ?? 'Kategori')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Kembali',
+          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+        ),
+        title: Text(_title ?? 'Kategori', maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            icon: Badge(
+              label: Text(cartItemCount > 99 ? '99+' : '$cartItemCount'),
+              isLabelVisible: cartItemCount > 0,
+              child: const Icon(Icons.shopping_bag_outlined),
+            ),
+            tooltip: 'Keranjang',
+            onPressed: () => context.push('/cart'),
+          ),
+        ],
+      ),
       body: _loading
           ? const ProductGridSkeleton()
           : RefreshIndicator(

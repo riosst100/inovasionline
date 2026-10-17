@@ -3,20 +3,17 @@ class ChatOtherUser {
     required this.id,
     required this.name,
     this.avatarUrl,
-    this.isSeller = false,
   });
 
   factory ChatOtherUser.fromJson(Map<String, dynamic> json) => ChatOtherUser(
     id: json['id'] as String,
     name: json['name'] as String,
     avatarUrl: json['avatar_url'] as String?,
-    isSeller: json['is_seller'] as bool? ?? false,
   );
 
   final String id;
   final String name;
   final String? avatarUrl;
-  final bool isSeller;
 }
 
 class ChatParticipant {
@@ -24,7 +21,6 @@ class ChatParticipant {
     required this.id,
     required this.name,
     this.avatarUrl,
-    this.isSeller = false,
   });
 
   factory ChatParticipant.fromJson(Map<String, dynamic> json) =>
@@ -32,13 +28,11 @@ class ChatParticipant {
         id: json['id'] as String,
         name: json['name'] as String,
         avatarUrl: json['avatar_url'] as String?,
-        isSeller: json['is_seller'] as bool? ?? false,
       );
 
   final String id;
   final String name;
   final String? avatarUrl;
-  final bool isSeller;
 }
 
 class ChatThreadLatestMessage {

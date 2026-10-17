@@ -8,4 +8,5 @@ enum PromotionType: string
     case FIXED_DISCOUNT = 'fixed_discount';
     case FREE_SHIPPING = 'free_shipping';
     case BUY_ONE_GET_ONE = 'buy_one_get_one';
+    case FLASH_SALE = 'flash_sale';
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:android_intent_plus/android_intent.dart';
@@ -9,10 +10,13 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../config/theme.dart';
+import '../../models/nearest_address.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/delivery_address_provider.dart';
 import '../../services/location_service.dart';
+import '../../services/push_notification_handler.dart';
+import '../../widgets/app_loading_skeleton.dart';
 import 'manual_address_screen.dart';
 
 /// First thing that happens once the native splash is gone.
@@ -25,6 +29,10 @@ import 'manual_address_screen.dart';
 /// 2. If the signed-in user has no address yet and location is allowed, shows
 ///    a loading screen while the current location is turned into the default
 ///    address.
+/// 3. Once a default address exists, location permission and GPS are never
+///    asked for again. Only when both happen to be on already, the current
+///    location is looked up quietly; if it is a different village, the user
+///    picks between the default address and their current location.
 class PermissionGate extends ConsumerStatefulWidget {
   const PermissionGate({super.key, required this.child});
 
@@ -71,6 +79,18 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
 
   /// The user chose to pick a served area by hand from the out-of-area screen.
   bool _pickingManually = false;
+
+  /// Where the device is now, when that differs from the default address;
+  /// offered as an alternative over the app.
+  NearestAddress? _currentLocation;
+  bool _applyingCurrentLocation = false;
+
+  /// Completes once the logo + wordmark intro has finished playing, so the
+  /// permission dialogs never pop up mid-animation.
+  final _introPlayed = Completer<void>();
+
+  /// The intro has faded out and is no longer built.
+  bool _introGone = false;
 
   bool get _isMobile => Platform.isAndroid || Platform.isIOS;
 
@@ -135,7 +155,11 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     await _readStatuses();
     if (!mounted) return;
 
+    // The checks run alongside the intro; only the system dialogs wait for it
+    // so they never pop up mid-animation.
     if (!_notificationGranted && !_notificationPermanentlyDenied) {
+      await _introPlayed.future;
+      if (!mounted) return;
       await _requestNotification();
     }
 
@@ -145,16 +169,64 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     if (!mounted) return;
 
     if (_locationNeeded && !_locationGranted && !_locationPermanentlyDenied) {
+      await _introPlayed.future;
+      if (!mounted) return;
       await _requestLocation();
     }
 
     if (!mounted) return;
     setState(() => _checking = false);
     _evaluate();
+
+    if (!_locationNeeded) _offerCurrentLocation();
+  }
+
+  /// A default address exists, so nothing is prompted here: only when
+  /// location is already allowed and GPS already on, look up where the device
+  /// is and offer it if that is somewhere else.
+  Future<void> _offerCurrentLocation() async {
+    try {
+      if (!_locationGranted || !await LocationService.isServiceEnabled()) {
+        return;
+      }
+      final result = await ref.read(deliveryAddressActionsProvider).locate();
+      final found = result.address;
+      if (!mounted || found == null) return;
+      final current = ref.read(deliveryAddressProvider);
+      if (current == null || current.villageCode == found.villageCode) return;
+      setState(() => _currentLocation = found);
+    } catch (_) {
+      // Purely a suggestion; the default address stays in place.
+    }
+  }
+
+  Future<void> _useCurrentLocation() async {
+    final found = _currentLocation;
+    if (found == null) return;
+    setState(() => _applyingCurrentLocation = true);
+    final saved = await ref.read(deliveryAddressActionsProvider).apply(found);
+    if (!mounted) return;
+    setState(() {
+      _applyingCurrentLocation = false;
+      _currentLocation = null;
+    });
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? 'Alamat pengiriman diatur sesuai lokasi kamu.'
+              : 'Gagal menyimpan alamat, alamat utama tetap dipakai.',
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   /// Waits for auth and the saved guest address to load, then reports whether
   /// there is still no default address.
+  /// Waits for the session restore (/auth/user); meanwhile the loading screen
+  /// shows, not the splash.
   Future<bool> _needsDefaultAddress() async {
     while (mounted && ref.read(authProvider).status == AuthStatus.unknown) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -184,6 +256,7 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     final status = await Permission.notification.request();
     if (status.isGranted) {
       // Registers for push on iOS; a no-op prompt-wise once granted.
+      await firebaseReady.future;
       await FirebaseMessaging.instance.requestPermission();
     }
     if (!mounted) return;
@@ -345,7 +418,44 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
 
   @override
   Widget build(BuildContext context) {
-    if (_checking) return const _SplashBackdrop();
+    // Always a Stack so the intro fading out never remounts what is beneath.
+    // The intro never waits on the checks below it: whatever is still
+    // pending once it has played shows as a loading screen instead.
+    final introDone = _introPlayed.isCompleted;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _buildGate(context),
+        if (!_introGone)
+          IgnorePointer(
+            ignoring: introDone,
+            child: AnimatedOpacity(
+              opacity: introDone ? 0 : 1,
+              duration: const Duration(milliseconds: 250),
+              onEnd: () {
+                if (introDone) setState(() => _introGone = true);
+              },
+              child: _SplashIntro(
+                onPlayed: () {
+                  if (!mounted || _introPlayed.isCompleted) return;
+                  setState(_introPlayed.complete);
+                },
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildGate(BuildContext context) {
+    // Nothing is built under the intro: building home (and its API calls /
+    // images) underneath makes the animation stutter.
+    if (!_introPlayed.isCompleted) {
+      return const ColoredBox(color: _splashColor);
+    }
+    // Permission dialogs, the session restore and the address check: the app
+    // shows as loading until it knows who the user is and where they are.
+    if (_checking) return const AppLoadingSkeleton();
 
     if (!_permissionsDone) {
       return _PermissionScreen(
@@ -374,7 +484,11 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
           if (mounted) _runLocating();
         });
       }
-      return _LocatingScreen(text: _locatingText);
+      // Still waiting on auth: looks like the app loading. The spinner with
+      // a status line only shows once a location lookup really happens.
+      final text = _locatingText;
+      if (text == null) return const AppLoadingSkeleton();
+      return _LocatingScreen(text: text);
     }
 
     // Not building the child at all keeps the router, and with it every home
@@ -401,24 +515,325 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
       );
     }
 
-    return widget.child;
+    // Always a Stack so showing / hiding the choice never remounts the app.
+    final current = ref.watch(deliveryAddressProvider);
+    final found = _currentLocation;
+    return Stack(
+      children: [
+        widget.child,
+        if (found != null && current != null)
+          _LocationChoiceOverlay(
+            defaultAddress: current,
+            currentLocation: found,
+            busy: _applyingCurrentLocation,
+            onUseCurrent: _useCurrentLocation,
+            onKeepDefault: () => setState(() => _currentLocation = null),
+          ),
+      ],
+    );
   }
 }
 
-/// Mirrors the native splash (same colour and logo) so the system permission
-/// dialogs appear to pop up over the splash itself.
-class _SplashBackdrop extends StatelessWidget {
-  const _SplashBackdrop();
+/// Default address vs. current location, shown over the app. Drawn without
+/// a route: this gate sits above the app's Navigator.
+class _LocationChoiceOverlay extends StatelessWidget {
+  const _LocationChoiceOverlay({
+    required this.defaultAddress,
+    required this.currentLocation,
+    required this.busy,
+    required this.onUseCurrent,
+    required this.onKeepDefault,
+  });
+
+  final NearestAddress defaultAddress;
+  final NearestAddress currentLocation;
+  final bool busy;
+  final VoidCallback onUseCurrent;
+  final VoidCallback onKeepDefault;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F9B8E),
-      body: Center(
-        child: Image.asset(
-          'assets/images/logo_splash.png',
-          width: 160,
-          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+    return Positioned.fill(
+      child: Material(
+        color: Colors.black54,
+        child: SafeArea(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Mau dikirim ke mana?',
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.foreground,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Lokasi kamu sekarang berbeda dari alamat utama.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _ChoiceOption(
+                    icon: Icons.my_location_rounded,
+                    title: 'Pakai lokasi saya',
+                    label: currentLocation.label,
+                    onTap: busy ? null : onUseCurrent,
+                    busy: busy,
+                  ),
+                  const SizedBox(height: 10),
+                  _ChoiceOption(
+                    icon: Icons.home_rounded,
+                    title: 'Pakai alamat utama',
+                    label: defaultAddress.label,
+                    onTap: busy ? null : onKeepDefault,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Kamu tetap bisa ganti alamat kapan saja dari bagian '
+                    '"Dikirim ke" di beranda.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.mutedForeground,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChoiceOption extends StatelessWidget {
+  const _ChoiceOption({
+    required this.icon,
+    required this.title,
+    required this.label,
+    required this.onTap,
+    this.busy = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String label;
+  final VoidCallback? onTap;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: busy
+                    ? const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      )
+                    : Icon(icon, color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.foreground,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.mutedForeground,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.mutedForeground,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+const _splashColor = Color(0xFF0F9B8E);
+/// Just the logo out of the native splash image (logo_splash.png is a 1152px
+/// canvas read as 4x, i.e. 288dp, by flutter_native_splash, with the logo
+/// 64dp in the middle); small so it decodes quickly.
+const _splashLogo = AssetImage('assets/images/logo_splash_mark.png');
+const _splashLogoSize = 64.0;
+
+/// Loads the splash logo into the image cache before [runApp], so the first
+/// Flutter frame already shows it and swapping out the native splash (which
+/// happens on that frame) does not flash an empty screen.
+Future<void> precacheSplashLogo() {
+  final done = Completer<void>();
+  final stream = _splashLogo.resolve(ImageConfiguration.empty);
+  late final ImageStreamListener listener;
+  listener = ImageStreamListener(
+    (_, _) {
+      stream.removeListener(listener);
+      if (!done.isCompleted) done.complete();
+    },
+    onError: (_, _) {
+      stream.removeListener(listener);
+      if (!done.isCompleted) done.complete();
+    },
+  );
+  stream.addListener(listener);
+  return done.future;
+}
+
+/// Picks up where the native splash (which cannot animate) leaves off: its
+/// first frame is pixel-identical to the splash, then the logo slides left
+/// while "Inovasi Online" unrolls out from behind it to the right. It then
+/// stays like that as the backdrop for the system permission dialogs.
+class _SplashIntro extends StatefulWidget {
+  const _SplashIntro({required this.onPlayed});
+
+  final VoidCallback onPlayed;
+
+  @override
+  State<_SplashIntro> createState() => _SplashIntroState();
+}
+
+class _SplashIntroState extends State<_SplashIntro>
+    with SingleTickerProviderStateMixin {
+  static const _gap = 8.0;
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 650),
+  );
+  late final Animation<double> _reveal = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOutCubic,
+  );
+  late final Animation<double> _fade = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.35, 1, curve: Curves.easeOut),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _play();
+  }
+
+  Future<void> _play() async {
+    // The first frames are slow (engine warm-up, native splash going away);
+    // starting before they are out would skip the start of the animation.
+    await WidgetsBinding.instance.waitUntilFirstFrameRasterized;
+    // A beat on the splash-identical frame so the hand-off is seamless.
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    await _controller.forward();
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (mounted) widget.onPlayed();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _splashColor,
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // The Row grows as the wordmark unrolls; Center keeps it
+              // centred, which is what slides the logo to the left.
+              const RepaintBoundary(
+                child: Image(
+                  image: _splashLogo,
+                  width: _splashLogoSize,
+                  height: _splashLogoSize,
+                  gaplessPlayback: true,
+                ),
+              ),
+              ClipRect(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: _reveal.value,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: _gap),
+                    child: Transform.translate(
+                      offset: Offset(-24 * (1 - _reveal.value), 0),
+                      child: Opacity(
+                        opacity: _fade.value,
+                        child: const Text(
+                          'INOVASI ONLINE',
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Montserrat',
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 3.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

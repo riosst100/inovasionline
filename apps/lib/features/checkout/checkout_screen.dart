@@ -4,16 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/cart.dart';
+import '../../models/delivery_schedule.dart';
 import '../../models/payment_method.dart';
 import '../../models/shipping_method.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/address_picker.dart';
+import '../wallet/wallet_providers.dart';
 import 'checkout_providers.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
-  const CheckoutScreen({super.key, required this.group});
+  const CheckoutScreen({super.key, required this.selection});
 
-  final CartStoreGroup group;
+  final CartSelection selection;
 
   @override
   ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -28,6 +30,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   AddressSelection _address = const AddressSelection();
   PaymentMethod? _paymentMethod;
   ShippingMethod? _shippingMethod;
+  SelectedDeliverySlot? _deliverySlot;
 
   @override
   void initState() {
@@ -59,7 +62,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (cfg == null || cfg['is_active'] != true) return 0;
     final value = (cfg['value'] as num?)?.toDouble() ?? 0;
     if (value <= 0) return 0;
-    var fee = cfg['type'] == 'percent' ? widget.group.subtotal * value / 100 : value;
+    var fee = cfg['type'] == 'percent' ? widget.selection.subtotal * value / 100 : value;
     final min = (cfg['min_fee'] as num?)?.toDouble();
     final max = (cfg['max_fee'] as num?)?.toDouble();
     if (min != null && fee < min) fee = min;
@@ -70,9 +73,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String get _serviceFeeLabel =>
       ref.watch(checkoutServiceFeeConfigProvider).valueOrNull?['label'] as String? ?? 'Biaya Layanan';
 
-  double get _total => widget.group.subtotal + (_shippingMethod?.displayFee ?? 0) + _serviceFee;
+  double get _total => widget.selection.subtotal + (_shippingMethod?.displayFee ?? 0) + _serviceFee;
 
-  bool get _canSubmit => _paymentMethod != null && _shippingMethod != null && _addressStepDone;
+  bool get _scheduleMissing => _shippingMethod?.requiresSchedule == true && _deliverySlot == null;
+
+  bool get _canSubmit => _paymentMethod != null && _shippingMethod != null && !_scheduleMissing && _addressStepDone;
 
   Future<void> _editAddress() async {
     final result = await showModalBottomSheet<_AddressFormResult>(
@@ -99,19 +104,28 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _address = result.address;
       if (districtChanged || villageChanged) {
         _shippingMethod = null;
+        _deliverySlot = null;
       }
     });
   }
 
   Future<void> _pickPaymentMethod() async {
-    final methods = await ref.read(checkoutStorePaymentMethodsProvider(widget.group.store.slug).future);
+    final methods = await ref.read(checkoutPaymentMethodsProvider.future);
+    // Fresh balance: it may have changed (top-up, refund) since the screen opened.
+    ref.invalidate(walletProvider);
+    final walletBalance = await ref.read(walletProvider.future).then((w) => w?.balance, onError: (_) => null);
     if (!mounted) return;
     final selected = await showModalBottomSheet<PaymentMethod>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _PaymentMethodPickerSheet(methods: methods, selected: _paymentMethod),
+      builder: (context) => _PaymentMethodPickerSheet(
+        methods: methods,
+        selected: _paymentMethod,
+        total: _total,
+        walletBalance: walletBalance,
+      ),
     );
     if (selected != null) setState(() => _paymentMethod = selected);
   }
@@ -123,8 +137,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    final methods = await ref.read(checkoutStoreShippingMethodsProvider((
-      storeSlug: widget.group.store.slug,
+    final methods = await ref.read(checkoutShippingMethodsProvider((
       districtCode: district.code,
       villageCode: _address.village?.code,
     )).future);
@@ -136,7 +149,35 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => _ShippingMethodPickerSheet(methods: methods, selected: _shippingMethod),
     );
-    if (selected != null) setState(() => _shippingMethod = selected);
+    if (selected == null || !mounted) return;
+    setState(() {
+      if (selected.id != _shippingMethod?.id) _deliverySlot = null;
+      _shippingMethod = selected;
+    });
+    if (selected.requiresSchedule && _deliverySlot == null) await _pickDeliverySlot();
+  }
+
+  Future<void> _pickDeliverySlot() async {
+    final method = _shippingMethod;
+    if (method == null) return;
+    // Always refetch: windows close and fill up while the buyer is on this screen.
+    ref.invalidate(checkoutDeliverySchedulesProvider(method.id));
+    final List<DeliveryDay> days;
+    try {
+      days = await ref.read(checkoutDeliverySchedulesProvider(method.id).future);
+    } catch (_) {
+      if (mounted) _showSnack('Gagal memuat jadwal pengiriman.');
+      return;
+    }
+    if (!mounted) return;
+    final selected = await showModalBottomSheet<SelectedDeliverySlot>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _DeliverySlotPickerSheet(days: days, selected: _deliverySlot),
+    );
+    if (selected != null) setState(() => _deliverySlot = selected);
   }
 
   void _showSnack(String message) {
@@ -157,6 +198,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     } else if (_shippingMethod == null) {
       _showSnack('Silakan pilih metode pengiriman terlebih dahulu.');
       _pickShippingMethod();
+    } else if (_scheduleMissing) {
+      _showSnack('Silakan pilih jadwal pengiriman terlebih dahulu.');
+      _pickDeliverySlot();
     } else if (_paymentMethod == null) {
       _showSnack('Silakan pilih metode pembayaran terlebih dahulu.');
       _pickPaymentMethod();
@@ -170,8 +214,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
 
     final success = await ref.read(checkoutProvider.notifier).submit(
-          storeId: widget.group.store.id,
-          cartItemIds: widget.group.items.map((item) => item.id).toList(),
+          cartItemIds: widget.selection.items.map((item) => item.id).toList(),
           paymentMethodId: _paymentMethod!.id,
           shippingMethodId: _shippingMethod!.id,
           recipientName: _recipientNameController.text.trim(),
@@ -182,6 +225,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           villageCode: _address.village!.code,
           addressDetail: _addressDetailController.text.trim(),
           customerNotes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+          deliveryScheduleId: _shippingMethod!.requiresSchedule ? _deliverySlot?.slot.scheduleId : null,
+          deliveryDate: _shippingMethod!.requiresSchedule ? _deliverySlot?.slot.date : null,
         );
 
     if (!mounted) return;
@@ -272,7 +317,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           // 1. Purchased Products Card
-          _StoreItemsCard(group: widget.group),
+          _ItemsCard(selection: widget.selection),
           const SizedBox(height: 14),
 
           // 2. Shipping Address Card
@@ -306,7 +351,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             icon: Icons.local_shipping_rounded,
             iconColor: const Color(0xFF2563EB),
             title: 'Metode Pengiriman',
-            done: _shippingMethod != null,
+            done: _shippingMethod != null && !_scheduleMissing,
             enabled: _addressStepDone,
             actionLabel: _shippingMethod != null ? 'Ganti' : 'Pilih',
             onTap: _pickShippingMethod,
@@ -331,11 +376,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ),
                   )
                 : _shippingMethod != null
-                    ? _SelectedShippingTile(method: _shippingMethod!)
+                    ? _SelectedShippingTile(
+                        method: _shippingMethod!,
+                        deliverySlot: _deliverySlot,
+                        onPickSlot: _pickDeliverySlot,
+                      )
                     : _EmptyStepPrompt(
                         icon: Icons.delivery_dining_outlined,
                         title: 'Pilih Metode Kurir & Pengiriman',
-                        subtitle: 'Tersedia opsi Instan 15 Menit dan Reguler.',
+                        subtitle: 'Pilih pengiriman instan atau pengiriman terjadwal.',
                         onTap: _pickShippingMethod,
                       ),
           ),
@@ -377,7 +426,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
           // 6. Payment Breakdown / Summary
           _OrderSummaryCard(
-            subtotal: widget.group.subtotal,
+            subtotal: widget.selection.subtotal,
             shippingFee: _shippingMethod?.displayFee,
             serviceFee: _serviceFee,
             serviceFeeLabel: _serviceFeeLabel,
@@ -471,12 +520,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 }
 
 // ==========================================
-// STORE & PRODUCT LIST CARD
+// PRODUCT LIST CARD
 // ==========================================
-class _StoreItemsCard extends StatelessWidget {
-  const _StoreItemsCard({required this.group});
+class _ItemsCard extends StatelessWidget {
+  const _ItemsCard({required this.selection});
 
-  final CartStoreGroup group;
+  final CartSelection selection;
 
   @override
   Widget build(BuildContext context) {
@@ -526,7 +575,7 @@ class _StoreItemsCard extends StatelessWidget {
                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
                       ),
                       Text(
-                        '${group.items.length} Barang dipesan',
+                        '${selection.items.length} Barang dipesan',
                         style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       ),
                     ],
@@ -541,9 +590,9 @@ class _StoreItemsCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               children: [
-                for (int i = 0; i < group.items.length; i++) ...[
-                  _CheckoutItemRow(item: group.items[i]),
-                  if (i < group.items.length - 1)
+                for (int i = 0; i < selection.items.length; i++) ...[
+                  _CheckoutItemRow(item: selection.items[i]),
+                  if (i < selection.items.length - 1)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 10),
                       child: Divider(height: 1, color: Color(0xFFF1F5F9)),
@@ -568,11 +617,11 @@ class _StoreItemsCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Subtotal (${group.items.length} Produk)',
+                  'Subtotal (${selection.items.length} Produk)',
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                 ),
                 Text(
-                  formatCurrency(group.subtotal),
+                  formatCurrency(selection.subtotal),
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                 ),
               ],
@@ -919,9 +968,11 @@ class _AddressSummary extends StatelessWidget {
 
 // Selected Shipping Method view
 class _SelectedShippingTile extends StatelessWidget {
-  const _SelectedShippingTile({required this.method});
+  const _SelectedShippingTile({required this.method, this.deliverySlot, this.onPickSlot});
 
   final ShippingMethod method;
+  final SelectedDeliverySlot? deliverySlot;
+  final VoidCallback? onPickSlot;
 
   @override
   Widget build(BuildContext context) {
@@ -932,7 +983,60 @@ class _SelectedShippingTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFBBF7D0)),
       ),
-      child: Row(
+      child: Column(
+        children: [
+          _buildMethodRow(),
+          if (method.requiresSchedule) ...[
+            const SizedBox(height: 10),
+            _buildScheduleRow(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScheduleRow() {
+    final slot = deliverySlot;
+    return InkWell(
+      onTap: onPickSlot,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: slot == null ? const Color(0xFFFCA5A5) : const Color(0xFFBBF7D0)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.event_available_rounded,
+              size: 16,
+              color: slot == null ? const Color(0xFFDC2626) : const Color(0xFF15803D),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                slot?.summary ?? 'Pilih jadwal pengiriman',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: slot == null ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            Text(
+              slot == null ? 'Pilih' : 'Ubah',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0D9488)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMethodRow() {
+    return Row(
         children: [
           Container(
             width: 36,
@@ -941,7 +1045,11 @@ class _SelectedShippingTile extends StatelessWidget {
               color: const Color(0xFFDCFCE7),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.bolt_rounded, size: 20, color: Color(0xFF16A34A)),
+            child: Icon(
+              method.requiresSchedule ? Icons.event_available_rounded : Icons.bolt_rounded,
+              size: 20,
+              color: const Color(0xFF16A34A),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -965,9 +1073,9 @@ class _SelectedShippingTile extends StatelessWidget {
                         color: const Color(0xFF16A34A),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Text(
-                        'Cepat',
-                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                      child: Text(
+                        method.requiresSchedule ? 'Terjadwal' : 'Cepat',
+                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ),
                   ],
@@ -992,8 +1100,7 @@ class _SelectedShippingTile extends StatelessWidget {
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
           ),
         ],
-      ),
-    );
+      );
   }
 }
 
@@ -1014,7 +1121,7 @@ class _SelectedPaymentTile extends StatelessWidget {
       iconColor = const Color(0xFFEA580C);
       bgIcon = const Color(0xFFFFEDD5);
     } else if (method.type == 'payment_gateway') {
-      iconData = Icons.credit_card_rounded;
+      iconData = _PaymentMethodPickerSheet._iconFor(method);
     } else if (method.type == 'bank_transfer') {
       iconData = Icons.account_balance_rounded;
       iconColor = const Color(0xFF2563EB);
@@ -1476,10 +1583,66 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
 // PAYMENT METHOD PICKER SHEET
 // ==========================================
 class _PaymentMethodPickerSheet extends StatelessWidget {
-  const _PaymentMethodPickerSheet({required this.methods, this.selected});
+  const _PaymentMethodPickerSheet({
+    required this.methods,
+    required this.total,
+    this.selected,
+    this.walletBalance,
+  });
 
   final List<PaymentMethod> methods;
   final PaymentMethod? selected;
+
+  /// Order total the balance has to cover; null balance = not loaded yet.
+  final double total;
+  final double? walletBalance;
+
+  /// The balance option: selectable only when it covers [total]; otherwise it leads to top-up.
+  Widget _walletTile(BuildContext context, PaymentMethod method) {
+    final balance = walletBalance;
+    final enough = balance != null && balance >= total;
+
+    return _PickerOptionTile(
+      icon: Icons.account_balance_wallet_rounded,
+      iconColor: const Color(0xFF0D9488),
+      title: method.name,
+      subtitle: balance == null
+          ? 'Memuat saldo…'
+          : enough
+              ? 'Saldo ${formatCurrency(balance)}'
+              : 'Saldo ${formatCurrency(balance)} · kurang ${formatCurrency(total - balance)}, ketuk untuk top up',
+      badge: enough ? 'Instan' : 'Top Up',
+      selected: selected?.id == method.id,
+      onTap: () {
+        if (enough) {
+          Navigator.of(context).pop(method);
+        } else if (balance != null) {
+          Navigator.of(context).pop();
+          context.push('/wallet/topup');
+        }
+      },
+    );
+  }
+
+  /// Methods by [PaymentMethod.group], in the order groups first appear (methods come sorted).
+  Map<String, List<PaymentMethod>> get _groups {
+    final groups = <String, List<PaymentMethod>>{};
+    for (final method in methods) {
+      groups.putIfAbsent(method.group, () => []).add(method);
+    }
+    return groups;
+  }
+
+  static IconData _iconFor(PaymentMethod method) {
+    if (method.type == 'cod') return Icons.payments_rounded;
+    if (method.type == 'bank_transfer') return Icons.account_balance_rounded;
+    return switch (method.group) {
+      'E-Wallet & QRIS' => method.gatewayChannel == 'other_qris' ? Icons.qr_code_2_rounded : Icons.account_balance_wallet_rounded,
+      'Virtual Account' => Icons.account_balance_rounded,
+      'Kartu' => Icons.credit_card_rounded,
+      _ => Icons.account_balance_wallet_rounded,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1533,28 +1696,44 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                     child: Text('Belum ada metode pembayaran yang tersedia.'),
                   ),
                 ),
-              for (final method in methods)
-                _PickerOptionTile(
-                  icon: method.type == 'cod'
-                      ? Icons.payments_rounded
-                      : method.type == 'bank_transfer'
-                          ? Icons.account_balance_rounded
-                          : Icons.account_balance_wallet_rounded,
-                  iconColor: method.type == 'cod'
-                      ? const Color(0xFFEA580C)
-                      : method.type == 'bank_transfer'
-                          ? const Color(0xFF2563EB)
-                          : const Color(0xFF7C3AED),
-                  title: method.name,
-                  subtitle: method.type == 'bank_transfer' && method.bankName != null
-                      ? method.bankName
-                      : method.description,
-                  badge: method.type == 'cod'
-                      ? 'COD'
-                      : (method.type == 'bank_transfer' ? 'Transfer' : (method.type == 'payment_gateway' ? 'Online' : null)),
-                  selected: selected?.id == method.id,
-                  onTap: () => Navigator.of(context).pop(method),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final group in _groups.entries) ...[
+                      if (_groups.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+                          child: Text(
+                            group.key,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                          ),
+                        ),
+                      for (final method in group.value)
+                        if (method.isWallet)
+                          _walletTile(context, method)
+                        else
+                          _PickerOptionTile(
+                            icon: _iconFor(method),
+                            iconColor: method.type == 'cod'
+                                ? const Color(0xFFEA580C)
+                                : method.type == 'bank_transfer'
+                                    ? const Color(0xFF2563EB)
+                                    : const Color(0xFF7C3AED),
+                            title: method.name,
+                            subtitle: method.type == 'bank_transfer' && method.bankName != null
+                                ? method.bankName
+                                : method.description,
+                            badge: method.type == 'cod'
+                                ? 'COD'
+                                : (method.type == 'bank_transfer' ? 'Transfer' : null),
+                            selected: selected?.id == method.id,
+                            onTap: () => Navigator.of(context).pop(method),
+                          ),
+                    ],
+                  ],
                 ),
+              ),
             ],
           ),
         ),
@@ -1630,15 +1809,197 @@ class _ShippingMethodPickerSheet extends StatelessWidget {
                 ),
               for (final method in methods)
                 _PickerOptionTile(
-                  icon: Icons.bolt_rounded,
-                  iconColor: const Color(0xFF16A34A),
+                  icon: method.requiresSchedule ? Icons.event_available_rounded : Icons.bolt_rounded,
+                  iconColor: method.requiresSchedule ? const Color(0xFF2563EB) : const Color(0xFF16A34A),
                   title: method.name,
                   subtitle: method.estimatedDeliveryTime,
-                  badge: method.isTableRate ? 'Instan' : 'Reguler',
+                  badge: method.requiresSchedule
+                      ? 'Terjadwal'
+                      : (method.type == 'io_express' || method.isTableRate ? 'Instan' : 'Reguler'),
                   trailing: method.displayFee == 0 ? 'GRATIS' : formatCurrency(method.displayFee),
                   selected: selected?.id == method.id,
                   onTap: () => Navigator.of(context).pop(method),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// DELIVERY SLOT PICKER SHEET (IO Same Day)
+// ==========================================
+class _DeliverySlotPickerSheet extends StatefulWidget {
+  const _DeliverySlotPickerSheet({required this.days, this.selected});
+
+  final List<DeliveryDay> days;
+  final SelectedDeliverySlot? selected;
+
+  @override
+  State<_DeliverySlotPickerSheet> createState() => _DeliverySlotPickerSheetState();
+}
+
+class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
+  late int _dayIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    final selectedIndex = widget.days.indexWhere((d) => d.date == widget.selected?.slot.date);
+    final firstOpen = widget.days.indexWhere((d) => d.hasAvailable);
+    _dayIndex = selectedIndex >= 0 ? selectedIndex : (firstOpen >= 0 ? firstOpen : 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final day = widget.days.isEmpty ? null : widget.days[_dayIndex];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Pilih Jadwal Pengiriman',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              if (day == null)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: Text(
+                      'Belum ada jadwal pengiriman yang tersedia.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFF64748B)),
+                    ),
+                  ),
+                )
+              else ...[
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 56,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: widget.days.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final d = widget.days[i];
+                      final active = i == _dayIndex;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setState(() => _dayIndex = i),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: active ? const Color(0xFFF0FDF4) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: active ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0),
+                              width: active ? 1.6 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                d.dayLabel,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: d.hasAvailable ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                ),
+                              ),
+                              Text(
+                                d.holiday != null ? 'Libur' : d.dateLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: d.holiday != null ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (day.holiday != null)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Libur: ${day.holiday} — tidak ada pengiriman di hari ini.',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFB91C1C)),
+                    ),
+                  ),
+                if (day.slots.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        'Tidak ada jadwal pengiriman di hari ini.',
+                        style: TextStyle(color: Color(0xFF64748B)),
+                      ),
+                    ),
+                  ),
+                for (final slot in day.slots)
+                  Opacity(
+                    opacity: slot.available ? 1 : 0.5,
+                    child: _PickerOptionTile(
+                      icon: Icons.schedule_rounded,
+                      iconColor: const Color(0xFF2563EB),
+                      title: slot.label,
+                      subtitle: slot.available
+                          ? (slot.remaining != null ? '${slot.timeRange} · sisa ${slot.remaining} slot' : slot.timeRange)
+                          : '${slot.timeRange} · ${slot.reason ?? 'tidak tersedia'}',
+                      selected: slot.isSameAs(widget.selected?.slot),
+                      onTap: slot.available
+                          ? () => Navigator.of(context).pop(SelectedDeliverySlot(slot: slot, day: day))
+                          : () {},
+                    ),
+                  ),
+              ],
             ],
           ),
         ),

@@ -12,7 +12,7 @@ class CartItemResource extends JsonResource
         $variant = $this->variant;
         $product = $this->product;
 
-        $unitPrice = $variant?->price ?? $product->sale_price ?? $product->regular_price;
+        $unitPrice = $variant?->price ?? $product->currentPrice();
         $stock = $variant?->stock ?? $product->stock;
 
         return [

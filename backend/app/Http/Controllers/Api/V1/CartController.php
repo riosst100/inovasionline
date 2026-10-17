@@ -21,30 +21,13 @@ class CartController extends Controller
     public function index(Request $request): JsonResponse
     {
         $cart = $this->cartService->cartForUser($request->user());
-        $cart->load(['items.product.images', 'items.product.store', 'items.variant']);
+        $cart->load(['items.product' => fn ($q) => $q->withStock(), 'items.product.images', 'items.variant']);
 
-        $groups = $cart->items
-            ->groupBy(fn (CartItem $item) => $item->product->store_id)
-            ->map(function ($items) {
-                $store = $items->first()->product->store;
-                $itemResources = CartItemResource::collection($items)->resolve();
-
-                return [
-                    'store' => [
-                        'id' => $store->id,
-                        'name' => $store->name,
-                        'slug' => $store->slug,
-                        'logo_url' => $store->logo_path ? asset('storage/'.$store->logo_path) : null,
-                    ],
-                    'items' => $itemResources,
-                    'subtotal' => array_sum(array_column($itemResources, 'line_total')),
-                ];
-            })
-            ->values();
+        $items = CartItemResource::collection($cart->items)->resolve();
 
         return ApiResponse::success([
-            'stores' => $groups,
-            'grand_total' => $groups->sum('subtotal'),
+            'items' => $items,
+            'grand_total' => array_sum(array_column($items, 'line_total')),
             'item_count' => $cart->items->sum('quantity'),
         ], 'Cart retrieved successfully.');
     }

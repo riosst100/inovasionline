@@ -14,7 +14,7 @@ use RuntimeException;
 
 class PostService
 {
-    private const FEED_WITH = ['user', 'media', 'products.images', 'products.store', 'sharedPost.user', 'sharedPost.media'];
+    private const FEED_WITH = ['user', 'media', 'products.images', 'sharedPost.user', 'sharedPost.media'];
 
     public function feed(?User $viewer, int $perPage = 15): LengthAwarePaginator
     {

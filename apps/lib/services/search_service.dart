@@ -1,12 +1,10 @@
 import '../core/api/api_client.dart';
 import '../models/product.dart';
-import '../models/store.dart';
 
 class SearchResult {
-  SearchResult({required this.products, required this.stores});
+  SearchResult({required this.products});
 
   final List<Product> products;
-  final List<Store> stores;
 }
 
 class SearchService {
@@ -22,7 +20,6 @@ class SearchService {
       products: (data['products'] as List<dynamic>)
           .map((e) => Product.fromJson(e as Map<String, dynamic>))
           .toList(),
-      stores: (data['stores'] as List<dynamic>).map((e) => Store.fromJson(e as Map<String, dynamic>)).toList(),
     );
   }
 

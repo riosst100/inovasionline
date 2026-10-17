@@ -5,16 +5,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../config/theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
+import '../../models/wallet.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/delivery_address_provider.dart';
 import '../../widgets/banner_carousel.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/skeleton.dart';
 import '../cart/cart_providers.dart';
+import '../wallet/wallet_providers.dart';
+import 'bonus_gift.dart';
+import 'delivery_address_sheet.dart';
 import 'home_providers.dart';
 import 'welcome_message.dart';
 
@@ -141,6 +147,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   silent(ref.refresh(flashSaleProvider.future)),
                   silent(ref.refresh(bestSellersProvider.future)),
                   silent(ref.refresh(popularProductsProvider.future)),
+                  silent(ref.refresh(walletProvider.future).then((_) {})),
                 ]);
               },
               child: ListView(
@@ -175,8 +182,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                   const SizedBox(height: 8),
 
-                  // Quick Highlight Bubbles (Astro-style 4 highlights)
-                  const _QuickHighlightsRow(),
+                  // Hadiah saldo belanja (one-time bonus), then Saldo E-Wallet
+                  const BonusGiftBanner(),
+                  const _WalletSection(),
 
                   const SizedBox(height: 8),
 
@@ -297,18 +305,15 @@ class _TopLocationHeader extends ConsumerWidget {
           // Delivery Speed & Location
           Expanded(
             child: InkWell(
-              onTap: () {
-                if (user == null) {
-                  context.push('/account/login');
-                } else {
-                  context.push('/complete-address');
-                }
-              },
+              onTap: () => showDeliveryAddressSheet(context),
               borderRadius: BorderRadius.circular(8),
               child: Row(
                 children: [
                   if (hasAddress) ...[
-                  Container(
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _showExpressInfoDialog(context),
+                    child: Container(
                     padding: const EdgeInsets.fromLTRB(6, 4, 9, 4),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
@@ -341,6 +346,7 @@ class _TopLocationHeader extends ConsumerWidget {
                         ),
                       ],
                     ),
+                  ),
                   ),
                   const SizedBox(width: 10),
                   ],
@@ -388,6 +394,187 @@ class _TopLocationHeader extends ConsumerWidget {
 }
 
 /// Stopwatch icon with looping speed lines streaming out behind it ("express" feel).
+void _showAboutAppDialog(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'assets/images/logo_mark.png',
+                width: 72,
+                height: 72,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Inovasi Online',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            FutureBuilder<PackageInfo>(
+              future: PackageInfo.fromPlatform(),
+              builder: (context, snapshot) {
+                final info = snapshot.data;
+                return Text(
+                  info == null ? ' ' : 'Versi ${info.version} (${info.buildNumber})',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                );
+              },
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Aplikasi belanja online dengan pengiriman instan dari toko terdekat '
+              'langsung ke alamatmu.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, height: 1.45),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.code_rounded, size: 20, color: Color(0xFFF59E0B)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dibuat oleh',
+                          style: TextStyle(fontSize: 11, color: Colors.black54),
+                        ),
+                        Text(
+                          'Rio Susanto',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '© ${DateTime.now().year} Inovasi Online. Hak cipta dilindungi.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Tutup'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+void _showExpressInfoDialog(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [Color(0xFFFDE047), Color(0xFFF59E0B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: const Icon(Icons.bolt, color: Color(0xFF78350F), size: 22),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Pengiriman Instan 15 Menit',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+      content: const Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Pesananmu bisa sampai dalam estimasi 15 menit sejak pesanan dikonfirmasi, '
+            'karena dikirim dari toko terdekat dengan alamat pengirimanmu.',
+            style: TextStyle(fontSize: 13, height: 1.45),
+          ),
+          SizedBox(height: 12),
+          _ExpressInfoPoint(
+            icon: Icons.location_on_outlined,
+            text: 'Berlaku untuk alamat yang berada dalam jangkauan layanan instan.',
+          ),
+          _ExpressInfoPoint(
+            icon: Icons.schedule,
+            text: 'Waktu tiba adalah estimasi dan dapat berubah karena cuaca, lalu lintas, atau antrean pesanan.',
+          ),
+          _ExpressInfoPoint(
+            icon: Icons.local_shipping_outlined,
+            text: 'Pilih opsi Instan 15 Menit atau Reguler saat checkout.',
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Mengerti'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ExpressInfoPoint extends StatelessWidget {
+  const _ExpressInfoPoint({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFFF59E0B)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: const TextStyle(fontSize: 12.5, height: 1.4)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ExpressCarIcon extends StatefulWidget {
   const _ExpressCarIcon();
 
@@ -476,14 +663,17 @@ class _TopSearchBar extends StatelessWidget {
       child: Row(
         children: [
           // Logo Mark
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              'assets/images/logo_mark.png',
-              width: 38,
-              height: 38,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+          GestureDetector(
+            onTap: () => _showAboutAppDialog(context),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/images/logo_mark.png',
+                width: 38,
+                height: 38,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -712,136 +902,325 @@ class _PetalPatternPainter extends CustomPainter {
 }
 
 // ==========================================
-// 3. QUICK HIGHLIGHTS ROW (Astro Feature Bubbles)
+// 3. SALDO E-WALLET (Saldo Belanja)
 // ==========================================
-class _QuickHighlightsRow extends StatelessWidget {
-  const _QuickHighlightsRow();
+class _WalletSection extends ConsumerStatefulWidget {
+  const _WalletSection();
 
-  static const _highlights = [
-    {
-      'title': 'GRATIS Ongkir',
-      'subtitle': 'Pasti Hemat',
-      'icon': Icons.local_shipping_outlined,
-      'color': Color(0xFFE0F2FE),
-      'textColor': Color(0xFF0369A1),
-    },
-    {
-      'title': 'Juaranya Buah',
-      'subtitle': 'Manis Segar',
-      'icon': Icons.eco_outlined,
-      'color': Color(0xFFFEF3C7),
-      'textColor': Color(0xFFB45309),
-    },
-    {
-      'title': 'Paket Dapur',
-      'subtitle': 'Sembako Murah',
-      'icon': Icons.shopping_basket_outlined,
-      'color': Color(0xFFF0FDF4),
-      'textColor': Color(0xFF15803D),
-    },
-    {
-      'title': 'Flash 15m',
-      'subtitle': 'Cepat Sampai',
-      'icon': Icons.bolt_rounded,
-      'color': Color(0xFFFDF2F8),
-      'textColor': Color(0xFFBE185D),
-    },
-  ];
+  @override
+  ConsumerState<_WalletSection> createState() => _WalletSectionState();
+}
+
+class _WalletSectionState extends ConsumerState<_WalletSection> {
+  static const _gradient = [Color(0xFF0D9488), Color(0xFF0284C7)];
 
   @override
   Widget build(BuildContext context) {
+    final authenticated = ref.watch(
+      authProvider.select((s) => s.status == AuthStatus.authenticated),
+    );
+    final wallet = ref.watch(walletProvider);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              color: _gradient.last.withValues(alpha: 0.28),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: Row(
-          children: _highlights.map((item) {
-            final color = item['color'] as Color;
-            final textColor = item['textColor'] as Color;
-            final icon = item['icon'] as IconData;
-            final title = item['title'] as String;
-            final subtitle = item['subtitle'] as String;
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Material(
+            color: Colors.transparent,
+            child: Ink(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: _gradient,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  // Decorative bubbles
+                  Positioned(right: -30, top: -40, child: _bubble(120, 0.10)),
+                  Positioned(right: 70, bottom: -46, child: _bubble(90, 0.08)),
+                  Positioned(left: -20, bottom: -30, child: _bubble(60, 0.06)),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+                    child: authenticated ? _signedIn(wallet) : _signedOut(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-            return Expanded(
-              child: InkWell(
-                onTap: () {},
-                borderRadius: BorderRadius.circular(14),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white,
-                              color,
-                            ],
-                          ),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: textColor.withValues(alpha: 0.15),
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: textColor.withValues(alpha: 0.14),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Icon(icon, color: textColor, size: 24),
+  static Widget _bubble(double size, double alpha) => IgnorePointer(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: alpha),
+          ),
+        ),
+      );
+
+  static Widget _iconBadge(IconData icon) => Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: 0.2),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
+      );
+
+  Widget _signedIn(AsyncValue<WalletSummary?> wallet) {
+    final hidden = ref.watch(walletBalanceHiddenProvider);
+    final summary = wallet.valueOrNull;
+    final Widget balance;
+    if (wallet.isLoading && !wallet.hasValue) {
+      balance = Container(
+        width: 110,
+        height: 20,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(6),
+        ),
+      );
+    } else {
+      balance = _CountUpBalance(amount: summary?.balance, hidden: hidden);
+    }
+
+    final balanceRow = Row(
+      children: [
+        _iconBadge(Icons.account_balance_wallet_rounded),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Saldo Belanja',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Flexible(child: KeyedSubtree(key: walletBalanceTargetKey, child: balance)),
+                  const SizedBox(width: 4),
+                  InkResponse(
+                    onTap: () => ref.read(walletBalanceHiddenProvider.notifier).toggle(),
+                    radius: 18,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        hidden ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        size: 17,
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
-                      const SizedBox(height: 7),
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1E293B),
-                          height: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: textColor,
-                          height: 1.2,
-                        ),
-                      ),
-                    ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        _WalletAction(
+          icon: Icons.add_rounded,
+          label: 'Top Up',
+          onTap: () => context.push('/wallet/topup'),
+        ),
+        const SizedBox(width: 4),
+        _WalletAction(
+          icon: Icons.receipt_long_rounded,
+          label: 'Riwayat',
+          onTap: () => context.push('/wallet'),
+        ),
+      ],
+    );
+
+    return balanceRow;
+  }
+
+  Widget _signedOut() {
+    return Row(
+      children: [
+        _iconBadge(Icons.card_giftcard_rounded),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE047),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'BONUS PENGGUNA BARU',
+                  style: TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF713F12),
+                    letterSpacing: 0.4,
                   ),
                 ),
               ),
-            );
-          }).toList(),
+              const SizedBox(height: 5),
+              const Text(
+                'Masuk untuk mendapatkan saldo belanja hingga 20rb!',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        FilledButton(
+          onPressed: () => context.push('/account/login'),
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: _gradient.last,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            minimumSize: const Size(0, 36),
+            shape: const StadiumBorder(),
+            elevation: 0,
+          ),
+          child: const Text('Masuk', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+        ),
+      ],
+    );
+  }
+}
+
+/// Balance figure that counts up (with a gold pulse) whenever it increases,
+/// e.g. when the bonus coin lands.
+class _CountUpBalance extends StatefulWidget {
+  const _CountUpBalance({required this.amount, required this.hidden});
+
+  final double? amount;
+  final bool hidden;
+
+  @override
+  State<_CountUpBalance> createState() => _CountUpBalanceState();
+}
+
+class _CountUpBalanceState extends State<_CountUpBalance> with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
+  double? _from;
+
+  @override
+  void didUpdateWidget(covariant _CountUpBalance oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final before = oldWidget.amount, after = widget.amount;
+    if (before != null && after != null && after > before) {
+      _from = before;
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, _) {
+        final amount = widget.amount;
+        final t = Curves.easeOutCubic.transform(_controller.value);
+        final pulse = math.sin(_controller.value * math.pi);
+        final shown = amount == null ? null : (_from ?? amount) + (amount - (_from ?? amount)) * t;
+
+        return Transform.scale(
+          scale: 1 + pulse * 0.12,
+          alignment: Alignment.centerLeft,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              shown == null ? '—' : (widget.hidden ? 'Rp ••••••' : formatCurrency(shown.roundToDouble())),
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Color.lerp(Colors.white, const Color(0xFFFDE047), pulse),
+                letterSpacing: -0.3,
+                shadows: pulse > 0
+                    ? [Shadow(color: const Color(0xFFFDE047).withValues(alpha: 0.7 * pulse), blurRadius: 12)]
+                    : null,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WalletAction extends StatelessWidget {
+  const _WalletAction({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+              ),
+              child: Icon(icon, size: 19, color: Colors.white),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+            ),
+          ],
         ),
       ),
     );
@@ -1105,12 +1484,12 @@ class _CategoriesSection extends StatelessWidget {
                               ? CachedNetworkImage(
                                   imageUrl: cat.imageUrl!,
                                   fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) => Center(
-                                    child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 26)),
+                                  errorWidget: (_, _, _) => const Center(
+                                    child: Icon(Icons.image_outlined, size: 26, color: Color(0xFF94A3B8)),
                                   ),
                                 )
-                              : Center(
-                                  child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 26)),
+                              : const Center(
+                                  child: Icon(Icons.image_outlined, size: 26, color: Color(0xFF94A3B8)),
                                 ),
                         ],
                       ),
@@ -1204,7 +1583,7 @@ class _CategoriesSection extends StatelessWidget {
                               children: [
                                 cat.imageUrl != null
                                     ? CachedNetworkImage(imageUrl: cat.imageUrl!, fit: BoxFit.cover)
-                                    : Center(child: Text(cat.icon ?? '🛒', style: const TextStyle(fontSize: 24))),
+                                    : const Center(child: Icon(Icons.image_outlined, size: 24, color: Color(0xFF94A3B8))),
                                     ],
                             ),
                           ),

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi } from '../../../lib/api';
 import { BannableFeature, Customer } from '../../../types';
@@ -10,11 +11,11 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
-  Store,
   Ban,
   ShieldCheck,
   MessageSquareOff,
-  UserPlus
+  UserPlus,
+  Eye
 } from 'lucide-react';
 
 const FEATURE_OPTIONS: { value: BannableFeature; label: string }[] = [
@@ -182,7 +183,6 @@ export default function CustomersPage() {
                   <th className="py-3.5 px-5">Nama Pelanggan</th>
                   <th className="py-3.5 px-5">Kontak</th>
                   <th className="py-3.5 px-5">Status Verifikasi</th>
-                  <th className="py-3.5 px-5">Tipe Akun</th>
                   <th className="py-3.5 px-5">Terdaftar Sejak</th>
                   <th className="py-3.5 px-5">Status</th>
                   <th className="py-3.5 px-5 text-right">Aksi</th>
@@ -191,7 +191,7 @@ export default function CustomersPage() {
               <tbody className="divide-y divide-slate-100 font-medium">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <td colSpan={6} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                         <span>Memuat data pelanggan...</span>
@@ -200,7 +200,7 @@ export default function CustomersPage() {
                   </tr>
                 ) : customers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <td colSpan={6} className="py-12 text-center text-slate-400">
                       Belum ada data pelanggan yang terdaftar.
                     </td>
                   </tr>
@@ -229,17 +229,6 @@ export default function CustomersPage() {
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
                             <XCircle className="h-3.5 w-3.5" /> Belum Verifikasi
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-4 px-5">
-                        {c.is_seller ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
-                            <Store className="h-3.5 w-3.5" /> Penjual (Seller)
-                          </span>
-                        ) : (
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                            Pembeli Biasa
                           </span>
                         )}
                       </td>
@@ -274,6 +263,12 @@ export default function CustomersPage() {
                         )}
                       </td>
                       <td className="py-4 px-5 text-right space-x-2 whitespace-nowrap">
+                        <Link
+                          href={`/dashboard/customers/${c.id}`}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> Detail
+                        </Link>
                         <button
                           onClick={() => openBanModal(c)}
                           disabled={busyId === c.id}

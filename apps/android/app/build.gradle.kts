@@ -48,7 +48,7 @@ android {
     productFlavors {
         create("dev") {
             dimension = "env"
-            applicationId = "com.inovasionline.twa.dev"
+            applicationId = "com.inovasionline.app.dev"
             resValue("string", "app_name", "Inovasi Online (Dev)")
         }
         create("prod") {

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Support\Enums\ProductStatus;
 use App\Support\Enums\ProductType;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,13 +13,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
     use HasFactory, HasUlids, SoftDeletes;
 
     protected $fillable = [
-        'store_id',
         'category_id',
         'name',
         'slug',
@@ -29,7 +31,6 @@ class Product extends Model
         'cost_price',
         'is_taxable',
         'sku',
-        'stock',
         'min_stock',
         'track_inventory',
         'weight',
@@ -64,11 +65,6 @@ class Product extends Model
         ];
     }
 
-    public function store(): BelongsTo
-    {
-        return $this->belongsTo(Store::class);
-    }
-
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
@@ -79,6 +75,41 @@ class Product extends Model
         return $this->belongsToMany(Warehouse::class, 'product_warehouse_stocks')
             ->withPivot('quantity')
             ->withTimestamps();
+    }
+
+    /**
+     * Total stock over all warehouses (read-only; write it through
+     * ProductStockService). Lists should use withStock() to avoid one query per product.
+     */
+    protected function stock(): Attribute
+    {
+        return Attribute::get(function (): int {
+            if (array_key_exists('stock_total', $this->attributes)) {
+                return (int) $this->attributes['stock_total'];
+            }
+            if ($this->relationLoaded('warehouses')) {
+                return (int) $this->warehouses->sum('pivot.quantity');
+            }
+
+            return (int) $this->warehouses()->sum('product_warehouse_stocks.quantity');
+        });
+    }
+
+    /** Slug from the name, suffixed until unique (soft-deleted products included). */
+    public static function uniqueSlug(string $name): string
+    {
+        $base = Str::slug($name) ?: 'produk';
+        $slug = $base;
+        for ($i = 1; static::withTrashed()->where('slug', $slug)->exists(); $i++) {
+            $slug = "{$base}-{$i}";
+        }
+
+        return $slug;
+    }
+
+    public function scopeWithStock(Builder $query): void
+    {
+        $query->withSum('warehouses as stock_total', 'product_warehouse_stocks.quantity');
     }
 
     public function images(): HasMany
@@ -108,7 +139,19 @@ class Product extends Model
 
     public function promotions(): BelongsToMany
     {
-        return $this->belongsToMany(Promotion::class, 'promotion_products')->using(PromotionProduct::class);
+        return $this->belongsToMany(Promotion::class, 'promotion_products')
+            ->using(PromotionProduct::class)
+            ->withPivot('flash_sale_price');
+    }
+
+    /**
+     * Price a buyer pays right now for the base product (no variant):
+     * a running flash sale wins over sale_price, which wins over regular_price.
+     */
+    public function currentPrice(): float
+    {
+        return app(\App\Services\FlashSalePricing::class)->priceFor($this->id)
+            ?? (float) ($this->sale_price ?? $this->regular_price);
     }
 
     public function posts(): BelongsToMany

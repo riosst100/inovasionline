@@ -6,18 +6,24 @@ use App\Http\Controllers\Api\Admin\CustomerController;
 use App\Http\Controllers\Api\Admin\DriverController;
 use App\Http\Controllers\Api\V1\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Api\V1\Admin\DataTransferController as AdminDataTransferController;
+use App\Http\Controllers\Api\V1\Admin\DeliveryHolidayController as AdminDeliveryHolidayController;
+use App\Http\Controllers\Api\V1\Admin\DeliveryScheduleController as AdminDeliveryScheduleController;
 use App\Http\Controllers\Api\V1\Admin\ProductAttributeController as AdminProductAttributeController;
 use App\Http\Controllers\Api\V1\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\V1\Admin\ProductStockController as AdminProductStockController;
 use App\Http\Controllers\Api\V1\Admin\SearchSuggestionController as AdminSearchSuggestionController;
+use App\Http\Controllers\Api\V1\Admin\FlashSaleController as AdminFlashSaleController;
 use App\Http\Controllers\Api\V1\Admin\FlashSaleSlotController as AdminFlashSaleSlotController;
 use App\Http\Controllers\Api\V1\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\V1\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Api\V1\Admin\PhotographerApplicationController as AdminPhotographerApplicationController;
 use App\Http\Controllers\Api\V1\Admin\RoleController as AdminRoleController;
-use App\Http\Controllers\Api\V1\Admin\SellerApplicationController as AdminSellerApplicationController;
 use App\Http\Controllers\Api\V1\Admin\ServiceCityController as AdminServiceCityController;
+use App\Http\Controllers\Api\V1\Admin\NavBadgeController as AdminNavBadgeController;
+use App\Http\Controllers\Api\V1\Admin\WalletBonusController as AdminWalletBonusController;
+use App\Http\Controllers\Api\V1\Admin\WalletController as AdminWalletController;
 use App\Http\Controllers\Api\V1\Admin\ServiceFeeController as AdminServiceFeeController;
 use App\Http\Controllers\Api\V1\Admin\ShippingMethodController as AdminShippingMethodController;
 use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateController as AdminShippingRateTemplateController;
@@ -32,10 +38,13 @@ use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\CheckoutController;
+use App\Http\Controllers\Api\V1\CheckoutOptionsController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\FaceProfileController;
 use App\Http\Controllers\Api\V1\FlashSaleSlotController;
 use App\Http\Controllers\Api\V1\MatchedPhotoController;
+use App\Http\Controllers\Api\V1\NavBadgeController;
+use App\Http\Controllers\Api\V1\WalletController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\Photographer\PhotoController as PhotographerPhotoController;
@@ -45,18 +54,8 @@ use App\Http\Controllers\Api\V1\PhotoController;
 use App\Http\Controllers\Api\V1\PhotoPurchaseController;
 use App\Http\Controllers\Api\V1\PostController;
 use App\Http\Controllers\Api\V1\PublicProductController;
-use App\Http\Controllers\Api\V1\PublicStoreController;
 use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\SearchController;
-use App\Http\Controllers\Api\V1\Seller\CategoryController as SellerCategoryController;
-use App\Http\Controllers\Api\V1\Seller\OrderController as SellerOrderController;
-use App\Http\Controllers\Api\V1\Seller\PaymentMethodController as SellerPaymentMethodController;
-use App\Http\Controllers\Api\V1\Seller\ProductController as SellerProductController;
-use App\Http\Controllers\Api\V1\Seller\PromotionController as SellerPromotionController;
-use App\Http\Controllers\Api\V1\Seller\ShippingMethodController as SellerShippingMethodController;
-use App\Http\Controllers\Api\V1\Seller\ShippingMethodRateController as SellerShippingMethodRateController;
-use App\Http\Controllers\Api\V1\Seller\ShippingRateTemplateReadController as SellerShippingRateTemplateReadController;
-use App\Http\Controllers\Api\V1\SellerApplicationController;
 use App\Http\Controllers\Api\V1\UserVerificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -90,11 +89,6 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware(['auth:sanctum', 'not.blocked'])->group(function () {
-        Route::prefix('seller-applications')->group(function () {
-            Route::post('/', [SellerApplicationController::class, 'store']);
-            Route::get('/me', [SellerApplicationController::class, 'show']);
-        });
-
         Route::prefix('potocandid')->group(function () {
             Route::post('/face-profile', [FaceProfileController::class, 'store']);
             Route::get('/face-profile', [FaceProfileController::class, 'show']);
@@ -135,11 +129,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/{product:slug}', [PublicProductController::class, 'show']);
     });
 
-    Route::get('/stores', [PublicStoreController::class, 'index']);
-    Route::get('/stores/{slug}', [PublicStoreController::class, 'show']);
-    Route::get('/stores/{store}/payment-methods', [PublicStoreController::class, 'paymentMethods']);
-    Route::get('/service-fee', [PublicStoreController::class, 'serviceFee']);
-    Route::get('/stores/{store}/shipping-methods', [PublicStoreController::class, 'shippingMethods']);
+    Route::get('/payment-methods', [CheckoutOptionsController::class, 'paymentMethods']);
+    Route::get('/shipping-methods', [CheckoutOptionsController::class, 'shippingMethods']);
+    Route::get('/delivery-schedules', [CheckoutOptionsController::class, 'deliverySchedules']);
+    Route::get('/service-fee', [CheckoutOptionsController::class, 'serviceFee']);
+    Route::get('/nav-badge', [NavBadgeController::class, 'show']);
 
     Route::prefix('search')->group(function () {
         Route::get('/', [SearchController::class, 'index']);
@@ -205,63 +199,18 @@ Route::prefix('v1')->group(function () {
         Route::get('/{order}', [OrderController::class, 'show']);
         Route::post('/{order}/cancel', [OrderController::class, 'cancel']);
         Route::post('/{order}/pay', [PaymentController::class, 'pay'])->middleware('feature.ban:purchase');
+        Route::get('/{order}/payment-status', [PaymentController::class, 'status']);
+    });
+
+    Route::prefix('wallet')->middleware(['auth:sanctum', 'not.blocked'])->group(function () {
+        Route::get('/', [WalletController::class, 'show']);
+        Route::get('/transactions', [WalletController::class, 'transactions']);
+        Route::post('/bonus/claim', [WalletController::class, 'claimBonus'])->middleware('throttle:5,1');
+        Route::post('/topups', [WalletController::class, 'topup'])->middleware('throttle:10,1');
+        Route::get('/topups/{topup}/status', [WalletController::class, 'topupStatus']);
     });
 
     Route::post('/payments/midtrans/notification', [PaymentController::class, 'notification']);
-
-    Route::prefix('seller')->middleware(['auth:sanctum', 'not.blocked', 'seller', 'store.owner'])->group(function () {
-        Route::prefix('products')->group(function () {
-            Route::get('/', [SellerProductController::class, 'index']);
-            Route::post('/', [SellerProductController::class, 'store']);
-            Route::get('/export', [SellerProductController::class, 'export']);
-            Route::post('/import', [SellerProductController::class, 'import']);
-            Route::get('/{product}', [SellerProductController::class, 'show']);
-            Route::post('/{product}', [SellerProductController::class, 'update']);
-        });
-
-        Route::prefix('promotions')->group(function () {
-            Route::get('/', [SellerPromotionController::class, 'index']);
-            Route::post('/', [SellerPromotionController::class, 'store']);
-        });
-
-        Route::prefix('categories')->group(function () {
-            Route::get('/', [SellerCategoryController::class, 'index']);
-            Route::post('/', [SellerCategoryController::class, 'store']);
-        });
-
-        Route::prefix('payment-methods')->group(function () {
-            Route::get('/', [SellerPaymentMethodController::class, 'index']);
-            Route::post('/', [SellerPaymentMethodController::class, 'store']);
-            Route::put('/{paymentMethod}', [SellerPaymentMethodController::class, 'update']);
-            Route::delete('/{paymentMethod}', [SellerPaymentMethodController::class, 'destroy']);
-        });
-
-        Route::prefix('shipping-methods')->group(function () {
-            Route::get('/', [SellerShippingMethodController::class, 'index']);
-            Route::post('/', [SellerShippingMethodController::class, 'store']);
-            Route::put('/{shippingMethod}', [SellerShippingMethodController::class, 'update']);
-            Route::delete('/{shippingMethod}', [SellerShippingMethodController::class, 'destroy']);
-
-            Route::prefix('{shippingMethod}/rates')->group(function () {
-                Route::get('/', [SellerShippingMethodRateController::class, 'index']);
-                Route::post('/', [SellerShippingMethodRateController::class, 'store']);
-                Route::put('/{rate}', [SellerShippingMethodRateController::class, 'update']);
-                Route::delete('/{rate}', [SellerShippingMethodRateController::class, 'destroy']);
-                Route::get('/export', [SellerShippingMethodRateController::class, 'export']);
-                Route::post('/import', [SellerShippingMethodRateController::class, 'import']);
-                Route::post('/copy-template', [SellerShippingMethodRateController::class, 'copyFromTemplate']);
-            });
-        });
-
-        Route::get('/shipping-rate-templates', [SellerShippingRateTemplateReadController::class, 'index']);
-
-        Route::prefix('orders')->group(function () {
-            Route::get('/', [SellerOrderController::class, 'index']);
-            Route::get('/{order}', [SellerOrderController::class, 'show']);
-            Route::post('/{order}/status', [SellerOrderController::class, 'updateStatus']);
-            Route::post('/{order}/mark-paid', [SellerOrderController::class, 'markAsPaid']);
-        });
-    });
 
     Route::prefix('photographer')->middleware(['auth:sanctum', 'not.blocked', 'photographer'])->group(function () {
         Route::prefix('events')->group(function () {
@@ -294,12 +243,6 @@ Route::prefix('v1')->group(function () {
             Route::get('/{role}', [AdminRoleController::class, 'show']);
             Route::put('/{role}', [AdminRoleController::class, 'update']);
             Route::delete('/{role}', [AdminRoleController::class, 'destroy']);
-        });
-
-        Route::prefix('seller-applications')->group(function () {
-            Route::get('/', [AdminSellerApplicationController::class, 'index']);
-            Route::post('/{sellerApplication}/approve', [AdminSellerApplicationController::class, 'approve']);
-            Route::post('/{sellerApplication}/reject', [AdminSellerApplicationController::class, 'reject']);
         });
 
         Route::prefix('photographer-applications')->group(function () {
@@ -439,6 +382,7 @@ Route::prefix('admin')->group(function () {
             Route::post('/{user}/unblock', [CustomerController::class, 'unblock']);
             Route::post('/{user}/ban', [CustomerController::class, 'ban']);
             Route::post('/{user}/unban', [CustomerController::class, 'unban']);
+            Route::delete('/{user}/sessions/{session}', [CustomerController::class, 'revokeSession']);
         });
 
         // Operational Marketplace Management
@@ -459,6 +403,17 @@ Route::prefix('admin')->group(function () {
             Route::put('/{category}', [AdminCategoryController::class, 'update']);
             Route::post('/{category}', [AdminCategoryController::class, 'update']);
             Route::delete('/{category}', [AdminCategoryController::class, 'destroy']);
+        });
+
+        // Queued CSV/XLSX import & export (categories, products, ...)
+        Route::prefix('data-transfers')->group(function () {
+            Route::get('/', [AdminDataTransferController::class, 'index']);
+            Route::get('/template', [AdminDataTransferController::class, 'template']);
+            Route::post('/export', [AdminDataTransferController::class, 'export']);
+            Route::post('/import', [AdminDataTransferController::class, 'import'])->middleware('throttle:20,1');
+            Route::get('/{dataTransfer}', [AdminDataTransferController::class, 'show']);
+            Route::get('/{dataTransfer}/download', [AdminDataTransferController::class, 'download']);
+            Route::delete('/{dataTransfer}', [AdminDataTransferController::class, 'destroy']);
         });
 
         Route::prefix('search-suggestions')->group(function () {
@@ -482,11 +437,54 @@ Route::prefix('admin')->group(function () {
             Route::delete('/{warehouse}', [AdminWarehouseController::class, 'destroy']);
         });
 
+        Route::prefix('shipping-methods')->group(function () {
+            Route::get('/', [AdminShippingMethodController::class, 'index']);
+            Route::post('/', [AdminShippingMethodController::class, 'store']);
+            Route::put('/{shippingMethod}', [AdminShippingMethodController::class, 'update']);
+            Route::delete('/{shippingMethod}', [AdminShippingMethodController::class, 'destroy']);
+            Route::post('/{shippingMethod}/toggle', [AdminShippingMethodController::class, 'toggle']);
+        });
+
+        Route::prefix('delivery-holidays')->group(function () {
+            Route::get('/', [AdminDeliveryHolidayController::class, 'index']);
+            Route::post('/', [AdminDeliveryHolidayController::class, 'store']);
+            Route::put('/{deliveryHoliday}', [AdminDeliveryHolidayController::class, 'update']);
+            Route::delete('/{deliveryHoliday}', [AdminDeliveryHolidayController::class, 'destroy']);
+        });
+
+        Route::prefix('delivery-schedules')->group(function () {
+            Route::get('/', [AdminDeliveryScheduleController::class, 'index']);
+            Route::post('/', [AdminDeliveryScheduleController::class, 'store']);
+            Route::put('/{deliverySchedule}', [AdminDeliveryScheduleController::class, 'update']);
+            Route::delete('/{deliverySchedule}', [AdminDeliveryScheduleController::class, 'destroy']);
+        });
+
         Route::get('service-cities', [AdminServiceCityController::class, 'index']);
         Route::put('service-cities', [AdminServiceCityController::class, 'update']);
 
         Route::get('service-fee', [AdminServiceFeeController::class, 'show']);
         Route::put('service-fee', [AdminServiceFeeController::class, 'update']);
+
+        Route::get('wallet-bonus', [AdminWalletBonusController::class, 'show']);
+        Route::put('wallet-bonus', [AdminWalletBonusController::class, 'update']);
+
+        Route::prefix('wallets')->group(function () {
+            Route::get('/', [AdminWalletController::class, 'index']);
+            Route::get('/{user}', [AdminWalletController::class, 'show']);
+            Route::post('/{user}/adjust', [AdminWalletController::class, 'adjust']);
+        });
+
+        Route::get('nav-badge', [AdminNavBadgeController::class, 'show']);
+        Route::put('nav-badge', [AdminNavBadgeController::class, 'update']);
+
+        Route::prefix('flash-sales')->group(function () {
+            Route::get('/', [AdminFlashSaleController::class, 'index']);
+            Route::post('/', [AdminFlashSaleController::class, 'store']);
+            Route::get('/{flashSale}', [AdminFlashSaleController::class, 'show']);
+            Route::put('/{flashSale}', [AdminFlashSaleController::class, 'update']);
+            Route::post('/{flashSale}/toggle', [AdminFlashSaleController::class, 'toggle']);
+            Route::delete('/{flashSale}', [AdminFlashSaleController::class, 'destroy']);
+        });
 
         Route::get('product-stocks', [AdminProductStockController::class, 'index']);
         Route::put('product-stocks/{product}', [AdminProductStockController::class, 'update']);

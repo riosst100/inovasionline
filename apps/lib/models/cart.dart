@@ -40,48 +40,27 @@ class CartItem {
   final double lineTotal;
 }
 
-class CartStoreSummary {
-  CartStoreSummary({required this.id, required this.name, required this.slug, this.logoUrl});
+/// Items picked in the cart to check out together.
+class CartSelection {
+  CartSelection({required this.items})
+      : subtotal = items.fold(0.0, (sum, item) => sum + item.lineTotal);
 
-  factory CartStoreSummary.fromJson(Map<String, dynamic> json) => CartStoreSummary(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        slug: json['slug'] as String,
-        logoUrl: json['logo_url'] as String?,
-      );
-
-  final String id;
-  final String name;
-  final String slug;
-  final String? logoUrl;
-}
-
-class CartStoreGroup {
-  CartStoreGroup({required this.store, required this.items, required this.subtotal});
-
-  factory CartStoreGroup.fromJson(Map<String, dynamic> json) => CartStoreGroup(
-        store: CartStoreSummary.fromJson(json['store'] as Map<String, dynamic>),
-        items: (json['items'] as List<dynamic>).map((e) => CartItem.fromJson(e as Map<String, dynamic>)).toList(),
-        subtotal: double.tryParse(json['subtotal'].toString()) ?? 0,
-      );
-
-  final CartStoreSummary store;
   final List<CartItem> items;
   final double subtotal;
 }
 
 class Cart {
-  Cart({required this.stores, required this.grandTotal, required this.itemCount});
+  Cart({required this.items, required this.grandTotal, required this.itemCount});
 
   factory Cart.fromJson(Map<String, dynamic> json) => Cart(
-        stores: (json['stores'] as List<dynamic>).map((e) => CartStoreGroup.fromJson(e as Map<String, dynamic>)).toList(),
+        items: (json['items'] as List<dynamic>).map((e) => CartItem.fromJson(e as Map<String, dynamic>)).toList(),
         grandTotal: double.tryParse(json['grand_total'].toString()) ?? 0,
         itemCount: json['item_count'] as int? ?? 0,
       );
 
-  final List<CartStoreGroup> stores;
+  final List<CartItem> items;
   final double grandTotal;
   final int itemCount;
 
-  bool get isEmpty => stores.isEmpty;
+  bool get isEmpty => items.isEmpty;
 }

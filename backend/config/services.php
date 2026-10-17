@@ -49,6 +49,14 @@ return [
         'client_key' => env('MIDTRANS_CLIENT_KEY'),
         'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
         'expiry_minutes' => (int) env('MIDTRANS_EXPIRY_MINUTES', 1440),
+        'notification_url' => env('MIDTRANS_NOTIFICATION_URL'),
+    ],
+
+    // Closed-loop buyer balance ("Saldo"). Limits in rupiah; 0 disables the balance cap.
+    'wallet' => [
+        'topup_min' => (int) env('WALLET_TOPUP_MIN', 10000),
+        'topup_max' => (int) env('WALLET_TOPUP_MAX', 2000000),
+        'max_balance' => (int) env('WALLET_MAX_BALANCE', 2000000),
     ],
 
     'support' => [

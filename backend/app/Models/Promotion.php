@@ -16,7 +16,6 @@ class Promotion extends Model
     use HasFactory, HasUlids, SoftDeletes;
 
     protected $fillable = [
-        'store_id',
         'flash_sale_slot_id',
         'name',
         'code',
@@ -45,11 +44,6 @@ class Promotion extends Model
         ];
     }
 
-    public function store(): BelongsTo
-    {
-        return $this->belongsTo(Store::class);
-    }
-
     public function flashSaleSlot(): BelongsTo
     {
         return $this->belongsTo(FlashSaleSlot::class);
@@ -62,7 +56,10 @@ class Promotion extends Model
 
     public function products(): BelongsToMany
     {
-        return $this->belongsToMany(Product::class, 'promotion_products')->using(PromotionProduct::class);
+        return $this->belongsToMany(Product::class, 'promotion_products')
+            ->using(PromotionProduct::class)
+            ->withPivot('flash_sale_price')
+            ->withTimestamps();
     }
 
     public function categories(): BelongsToMany

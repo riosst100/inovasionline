@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\WalletTopup;
 use App\Support\Enums\OrderStatus;
 use App\Support\Enums\PaymentStatus;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,10 @@ use RuntimeException;
 
 class MidtransService
 {
-    public function __construct(private readonly OrderCancellationService $cancellationService) {}
+    public function __construct(
+        private readonly OrderCancellationService $cancellationService,
+        private readonly WalletService $walletService = new WalletService,
+    ) {}
 
     /**
      * Create (or reuse a still-valid) Snap transaction for the order.
@@ -30,15 +34,8 @@ class MidtransService
             return $order;
         }
 
-        $serverKey = (string) config('services.midtrans.server_key');
-
-        if ($serverKey === '') {
-            throw new RuntimeException('Payment gateway is not configured.');
-        }
-
-        $order->loadMissing('user');
-
-        $expiryMinutes = (int) config('services.midtrans.expiry_minutes', 1440);
+        $order->loadMissing(['user', 'paymentMethod']);
+        $channel = $order->paymentMethod?->gateway_channel;
         $address = $order->delivery_address ?? [];
 
         // Midtrans rejects a reused order_id, so a retry after an expired token gets a suffix.
@@ -46,39 +43,80 @@ class MidtransService
             ? $order->order_number.'~'.now()->timestamp
             : $order->order_number;
 
-        $response = Http::withBasicAuth($serverKey, '')
-            ->acceptJson()
-            ->asJson()
-            ->timeout(15)
-            ->post($this->snapUrl().'/snap/v1/transactions', [
-                'transaction_details' => [
-                    'order_id' => $midtransOrderId,
-                    'gross_amount' => (int) round((float) $order->grand_total),
-                ],
-                'customer_details' => [
-                    'first_name' => $address['recipient_name'] ?? $order->user?->name,
-                    'email' => $order->user?->email,
-                    'phone' => $address['recipient_phone'] ?? null,
-                ],
-                'expiry' => [
-                    'unit' => 'minutes',
-                    'duration' => $expiryMinutes,
-                ],
-            ]);
-
-        if (! $response->successful() || ! $response->json('token')) {
-            report(new RuntimeException('Midtrans Snap error: '.$response->body()));
-
-            throw new RuntimeException('Failed to create payment transaction.');
-        }
+        $snap = $this->requestSnap([
+            // A single enabled channel makes Snap skip its own method list.
+            'enabled_payments' => $channel ? [$channel] : null,
+            'transaction_details' => [
+                'order_id' => $midtransOrderId,
+                'gross_amount' => (int) round((float) $order->grand_total),
+            ],
+            'customer_details' => [
+                'first_name' => $address['recipient_name'] ?? $order->user?->name,
+                'email' => $order->user?->email,
+                'phone' => $address['recipient_phone'] ?? null,
+            ],
+        ]);
 
         $order->update([
-            'payment_token' => $response->json('token'),
-            'payment_redirect_url' => $response->json('redirect_url'),
-            'payment_expires_at' => now()->addMinutes($expiryMinutes),
+            ...$snap,
+            'midtrans_order_id' => $midtransOrderId,
         ]);
 
         return $order->fresh();
+    }
+
+    /**
+     * Snap transaction for a balance top-up; the buyer picks any channel on the Midtrans page.
+     */
+    public function createTopupTransaction(WalletTopup $topup): WalletTopup
+    {
+        $topup->loadMissing('user');
+
+        $snap = $this->requestSnap([
+            'transaction_details' => [
+                'order_id' => $topup->topup_number,
+                'gross_amount' => (int) round((float) $topup->amount),
+            ],
+            'customer_details' => [
+                'first_name' => $topup->user?->name,
+                'email' => $topup->user?->email,
+                'phone' => $topup->user?->phone,
+            ],
+            'item_details' => [[
+                'id' => 'topup',
+                'name' => 'Top Up Saldo Inovasi',
+                'price' => (int) round((float) $topup->amount),
+                'quantity' => 1,
+            ]],
+        ]);
+
+        $topup->update($snap);
+
+        return $topup->fresh();
+    }
+
+    /**
+     * Voids an unpaid transaction (VA number, QR) so a cancelled order cannot be paid
+     * afterwards. Best effort: Midtrans answers 404 when no channel was picked yet.
+     */
+    public function cancelTransaction(Order $order): void
+    {
+        $serverKey = (string) config('services.midtrans.server_key');
+
+        if ($serverKey === '' || ! $order->payment_token) {
+            return;
+        }
+
+        $midtransOrderId = $order->midtrans_order_id ?? $order->order_number;
+
+        try {
+            Http::withBasicAuth($serverKey, '')
+                ->acceptJson()
+                ->timeout(15)
+                ->post($this->apiUrl().'/v2/'.rawurlencode($midtransOrderId).'/cancel');
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     public function isValidSignature(array $payload): bool
@@ -92,11 +130,19 @@ class MidtransService
     }
 
     /**
-     * Apply a Midtrans HTTP notification to the matching order. Idempotent.
+     * Apply a Midtrans HTTP notification to the matching order or top-up. Idempotent.
      */
     public function handleNotification(array $payload): void
     {
-        $orderNumber = explode('~', (string) ($payload['order_id'] ?? ''))[0];
+        $midtransOrderId = (string) ($payload['order_id'] ?? '');
+
+        if (str_starts_with($midtransOrderId, WalletTopup::NUMBER_PREFIX)) {
+            $this->handleTopupNotification($payload);
+
+            return;
+        }
+
+        $orderNumber = explode('~', $midtransOrderId)[0];
         $order = Order::where('order_number', $orderNumber)->first();
 
         if (! $order) {
@@ -114,7 +160,8 @@ class MidtransService
             $order = Order::whereKey($order->id)->lockForUpdate()->first();
             $isRefund = in_array($transactionStatus, ['refund', 'partial_refund'], true);
 
-            if ($order->payment_status === PaymentStatus::PAID && ! $isRefund) {
+            // Already settled (or settled and refunded to the balance): nothing left to do.
+            if (in_array($order->payment_status, [PaymentStatus::PAID, PaymentStatus::REFUNDED], true) && ! $isRefund) {
                 return;
             }
 
@@ -126,7 +173,28 @@ class MidtransService
             if ($transactionStatus === 'settlement' || ($transactionStatus === 'capture' && $fraudStatus === 'accept')) {
                 $order->payment_status = PaymentStatus::PAID;
                 $order->paid_at = now();
-            } elseif ($isRefund) {
+
+                // Paid orders start preparation right away, same as non-gateway orders.
+                if ($order->status === OrderStatus::PENDING) {
+                    $order->status = OrderStatus::PROCESSING;
+                    $order->status_history = [
+                        ...($order->status_history ?? []),
+                        ['status' => OrderStatus::PROCESSING->value, 'at' => now()->toIso8601String(), 'by' => 'system'],
+                    ];
+                }
+
+                $order->save();
+
+                // Paid after it was already cancelled (e.g. VA paid before the void went through):
+                // the money goes to the buyer's balance instead of being lost.
+                if ($order->status === OrderStatus::CANCELLED) {
+                    $this->walletService->refundOrder($order);
+                }
+
+                return;
+            }
+
+            if ($isRefund) {
                 $order->payment_status = PaymentStatus::REFUNDED;
             } elseif (in_array($transactionStatus, ['deny', 'cancel', 'expire', 'failure'], true)) {
                 $order->payment_status = PaymentStatus::FAILED;
@@ -141,6 +209,159 @@ class MidtransService
 
             $order->save();
         });
+    }
+
+    /**
+     * Pull the latest transaction status from Midtrans and apply it, for when the
+     * HTTP notification is late or cannot reach this server (e.g. local dev).
+     */
+    public function syncStatus(Order $order): Order
+    {
+        if (! $order->payment_token || $order->payment_status === PaymentStatus::PAID) {
+            return $order;
+        }
+
+        if ($status = $this->fetchStatus($order->midtrans_order_id ?? $order->order_number)) {
+            $this->handleNotification($status);
+        }
+
+        return $order->fresh();
+    }
+
+    public function syncTopupStatus(WalletTopup $topup): WalletTopup
+    {
+        if (! $topup->payment_token || $topup->status !== WalletTopup::STATUS_PENDING) {
+            return $topup;
+        }
+
+        if ($status = $this->fetchStatus($topup->topup_number)) {
+            $this->handleNotification($status);
+        }
+
+        return $topup->fresh();
+    }
+
+    private function handleTopupNotification(array $payload): void
+    {
+        $topup = WalletTopup::where('topup_number', $payload['order_id'] ?? '')->first();
+
+        if (! $topup) {
+            throw new RuntimeException('Top-up not found.');
+        }
+
+        if (abs((float) ($payload['gross_amount'] ?? 0) - (float) $topup->amount) > 1) {
+            throw new RuntimeException('Amount mismatch.');
+        }
+
+        $transactionStatus = $payload['transaction_status'] ?? '';
+        $fraudStatus = $payload['fraud_status'] ?? 'accept';
+
+        DB::transaction(function () use ($topup, $payload, $transactionStatus, $fraudStatus) {
+            $topup = WalletTopup::whereKey($topup->id)->lockForUpdate()->first();
+
+            if ($topup->status === WalletTopup::STATUS_PAID) {
+                return;
+            }
+
+            $topup->fill([
+                'midtrans_transaction_id' => $payload['transaction_id'] ?? $topup->midtrans_transaction_id,
+                'midtrans_payment_type' => $payload['payment_type'] ?? $topup->midtrans_payment_type,
+            ]);
+
+            if ($transactionStatus === 'settlement' || ($transactionStatus === 'capture' && $fraudStatus === 'accept')) {
+                $topup->status = WalletTopup::STATUS_PAID;
+                $topup->paid_at = now();
+                $topup->save();
+                $this->walletService->creditTopup($topup);
+
+                return;
+            }
+
+            if ($transactionStatus === 'expire') {
+                $topup->status = WalletTopup::STATUS_EXPIRED;
+            } elseif (in_array($transactionStatus, ['deny', 'cancel', 'failure'], true)) {
+                $topup->status = WalletTopup::STATUS_FAILED;
+            }
+
+            $topup->save();
+        });
+    }
+
+    /**
+     * @return array{payment_token: string, payment_redirect_url: string, payment_expires_at: \Illuminate\Support\Carbon}
+     */
+    private function requestSnap(array $payload): array
+    {
+        $serverKey = (string) config('services.midtrans.server_key');
+
+        if ($serverKey === '') {
+            throw new RuntimeException('Payment gateway is not configured.');
+        }
+
+        $expiryMinutes = (int) config('services.midtrans.expiry_minutes', 1440);
+
+        // Lets a local/staging server receive its own notifications (e.g. via an ngrok URL)
+        // while the dashboard Notification URL keeps pointing at production.
+        $notificationUrl = (string) config('services.midtrans.notification_url');
+
+        $response = Http::withBasicAuth($serverKey, '')
+            ->acceptJson()
+            ->asJson()
+            ->timeout(15)
+            ->when($notificationUrl !== '', fn ($http) => $http->withHeaders(['X-Override-Notification' => $notificationUrl]))
+            ->post($this->snapUrl().'/snap/v1/transactions', array_filter([
+                ...$payload,
+                'expiry' => [
+                    'unit' => 'minutes',
+                    'duration' => $expiryMinutes,
+                ],
+                // The app's webview closes on any redirect carrying transaction_status,
+                // so this works without configuring a Finish URL in the dashboard.
+                'callbacks' => [
+                    'finish' => $this->finishUrl(),
+                ],
+            ]));
+
+        if (! $response->successful() || ! $response->json('token')) {
+            report(new RuntimeException('Midtrans Snap error: '.$response->body()));
+
+            throw new RuntimeException('Failed to create payment transaction.');
+        }
+
+        return [
+            'payment_token' => $response->json('token'),
+            'payment_redirect_url' => $response->json('redirect_url'),
+            'payment_expires_at' => now()->addMinutes($expiryMinutes),
+        ];
+    }
+
+    /** Midtrans answers with status_code 404 in the body until the buyer picks a payment channel. */
+    private function fetchStatus(string $midtransOrderId): ?array
+    {
+        $serverKey = (string) config('services.midtrans.server_key');
+
+        if ($serverKey === '') {
+            return null;
+        }
+
+        $response = Http::withBasicAuth($serverKey, '')
+            ->acceptJson()
+            ->timeout(15)
+            ->get($this->apiUrl().'/v2/'.rawurlencode($midtransOrderId).'/status');
+
+        return $response->successful() && $response->json('transaction_status') ? $response->json() : null;
+    }
+
+    private function finishUrl(): string
+    {
+        return rtrim((string) config('app.frontend_url'), '/').'/payment/finish';
+    }
+
+    private function apiUrl(): string
+    {
+        return config('services.midtrans.is_production')
+            ? 'https://api.midtrans.com'
+            : 'https://api.sandbox.midtrans.com';
     }
 
     private function snapUrl(): string

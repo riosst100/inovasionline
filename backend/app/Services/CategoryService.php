@@ -16,19 +16,6 @@ class CategoryService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function createFromSeller(User $seller, array $data): Category
-    {
-        return Category::create([
-            ...$data,
-            'slug' => $this->generateSlug($data['name']),
-            'is_active' => false,
-            'created_by' => $seller->id,
-        ]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
     public function createFromAdmin(User|AdminUser $admin, array $data, ?UploadedFile $image = null): Category
     {
         unset($data['image']);
@@ -119,7 +106,7 @@ class CategoryService
         return $category->fresh();
     }
 
-    private function generateSlug(string $name, ?string $excludeId = null): string
+    public function generateSlug(string $name, ?string $excludeId = null): string
     {
         $base = Str::slug($name);
         $slug = $base;

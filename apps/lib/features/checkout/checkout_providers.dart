@@ -1,10 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_exception.dart';
+import '../../models/delivery_schedule.dart';
 import '../../models/order.dart';
 import '../../models/payment_method.dart';
 import '../../models/shipping_method.dart';
 import '../../providers/core_providers.dart';
+import '../orders/order_providers.dart';
+import '../wallet/wallet_providers.dart';
 
 String _errorMessage(Object error, String fallback) {
   if (error is DioException && error.error is ApiException) {
@@ -13,24 +16,28 @@ String _errorMessage(Object error, String fallback) {
   return fallback;
 }
 
-final checkoutStorePaymentMethodsProvider =
-    FutureProvider.autoDispose.family<List<PaymentMethod>, String>((ref, storeSlug) {
-  return ref.watch(checkoutServiceProvider).paymentMethods(storeSlug);
+final checkoutPaymentMethodsProvider = FutureProvider.autoDispose<List<PaymentMethod>>((ref) {
+  return ref.watch(checkoutServiceProvider).paymentMethods();
 });
 
 final checkoutServiceFeeConfigProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
   return ref.watch(checkoutServiceProvider).serviceFeeConfig();
 });
 
-typedef ShippingMethodsQuery = ({String storeSlug, String districtCode, String? villageCode});
+typedef ShippingMethodsQuery = ({String districtCode, String? villageCode});
 
-final checkoutStoreShippingMethodsProvider =
+final checkoutShippingMethodsProvider =
     FutureProvider.autoDispose.family<List<ShippingMethod>, ShippingMethodsQuery>((ref, query) {
   return ref.watch(checkoutServiceProvider).shippingMethods(
-        query.storeSlug,
         districtCode: query.districtCode,
         villageCode: query.villageCode,
       );
+});
+
+/// Keyed by shipping method id: each scheduled method has its own windows.
+final checkoutDeliverySchedulesProvider =
+    FutureProvider.autoDispose.family<List<DeliveryDay>, String>((ref, shippingMethodId) {
+  return ref.watch(checkoutServiceProvider).deliverySchedules(shippingMethodId);
 });
 
 class CheckoutState {
@@ -53,7 +60,6 @@ class CheckoutNotifier extends StateNotifier<CheckoutState> {
   final Ref _ref;
 
   Future<bool> submit({
-    required String storeId,
     required List<String> cartItemIds,
     required String paymentMethodId,
     required String shippingMethodId,
@@ -65,11 +71,12 @@ class CheckoutNotifier extends StateNotifier<CheckoutState> {
     required String villageCode,
     required String addressDetail,
     String? customerNotes,
+    String? deliveryScheduleId,
+    String? deliveryDate,
   }) async {
     state = state.copyWith(submitting: true, error: null);
     try {
       final order = await _ref.read(checkoutServiceProvider).checkout(
-            storeId: storeId,
             cartItemIds: cartItemIds,
             paymentMethodId: paymentMethodId,
             shippingMethodId: shippingMethodId,
@@ -81,7 +88,12 @@ class CheckoutNotifier extends StateNotifier<CheckoutState> {
             villageCode: villageCode,
             addressDetail: addressDetail,
             customerNotes: customerNotes,
+            deliveryScheduleId: deliveryScheduleId,
+            deliveryDate: deliveryDate,
           );
+      _ref.invalidate(myOrdersProvider);
+      invalidateWallet(_ref); // paying with balance debits it
+
       state = CheckoutState(order: order);
       return true;
     } catch (e) {

@@ -3,6 +3,7 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import NoWarehouseNotice from '../../../../components/warehouses/NoWarehouseNotice';
 import AdminLayout from '../../../../components/layout/AdminLayout';
 import SearchableSelect from '../../../../components/ui/SearchableSelect';
 import { adminApi } from '../../../../lib/api';
@@ -62,7 +63,6 @@ function EditProductPageContent() {
           description: p.description ?? '',
           regular_price: initPrice(p.regular_price),
           sale_price: initPrice(p.sale_price),
-          stock: p.stock ?? 0,
           sku: p.sku ?? '',
           status: p.status ?? 'draft',
         });
@@ -263,11 +263,7 @@ function EditProductPageContent() {
               </div>
 
               {warehouses.length === 0 ? (
-                <label className="block text-xs font-semibold text-slate-600">
-                  Stok tersedia
-                  <input type="number" min={0} required value={form.stock} onChange={(e) => setField('stock', e.target.value)} className={inputCls} />
-                  <span className="mt-1 block text-[11px] font-normal text-slate-400">Belum ada gudang aktif. Tambahkan gudang di menu Stok → Gudang untuk mengatur stok per gudang.</span>
-                </label>
+                <NoWarehouseNotice />
               ) : (
                 <>
                   {rows.length === 0 && (

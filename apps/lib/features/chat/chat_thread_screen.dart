@@ -122,7 +122,6 @@ class ChatThreadScreen extends ConsumerStatefulWidget {
     this.avatarUrl,
     this.avatarIcon,
     this.isDirectMessage = false,
-    this.isSeller = false,
   });
 
   final String threadId;
@@ -131,7 +130,6 @@ class ChatThreadScreen extends ConsumerStatefulWidget {
   final String? avatarUrl;
   final IconData? avatarIcon;
   final bool isDirectMessage;
-  final bool isSeller;
 
   @override
   ConsumerState<ChatThreadScreen> createState() => _ChatThreadScreenState();
@@ -329,64 +327,145 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
     });
   }
 
+  void _openInfo() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatThreadInfoScreen(
+          threadId: widget.threadId,
+          title: widget.title,
+          avatarUrl: widget.avatarUrl,
+          avatarIcon: widget.avatarIcon,
+          isDirectMessage: widget.isDirectMessage,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = ref.watch(authProvider).user?.id;
 
     return Scaffold(
+      backgroundColor: _threadBackground,
       appBar: AppBar(
         titleSpacing: 0,
         title: InkWell(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ChatThreadInfoScreen(
-                threadId: widget.threadId,
-                title: widget.title,
-                avatarUrl: widget.avatarUrl,
-                avatarIcon: widget.avatarIcon,
-                isDirectMessage: widget.isDirectMessage,
-                isSeller: widget.isSeller,
-              ),
+          onTap: _openInfo,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: widget.avatarUrl == null
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF2DD4BF), AppColors.primary],
+                          )
+                        : null,
+                    image: widget.avatarUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(widget.avatarUrl!),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                  child: widget.avatarUrl == null
+                      ? Icon(
+                          widget.avatarIcon ?? Icons.person_rounded,
+                          size: 20,
+                          color: Colors.white,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.title,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        widget.isDirectMessage
+                            ? 'Ketuk untuk info kontak'
+                            : 'Ketuk untuk info grup',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.surface,
-                foregroundColor: AppColors.primary,
-                backgroundImage: widget.avatarUrl != null
-                    ? NetworkImage(widget.avatarUrl!)
-                    : null,
-                child: widget.avatarUrl == null
-                    ? Icon(widget.avatarIcon ?? Icons.person_outline, size: 18)
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(widget.title, overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Info',
+            icon: const Icon(Icons.info_outline_rounded),
+            onPressed: _openInfo,
+          ),
+        ],
       ),
       body: Column(
         children: [
           if (_error != null)
-            Container(
-              width: double.infinity,
-              color: Colors.red.shade50,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                _error!,
-                style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+            Material(
+              color: const Color(0xFFFEF2F2),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      size: 18,
+                      color: Colors.red.shade700,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      color: Colors.red.shade700,
+                      onPressed: () => setState(() => _error = null),
+                    ),
+                  ],
+                ),
               ),
             ),
           Expanded(
             child: Container(
               width: double.infinity,
               height: double.infinity,
-              color: AppColors.chatBackground,
+              color: _threadBackground,
               child: Stack(
                 children: [
                   SizedBox(
@@ -395,7 +474,7 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                     child: _loading
                         ? const _ChatThreadSkeleton()
                         : _messages.isEmpty
-                        ? const Center(child: Text('Belum ada pesan.'))
+                        ? _EmptyThread(canPost: widget.canPost)
                         : ScrollablePositionedList.builder(
                             reverse: true,
                             physics: const _FastFlingScrollPhysics(),
@@ -408,11 +487,32 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                               final isMine =
                                   message.senderId != null &&
                                   message.senderId == currentUserId;
-                              return _MessageBubble(
+                              // The list is reversed: index + 1 is the
+                              // previous (older) message, index - 1 the next.
+                              final older = index + 1 < _messages.length
+                                  ? _messages[index + 1]
+                                  : null;
+                              final newer = index > 0
+                                  ? _messages[index - 1]
+                                  : null;
+                              final startsDay =
+                                  older == null || !_isSameDay(older, message);
+                              final startsGroup =
+                                  startsDay || !_isSameSender(older, message);
+                              final endsGroup =
+                                  newer == null ||
+                                  !_isSameDay(newer, message) ||
+                                  !_isSameSender(newer, message);
+
+                              final bubble = _MessageBubble(
                                 key: ValueKey(message.id),
                                 message: message,
                                 isMine: isMine,
                                 currentUserId: currentUserId,
+                                showSenderName:
+                                    startsGroup && !widget.isDirectMessage,
+                                isFirstInGroup: startsGroup,
+                                isLastInGroup: endsGroup,
                                 isHighlighted:
                                     message.id == _highlightedMessageId,
                                 onReply: widget.canPost
@@ -422,6 +522,21 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                                     ? () =>
                                           _scrollToMessage(message.replyTo!.id)
                                     : null,
+                              );
+
+                              if (!startsDay || message.createdAt == null) {
+                                return bubble;
+                              }
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _DateSeparator(
+                                    label: formatChatDayLabel(
+                                      message.createdAt!,
+                                    ),
+                                  ),
+                                  bubble,
+                                ],
                               );
                             },
                           ),
@@ -450,26 +565,28 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
           if (widget.canPost)
             Container(
               width: double.infinity,
-              color: AppColors.chatBackground,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
               child: SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Expanded(
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -483,13 +600,20 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                               TextField(
                                 controller: _messageController,
                                 minLines: 1,
-                                maxLines: 4,
+                                maxLines: 5,
+                                textCapitalization:
+                                    TextCapitalization.sentences,
+                                style: const TextStyle(fontSize: 15),
                                 decoration: const InputDecoration(
-                                  hintText: 'Ketik Pesan',
+                                  hintText: 'Tulis pesan…',
+                                  hintStyle: TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                  ),
                                   filled: false,
+                                  isDense: true,
                                   contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
+                                    horizontal: 18,
+                                    vertical: 13,
                                   ),
                                   border: InputBorder.none,
                                   enabledBorder: InputBorder.none,
@@ -501,9 +625,34 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      IconButton.filled(
-                        onPressed: _send,
-                        icon: const Icon(Icons.send),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _messageController,
+                        builder: (context, value, _) {
+                          final canSend = value.text.trim().isNotEmpty;
+                          return AnimatedScale(
+                            scale: canSend ? 1 : 0.9,
+                            duration: const Duration(milliseconds: 150),
+                            child: Material(
+                              shape: const CircleBorder(),
+                              color: canSend
+                                  ? AppColors.primary
+                                  : const Color(0xFFCBD5E1),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: canSend ? _send : null,
+                                child: const SizedBox(
+                                  width: 46,
+                                  height: 46,
+                                  child: Icon(
+                                    Icons.send_rounded,
+                                    color: Colors.white,
+                                    size: 21,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -514,15 +663,161 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
             Container(
               width: double.infinity,
               color: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: const Center(
-                child: Text(
-                  'Percakapan ini bersifat baca saja.',
-                  style: TextStyle(color: AppColors.mutedForeground),
+              child: const SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 16,
+                        color: AppColors.mutedForeground,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Hanya admin yang dapat mengirim pesan',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+const _threadBackground = Color(0xFFEEF2F6);
+
+bool _isSameDay(ChatMessage a, ChatMessage b) {
+  final aTime = a.createdAt?.toLocal();
+  final bTime = b.createdAt?.toLocal();
+  if (aTime == null || bTime == null) return true;
+  return DateUtils.isSameDay(aTime, bTime);
+}
+
+bool _isSameSender(ChatMessage a, ChatMessage b) =>
+    a.isOfficial == b.isOfficial && a.senderId == b.senderId;
+
+/// Distinct, readable colours for sender names in group chats, picked by a
+/// stable hash of the sender so each person keeps the same colour.
+const _senderNameColors = [
+  Color(0xFF0D9488),
+  Color(0xFF7C3AED),
+  Color(0xFFDB2777),
+  Color(0xFFEA580C),
+  Color(0xFF2563EB),
+  Color(0xFF16A34A),
+  Color(0xFFCA8A04),
+  Color(0xFF0891B2),
+];
+
+Color _senderNameColor(ChatMessage message) {
+  if (message.isOfficial) return AppColors.secondary;
+  final key = message.senderId ?? message.senderName ?? '';
+  final hash = key.codeUnits.fold<int>(0, (h, c) => (h * 31 + c) & 0x7fffffff);
+  return _senderNameColors[hash % _senderNameColors.length];
+}
+
+class _DateSeparator extends StatelessWidget {
+  const _DateSeparator({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.mutedForeground,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyThread extends StatelessWidget {
+  const _EmptyThread({required this.canPost});
+
+  final bool canPost;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.waving_hand_rounded,
+                size: 36,
+                color: Color(0xFFF59E0B),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Belum ada pesan',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.foreground,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              canPost
+                  ? 'Mulai percakapan dengan mengirim pesan pertama.'
+                  : 'Pengumuman akan muncul di sini.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.mutedForeground,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -622,6 +917,9 @@ class _MessageBubble extends StatefulWidget {
     required this.message,
     required this.isMine,
     this.currentUserId,
+    this.showSenderName = true,
+    this.isFirstInGroup = true,
+    this.isLastInGroup = true,
     this.isHighlighted = false,
     this.onReply,
     this.onQuoteTap,
@@ -630,6 +928,13 @@ class _MessageBubble extends StatefulWidget {
   final ChatMessage message;
   final bool isMine;
   final String? currentUserId;
+
+  /// Consecutive messages from the same sender form a group: only the first
+  /// shows the sender's name, and only the last gets the pointed "tail"
+  /// corner, like WhatsApp/Telegram.
+  final bool showSenderName;
+  final bool isFirstInGroup;
+  final bool isLastInGroup;
   final bool isHighlighted;
   final VoidCallback? onReply;
   final VoidCallback? onQuoteTap;
@@ -680,21 +985,46 @@ class _MessageBubbleState extends State<_MessageBubble> {
 
     final bubbleMaxWidth = MediaQuery.sizeOf(context).width * 0.75;
 
-    final senderNameWidget = isMine
+    final senderNameWidget = isMine || !widget.showSenderName
         ? null
         : Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 2),
-            child: Text(
-              message.isOfficial
-                  ? 'Inovasi Online'
-                  : (message.senderName ?? 'Pengguna'),
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    message.isOfficial
+                        ? 'Inovasi Online'
+                        : (message.senderName ?? 'Pengguna'),
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _senderNameColor(message),
+                    ),
+                  ),
+                ),
+                if (message.isOfficial) ...[
+                  const SizedBox(width: 3),
+                  const Icon(
+                    Icons.verified_rounded,
+                    size: 13,
+                    color: AppColors.secondary,
+                  ),
+                ],
+              ],
             ),
           );
+
+    const bigRadius = Radius.circular(18);
+    const smallRadius = Radius.circular(5);
+    final bubbleRadius = BorderRadius.only(
+      topLeft: !isMine && !widget.isFirstInGroup ? smallRadius : bigRadius,
+      topRight: isMine && !widget.isFirstInGroup ? smallRadius : bigRadius,
+      bottomLeft: !isMine ? smallRadius : bigRadius,
+      bottomRight: isMine ? smallRadius : bigRadius,
+    );
 
     final replyQuote = message.replyTo == null
         ? null
@@ -769,27 +1099,31 @@ class _MessageBubbleState extends State<_MessageBubble> {
           };
 
     final bodyWithTime = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: message.createdAt != null
           ? Text.rich(
               TextSpan(
                 children: [
                   TextSpan(
                     text: message.body,
-                    style: TextStyle(color: textColor, fontSize: 14),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 14.5,
+                      height: 1.35,
+                    ),
                   ),
                   const WidgetSpan(child: SizedBox(width: 10)),
                   WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
+                    alignment: PlaceholderAlignment.bottom,
                     child: Text(
-                      formatChatListTime(message.createdAt!),
+                      formatChatBubbleTime(message.createdAt!),
                       style: TextStyle(fontSize: 10.5, color: timeColor),
                     ),
                   ),
                   if (statusIcon != null) ...[
                     const WidgetSpan(child: SizedBox(width: 3)),
                     WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
+                      alignment: PlaceholderAlignment.bottom,
                       child: Icon(
                         statusIcon,
                         size: 12,
@@ -804,7 +1138,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
             )
           : Text(
               message.body,
-              style: TextStyle(color: textColor, fontSize: 14),
+              style: TextStyle(color: textColor, fontSize: 14.5, height: 1.35),
             ),
     );
 
@@ -845,18 +1179,31 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     ? Alignment.centerRight
                     : Alignment.centerLeft,
                 child: Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 1,
+                  margin: EdgeInsets.fromLTRB(
+                    12,
+                    widget.isFirstInGroup ? 6 : 1.5,
+                    12,
+                    widget.isLastInGroup ? 2 : 0,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
                   constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
                   decoration: BoxDecoration(
-                    color: bubbleColor,
-                    borderRadius: BorderRadius.circular(14),
+                    color: isMine && !message.isOfficial ? null : bubbleColor,
+                    gradient: isMine && !message.isOfficial
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF14B8A6), AppColors.primary],
+                          )
+                        : null,
+                    borderRadius: bubbleRadius,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

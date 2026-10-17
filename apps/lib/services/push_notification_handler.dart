@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -5,9 +6,14 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/router.dart';
+import '../features/orders/order_providers.dart';
 import '../providers/core_providers.dart';
 
 const _broadcastTopic = 'all_users';
+
+/// Completes once Firebase and push are set up. bootstrap does that without
+/// holding up the splash, so await this before touching FirebaseMessaging.
+final firebaseReady = Completer<void>();
 
 const _androidChannel = AndroidNotificationChannel(
   'default_channel',
@@ -32,7 +38,16 @@ class PushNotificationHandler {
 
     // Permission is requested by PermissionGate once the splash is gone, not
     // here, so the system dialog doesn't fire over the native splash.
-    await FirebaseMessaging.instance.subscribeToTopic(_broadcastTopic);
+    // Network round trips are not awaited: this runs before runApp, so every
+    // await here keeps the native splash up.
+    unawaited(
+      FirebaseMessaging.instance
+          .subscribeToTopic(_broadcastTopic)
+          .catchError(
+            (Object e) =>
+                developer.log('Failed to subscribe to topic: $e', name: 'push'),
+          ),
+    );
 
     await _localNotifications.initialize(
       const InitializationSettings(
@@ -50,7 +65,7 @@ class PushNotificationHandler {
         >()
         ?.createNotificationChannel(_androidChannel);
 
-    await _syncToken();
+    unawaited(_syncToken());
     FirebaseMessaging.instance.onTokenRefresh.listen((_) => _syncToken());
 
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
@@ -75,6 +90,13 @@ class PushNotificationHandler {
   }
 
   void _showForegroundNotification(RemoteMessage message) {
+    final orderId = message.data['type'] == 'order' ? message.data['order_id'] as String? : null;
+    if (orderId != null) {
+      // Keeps the active-order bar, badges and ongoing notification current.
+      _container.invalidate(myOrdersProvider);
+      _container.invalidate(orderDetailProvider(orderId));
+    }
+
     final notification = message.notification;
     if (notification == null) return;
 

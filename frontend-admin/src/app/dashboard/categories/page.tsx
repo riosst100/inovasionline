@@ -2,13 +2,23 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
+import ImportExportActions from '../../../components/data-transfer/ImportExportActions';
+import DataTransferProgress from '../../../components/data-transfer/DataTransferProgress';
 import { adminApi } from '../../../lib/api';
-import { FolderTree, GripVertical, Loader2, Plus, X } from 'lucide-react';
+import { useDataTransfers } from '../../../lib/dataTransfer';
+import { DataTransfer } from '../../../types';
+import { FolderTree, GripVertical, ImageIcon, Loader2, Plus, X } from 'lucide-react';
+
+const IMPORT_HINT = (
+  <>
+    Kolom: <b>name</b> (wajib), slug, parent (slug/nama kategori induk), description, image_url, sort_order,
+    is_active (1/0). Baris dengan slug yang sudah ada akan <b>diperbarui</b>, selain itu dibuat baru.
+  </>
+);
 
 type CategoryForm = {
   id?: string;
   name: string;
-  icon: string;
   is_active: boolean;
   image: File | null;
   preview: string | null;
@@ -16,7 +26,6 @@ type CategoryForm = {
 
 const emptyForm: CategoryForm = {
   name: '',
-  icon: '',
   is_active: true,
   image: null,
   preview: null,
@@ -39,6 +48,14 @@ export default function AdminCategoriesPage() {
   }, []);
 
   useEffect(load, [load]);
+
+  const onTransferFinished = useCallback(
+    (t: DataTransfer) => {
+      if (t.type === 'import' && t.status === 'completed') load();
+    },
+    [load]
+  );
+  const transfers = useDataTransfers({ resource: 'categories', perPage: 5 }, onTransferFinished);
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -66,7 +83,6 @@ export default function AdminCategoriesPage() {
     setForm({
       id: c.id,
       name: c.name,
-      icon: c.icon ?? '',
       is_active: !!c.is_active,
       image: null,
       preview: c.image_url ?? null,
@@ -107,7 +123,6 @@ export default function AdminCategoriesPage() {
     try {
       const body = new FormData();
       body.append('name', form.name);
-      body.append('icon', form.icon);
       body.append('is_active', form.is_active ? '1' : '0');
       if (form.image) body.append('image', form.image);
       await adminApi.saveCategory(body, form.id);
@@ -137,16 +152,21 @@ export default function AdminCategoriesPage() {
             </p>
             {error && !form && <p className="mt-1 text-xs text-red-600">{error}</p>}
           </div>
-          <button
-            onClick={() => {
-              setError('');
-              setForm(emptyForm);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-          >
-            <Plus className="h-4 w-4" /> Tambah
-          </button>
+          <div className="flex flex-wrap items-start justify-end gap-2">
+            <ImportExportActions resource="categories" onStarted={transfers.track} importHint={IMPORT_HINT} />
+            <button
+              onClick={() => {
+                setError('');
+                setForm(emptyForm);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+            >
+              <Plus className="h-4 w-4" /> Tambah
+            </button>
+          </div>
         </div>
+
+        <DataTransferProgress items={transfers.items} resource="categories" />
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs">
           {loading ? (
@@ -214,7 +234,7 @@ export default function AdminCategoriesPage() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" draggable={false} />
                       ) : (
-                        c.icon || c.name.slice(0, 2)
+                        <ImageIcon className="h-6 w-6 text-emerald-400" />
                       )}
                     </div>
                     <span className="text-xs font-bold text-slate-800 line-clamp-1">{c.name}</span>
@@ -243,15 +263,6 @@ export default function AdminCategoriesPage() {
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              />
-            </label>
-
-            <label className="block text-xs font-bold text-slate-700">
-              Ikon (emoji)
-              <input
-                value={form.icon}
-                onChange={(e) => setForm({ ...form, icon: e.target.value })}
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               />
             </label>

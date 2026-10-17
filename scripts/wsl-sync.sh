@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Sync project dari Windows (D:\inovasionline) ke filesystem WSL lalu jalankan Docker di sana.
+# Sync backend, frontend & frontend-admin dari Windows ke filesystem WSL lalu jalankan Docker di sana.
+# apps/ (Flutter) tidak ikut: tetap di-build dari Windows.
 # Pakai dari PowerShell/Git Bash di Windows:
 #   bash scripts/wsl-sync.sh            # sync sekali
 #   bash scripts/wsl-sync.sh up         # sync + docker compose up -d
-#   bash scripts/wsl-sync.sh watch      # sync terus-menerus (tiap 2 detik)
-#   bash scripts/wsl-sync.sh down|logs|ps
-# Edit hanya di Windows; folder tujuan WSL ditimpa tiap sync.
+#   bash scripts/wsl-sync.sh watch      # sync otomatis tiap file disimpan
+#   bash scripts/wsl-sync.sh down|logs [svc]|ps
+# Edit hanya di Windows; folder tujuan WSL ditimpa tiap sync (kecuali .env, vendor, node_modules, storage).
 set -euo pipefail
 
 DISTRO="${WSL_DISTRO:-Ubuntu-24.04}"
@@ -17,21 +18,32 @@ case "$SRC_WSL" in /mnt/?*) ;; *) echo "wslpath gagal: '$SRC_WSL'" >&2; exit 1 ;
 
 wsh() { wsl -d "$DISTRO" -- bash -lc "$1"; }
 
+# Keep in sync with Sync-Now in wsl-watch.ps1.
 sync_once() {
   wsh "mkdir -p $DEST && rsync -a --delete \
-    --exclude='.git/' --exclude='node_modules/' --exclude='.next/' \
+    --exclude='node_modules/' --exclude='.next/' \
     --exclude='backend/vendor/' --exclude='backend/.env' \
     --exclude='backend/storage/logs/' --exclude='backend/storage/framework/' \
     --exclude='backend/storage/app/' --exclude='backend/public/storage' \
-    --exclude='apps/' --exclude='.env' \
+    --exclude='backend/bootstrap/cache/*.php' \
+    --include='/backend/' --include='/frontend/' --include='/frontend-admin/' \
+    --include='/docker/' --include='/docker-compose.yml' --include='/.env.example' \
+    --include='/deploy-local.sh' --exclude='/*' \
     '$SRC_WSL/' $DEST/"
 }
 
-[ -f "$SRC_WIN/.env" ] && wsh "cp -n '$SRC_WSL/.env' $DEST/.env 2>/dev/null || true"
+# .env files are only seeded once; after that the WSL copies are left alone.
+seed_env() {
+  wsh "mkdir -p $DEST/backend; \
+    [ -f '$SRC_WSL/.env' ] && [ ! -f $DEST/.env ] && cp '$SRC_WSL/.env' $DEST/.env; \
+    [ -f '$SRC_WSL/backend/.env' ] && [ ! -f $DEST/backend/.env ] && cp '$SRC_WSL/backend/.env' $DEST/backend/.env; true"
+}
+
+seed_env
 
 case "${1:-sync}" in
   sync)  sync_once ;;
-  up)    sync_once; wsh "cd $DEST && [ -f .env ] || cp .env.example .env; docker compose up -d --build && docker compose ps" ;;
+  up)    sync_once; wsh "cd $DEST && { [ -f .env ] || cp .env.example .env; } && docker compose up -d --build && docker compose ps" ;;
   watch) powershell.exe -ExecutionPolicy Bypass -File "$(cygpath -w "$SRC_WIN/scripts/wsl-watch.ps1")" ;;
   down)  wsh "cd $DEST && docker compose down" ;;
   logs)  wsh "cd $DEST && docker compose logs -f --tail=100 ${2:-}" ;;

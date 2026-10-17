@@ -28,6 +28,17 @@ import {
   Settings,
   MapPinned,
   Receipt,
+  Tag,
+  Wallet,
+  ArrowDownUp,
+  Bike,
+  CalendarClock,
+  PackageCheck,
+  Megaphone,
+  Ticket,
+  Percent,
+  Zap,
+  Gift,
   X,
 } from 'lucide-react';
 
@@ -60,7 +71,16 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
       title: 'Operasional',
       items: [
         { name: 'Pesanan', href: '/dashboard/orders', icon: ShoppingBag },
-        { name: 'Kurir', href: '/dashboard/drivers', icon: Truck },
+        {
+          name: 'Pengiriman',
+          href: '/dashboard/shipping',
+          icon: Truck,
+          children: [
+            { name: 'Metode Pengiriman', href: '/dashboard/shipping-methods', icon: PackageCheck },
+            { name: 'Kurir', href: '/dashboard/drivers', icon: Bike },
+            { name: 'Jadwal Pengiriman', href: '/dashboard/delivery-schedules', icon: CalendarClock },
+          ],
+        },
         {
           name: 'Katalog',
           href: '/dashboard/catalog',
@@ -94,12 +114,24 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
           icon: LayoutTemplate,
           children: [{ name: 'Banner', href: '/dashboard/banners', icon: ImageIcon }],
         },
+        {
+          name: 'Promosi',
+          href: '/dashboard/promotions',
+          icon: Megaphone,
+          children: [
+            { name: 'Voucher', href: '/dashboard/promotions/vouchers', icon: Ticket },
+            { name: 'Diskon', href: '/dashboard/promotions/discounts', icon: Percent },
+            { name: 'Flash Sale', href: '/dashboard/promotions/flash-sales', icon: Zap },
+            { name: 'Bonus Saldo Belanja', href: '/dashboard/promotions/wallet-bonus', icon: Gift },
+          ],
+        },
       ],
     },
     {
       title: 'Pengguna',
       items: [
         { name: 'Customer', href: '/dashboard/customers', icon: Users2 },
+        { name: 'Saldo Customer', href: '/dashboard/wallets', icon: Wallet },
         { name: 'User', href: '/dashboard/users', icon: UserCog, badge: 'Internal' },
         {
           name: 'Hak Akses & Role',
@@ -108,6 +140,10 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
           badge: isSuperAdmin ? 'Super' : undefined,
         },
       ],
+    },
+    {
+      title: 'Data',
+      items: [{ name: 'Import / Export', href: '/dashboard/data-transfers', icon: ArrowDownUp }],
     },
     {
       title: 'Pengaturan',
@@ -119,6 +155,7 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
           children: [
             { name: 'Cakupan Kota', href: '/dashboard/settings/service-cities', icon: MapPinned },
             { name: 'Biaya Layanan', href: '/dashboard/settings/service-fee', icon: Receipt },
+            { name: 'Badge Menu', href: '/dashboard/settings/nav-badge', icon: Tag },
           ],
         },
       ],

@@ -22,7 +22,7 @@ echo "==> Using device: $DEVICE"
 
 # pubspec.yaml bundles .env, .env.dev and .env.prod as assets, so all three must exist (gitignored).
 [ -f .env ]      || cp .env.example .env
-[ -f .env.dev ]  || cp .env.example .env.dev
+[ -f .env.dev ]  || cp .env.dev.example .env.dev
 [ -f .env.prod ] || cp .env.prod.example .env.prod
 
 # adb reverse resets on every USB reconnect, so set it up before each run.

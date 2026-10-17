@@ -11,14 +11,11 @@ class ShippingMethodResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'store_id' => $this->store_id,
-            'store' => $this->whenLoaded('store', fn () => [
-                'id' => $this->store->id,
-                'name' => $this->store->name,
-                'slug' => $this->store->slug,
-            ]),
             'type' => $this->type?->value,
             'rate_type' => $this->rate_type?->value,
+            'requires_schedule' => (bool) $this->requires_schedule,
+            'schedule_days_ahead' => $this->schedule_days_ahead,
+            'delivery_schedules_count' => $this->whenCounted('deliverySchedules'),
             'name' => $this->name,
             'description' => $this->description,
             'base_fee' => (float) $this->base_fee,

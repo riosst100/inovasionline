@@ -13,8 +13,7 @@ class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $orders = Order::with(['store', 'user'])
-            ->when($request->filled('store_id'), fn ($q) => $q->where('store_id', $request->string('store_id')))
+        $orders = Order::with(['user'])
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')))
             ->latest()
@@ -25,7 +24,7 @@ class OrderController extends Controller
 
     public function show(Order $order): JsonResponse
     {
-        $order->load(['store', 'user', 'items', 'paymentMethod', 'shippingMethod']);
+        $order->load(['user', 'items', 'paymentMethod', 'shippingMethod']);
 
         return ApiResponse::success(new OrderResource($order), 'Order retrieved successfully.');
     }

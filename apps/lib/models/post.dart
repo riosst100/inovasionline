@@ -34,8 +34,6 @@ class PostProductTag {
     required this.regularPrice,
     this.salePrice,
     this.imageUrl,
-    this.storeSlug,
-    this.storeName,
   });
 
   factory PostProductTag.fromJson(Map<String, dynamic> json) => PostProductTag(
@@ -45,8 +43,6 @@ class PostProductTag {
         regularPrice: double.tryParse(json['regular_price'].toString()) ?? 0,
         salePrice: json['sale_price'] != null ? double.tryParse(json['sale_price'].toString()) : null,
         imageUrl: json['image_url'] as String?,
-        storeSlug: json['store_slug'] as String?,
-        storeName: json['store_name'] as String?,
       );
 
   final String id;
@@ -55,8 +51,6 @@ class PostProductTag {
   final double regularPrice;
   final double? salePrice;
   final String? imageUrl;
-  final String? storeSlug;
-  final String? storeName;
 
   double get displayPrice => salePrice ?? regularPrice;
 }

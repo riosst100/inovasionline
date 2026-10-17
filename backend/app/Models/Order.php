@@ -17,11 +17,11 @@ class Order extends Model
 
     protected $fillable = [
         'order_number',
-        'store_id',
         'user_id',
         'driver_id',
         'payment_method_id',
         'shipping_method_id',
+        'delivery_schedule_id',
         'promotion_id',
         'subtotal',
         'discount_total',
@@ -34,13 +34,16 @@ class Order extends Model
         'payment_token',
         'payment_redirect_url',
         'payment_expires_at',
+        'midtrans_order_id',
         'midtrans_transaction_id',
         'midtrans_payment_type',
         'paid_at',
         'delivery_method',
         'delivery_address',
+        'delivery_date',
+        'delivery_slot',
         'customer_notes',
-        'seller_notes',
+        'admin_notes',
         'status_history',
         'accepted_at',
         'completed_at',
@@ -59,6 +62,8 @@ class Order extends Model
             'tax_total' => 'decimal:2',
             'grand_total' => 'decimal:2',
             'delivery_address' => 'array',
+            'delivery_date' => 'date',
+            'delivery_slot' => 'array',
             'status_history' => 'array',
             'payment_expires_at' => 'datetime',
             'paid_at' => 'datetime',
@@ -68,14 +73,15 @@ class Order extends Model
         ];
     }
 
-    public function store(): BelongsTo
-    {
-        return $this->belongsTo(Store::class);
-    }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function deliverySchedule(): BelongsTo
+    {
+        return $this->belongsTo(DeliverySchedule::class);
     }
 
     public function driver(): BelongsTo
@@ -107,7 +113,8 @@ class Order extends Model
      * @var array<string, list<string>>
      */
     private const TRANSITIONS = [
-        'pending' => ['accepted', 'cancelled'],
+        // pending -> processing happens automatically once an online payment settles.
+        'pending' => ['accepted', 'processing', 'cancelled'],
         'accepted' => ['processing', 'cancelled'],
         'processing' => ['ready', 'cancelled'],
         'ready' => ['completed'],

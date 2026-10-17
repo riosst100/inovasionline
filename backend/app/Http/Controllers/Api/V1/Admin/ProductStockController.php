@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Services\ProductStockService;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ProductStockController extends Controller
 {
@@ -38,7 +38,7 @@ class ProductStockController extends Controller
         ]);
     }
 
-    public function update(Request $request, Product $product): JsonResponse
+    public function update(Request $request, Product $product, ProductStockService $stockService): JsonResponse
     {
         $data = $request->validate([
             'stocks' => ['present', 'array'],
@@ -46,16 +46,11 @@ class ProductStockController extends Controller
             'stocks.*.quantity' => ['required', 'integer', 'min:0'],
         ]);
 
-        $stocks = collect($data['stocks']);
-
-        DB::transaction(function () use ($product, $stocks) {
-            $product->warehouses()->sync(
-                $stocks->mapWithKeys(fn ($row) => [
-                    $row['warehouse_id'] => ['quantity' => $row['quantity']],
-                ])->all()
-            );
-            $product->update(['stock' => $stocks->sum('quantity')]);
-        });
+        $stockService->set(
+            $product,
+            collect($data['stocks'])->mapWithKeys(fn ($row) => [$row['warehouse_id'] => (int) $row['quantity']])->all(),
+            detach: true,
+        );
 
         $product->load(['warehouses:id,code,name', 'images']);
 

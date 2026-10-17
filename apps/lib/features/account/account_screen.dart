@@ -11,6 +11,9 @@ import '../../config/theme.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../home/welcome_message.dart';
+import '../../core/utils/formatters.dart';
+import '../orders/order_providers.dart';
+import '../wallet/wallet_providers.dart';
 import 'edit_profile_screen.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -104,9 +107,9 @@ class AccountScreen extends ConsumerWidget {
     );
     if (cropped == null) return;
 
-    final success = await ref.read(authProvider.notifier).updateProfile(
-          avatar: File(cropped.path),
-        );
+    final success = await ref
+        .read(authProvider.notifier)
+        .updateProfile(avatar: File(cropped.path));
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -114,7 +117,8 @@ class AccountScreen extends ConsumerWidget {
         content: Text(
           success
               ? 'Foto profil diperbarui.'
-              : (ref.read(authProvider).error ?? 'Gagal memperbarui foto profil.'),
+              : (ref.read(authProvider).error ??
+                    'Gagal memperbarui foto profil.'),
         ),
       ),
     );
@@ -123,26 +127,11 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-    final user = authState.user;
-
-    if (authState.status != AuthStatus.authenticated || user == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Akun')),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Anda belum masuk.'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => context.push('/account/login'),
-                child: const Text('Masuk'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final authUser = authState.user;
+    final user = authState.status == AuthStatus.authenticated ? authUser : null;
+    final activeOrderCount = ref.watch(activeOrdersProvider).valueOrNull?.length ?? 0;
+    final walletBalance = ref.watch(walletProvider).valueOrNull?.balance;
+    void goToLogin() => context.push('/account/login');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -151,10 +140,16 @@ class AccountScreen extends ConsumerWidget {
         children: [
           _ProfileHeader(
             user: user,
-            onAvatarTap: () => _showAvatarOptions(context, ref, user),
-            onEditTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-            ),
+            onAvatarTap: user != null
+                ? () => _showAvatarOptions(context, ref, user)
+                : goToLogin,
+            onEditTap: user != null
+                ? () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const EditProfileScreen(),
+                    ),
+                  )
+                : goToLogin,
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -165,11 +160,25 @@ class AccountScreen extends ConsumerWidget {
                 _MenuGroup(
                   children: [
                     _MenuTile(
+                      icon: Icons.account_balance_wallet_rounded,
+                      color: const Color(0xFF0D9488),
+                      title: 'Saldo Inovasi',
+                      subtitle: user == null
+                          ? 'Masuk untuk melihat saldo'
+                          : walletBalance == null
+                              ? 'Lihat saldo dan top up'
+                              : '${formatCurrency(walletBalance)} · Top up & riwayat',
+                      onTap: user != null ? () => context.push('/wallet') : goToLogin,
+                    ),
+                    _MenuTile(
                       icon: Icons.receipt_long_rounded,
                       color: const Color(0xFF0284C7),
                       title: 'Pesanan Saya',
                       subtitle: 'Lacak dan lihat riwayat pesanan',
-                      onTap: () => context.push('/orders'),
+                      badgeCount: activeOrderCount,
+                      onTap: user != null
+                          ? () => context.go('/orders')
+                          : goToLogin,
                     ),
                   ],
                 ),
@@ -181,7 +190,10 @@ class AccountScreen extends ConsumerWidget {
                       icon: Icons.phone_rounded,
                       color: AppColors.primary,
                       title: 'Nomor Telepon',
-                      subtitle: user.phone ?? '-',
+                      subtitle: user != null
+                          ? (user.phone ?? '-')
+                          : 'Masuk untuk melihat info akun',
+                      onTap: user != null ? null : goToLogin,
                     ),
                   ],
                 ),
@@ -199,35 +211,57 @@ class AccountScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFDC2626),
-                      side: const BorderSide(color: Color(0xFFFECACA)),
-                      backgroundColor: const Color(0xFFFEF2F2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                if (user == null)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: goToLogin,
+                      icon: const Icon(Icons.login_rounded, size: 20),
+                      label: const Text(
+                        'Masuk / Daftar',
+                        style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
-                    onPressed: () async {
-                      final name = user.name;
-                      await ref.read(authProvider.notifier).logout();
-                      ref.read(pendingWelcomeProvider.notifier).state =
-                          WelcomeMessage(
-                        name: name,
-                        type: WelcomeType.logout,
-                      );
-                      if (context.mounted) context.go('/');
-                    },
-                    icon: const Icon(Icons.logout_rounded, size: 20),
-                    label: const Text(
-                      'Keluar',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFDC2626),
+                        side: const BorderSide(color: Color(0xFFFECACA)),
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final name = user.name;
+                        await ref.read(authProvider.notifier).logout();
+                        ref
+                            .read(pendingWelcomeProvider.notifier)
+                            .state = WelcomeMessage(
+                          name: name,
+                          type: WelcomeType.logout,
+                        );
+                        if (context.mounted) context.go('/');
+                      },
+                      icon: const Icon(Icons.logout_rounded, size: 20),
+                      label: const Text(
+                        'Keluar',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -244,13 +278,17 @@ class _ProfileHeader extends StatelessWidget {
     required this.onEditTap,
   });
 
-  final User user;
+  /// Null when browsing as a guest: the header then shows a placeholder
+  /// profile and its actions lead to the login screen.
+  final User? user;
   final VoidCallback onAvatarTap;
   final VoidCallback onEditTap;
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    final user = this.user;
+    final avatarUrl = user?.avatarUrl;
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, topPadding + 20, 20, 24),
@@ -277,10 +315,10 @@ class _ProfileHeader extends StatelessWidget {
                   child: CircleAvatar(
                     radius: 34,
                     backgroundColor: const Color(0xFFF3F4F6),
-                    backgroundImage: user.avatarUrl != null
-                        ? CachedNetworkImageProvider(user.avatarUrl!)
+                    backgroundImage: avatarUrl != null
+                        ? CachedNetworkImageProvider(avatarUrl)
                         : null,
-                    child: user.avatarUrl == null
+                    child: avatarUrl == null
                         ? const Icon(
                             Icons.person_rounded,
                             size: 36,
@@ -289,25 +327,26 @@ class _ProfileHeader extends StatelessWidget {
                         : null,
                   ),
                 ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF59E0B),
-                      shape: BoxShape.circle,
-                      border: Border.fromBorderSide(
-                        BorderSide(color: Colors.white, width: 2),
+                if (user != null)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF59E0B),
+                        shape: BoxShape.circle,
+                        border: Border.fromBorderSide(
+                          BorderSide(color: Colors.white, width: 2),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt_rounded,
+                        size: 12,
+                        color: Colors.white,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      size: 12,
-                      color: Colors.white,
-                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -317,7 +356,7 @@ class _ProfileHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user.name,
+                  user?.name ?? 'Pengunjung',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -328,7 +367,9 @@ class _ProfileHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  user.email ?? user.phone ?? '',
+                  user != null
+                      ? (user.email ?? user.phone ?? '')
+                      : 'Masuk untuk menikmati semua fitur',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -352,14 +393,20 @@ class _ProfileHeader extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.4),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.edit_rounded, size: 14, color: Colors.white),
-                        SizedBox(width: 6),
+                        Icon(
+                          user != null
+                              ? Icons.edit_rounded
+                              : Icons.login_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
                         Text(
-                          'Edit Profil',
-                          style: TextStyle(
+                          user != null ? 'Edit Profil' : 'Masuk / Daftar',
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
@@ -433,6 +480,7 @@ class _MenuTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.onTap,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
@@ -440,6 +488,7 @@ class _MenuTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -484,11 +533,22 @@ class _MenuTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (onTap != null)
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFFCBD5E1),
+            if (badgeCount > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.destructive,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$badgeCount aktif',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
               ),
+            ],
+            if (onTap != null)
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
           ],
         ),
       ),

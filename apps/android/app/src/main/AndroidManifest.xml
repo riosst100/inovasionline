@@ -69,5 +69,14 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />
         </intent>
+        <!-- E-wallet apps opened from the Midtrans payment page -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="gojek" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="shopeeid" />
+        </intent>
     </queries>
 </manifest>

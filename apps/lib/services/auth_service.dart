@@ -12,6 +12,12 @@ class AuthService {
   final ApiClient _apiClient;
   final TokenStorage _tokenStorage;
 
+  /// Shown to admins as the device of this login session, e.g. "Android 14".
+  static String get _deviceName {
+    final os = Platform.isIOS ? 'iOS' : Platform.isAndroid ? 'Android' : Platform.operatingSystem;
+    return '$os ${Platform.operatingSystemVersion}'.trim();
+  }
+
   /// The phone number must already be verified via [sendPhoneOtp] +
   /// [verifyPhoneOtp] before calling this.
   Future<User> register({
@@ -32,7 +38,7 @@ class AuthService {
         'password': password,
         'password_confirmation': passwordConfirmation,
         'terms_agreed': true,
-        'device_name': 'flutter-app',
+        'device_name': _deviceName,
       },
     );
 
@@ -62,7 +68,7 @@ class AuthService {
       data: {
         'login': login,
         'password': password,
-        'device_name': 'flutter-app',
+        'device_name': _deviceName,
       },
     );
 
@@ -74,7 +80,7 @@ class AuthService {
   Future<User> loginWithGoogle(String idToken) async {
     final response = await _apiClient.dio.post(
       '/auth/google',
-      data: {'id_token': idToken, 'device_name': 'flutter-app'},
+      data: {'id_token': idToken, 'device_name': _deviceName},
     );
 
     final data = response.data['data'] as Map<String, dynamic>;

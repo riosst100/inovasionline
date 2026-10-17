@@ -20,6 +20,12 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class PublicProductController extends Controller
 {
+    private const TIMEZONE = 'Asia/Jakarta';
+
+    /**
+     * Flash sales for one local (WIB) date. Each flash sale is returned as a "slot"
+     * with its own window, so the response shape stays what the app expects.
+     */
     public function flashSale(Request $request): JsonResponse
     {
         $request->validate(['date' => ['nullable', 'date_format:Y-m-d']]);
@@ -31,49 +37,43 @@ class PublicProductController extends Controller
             return ApiResponse::success(['date' => null, 'slots' => [], 'available_dates' => []], 'Flash sale products retrieved successfully.');
         }
 
-        $slots = FlashSaleSlot::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('start_time')
+        $dayStart = Carbon::parse($date, self::TIMEZONE)->startOfDay()->utc();
+        $dayEnd = Carbon::parse($date, self::TIMEZONE)->endOfDay()->utc();
+
+        $flashSales = $this->flashSaleQuery()
+            ->where('starts_at', '<=', $dayEnd)
+            ->where('ends_at', '>=', $dayStart)
+            ->orderBy('starts_at')
             ->get();
 
         $now = now();
 
-        $schedule = $slots->map(function (FlashSaleSlot $slot) use ($date, $now) {
-            $startsAt = Carbon::parse("{$date} {$slot->start_time}");
-            $endsAt = Carbon::parse("{$date} {$slot->end_time}");
-
+        $schedule = $flashSales->map(function (Promotion $flashSale) use ($now) {
             $products = Product::query()
                 ->where('status', ProductStatus::ACTIVE)
-                ->whereHas('promotions', function ($query) use ($slot, $date) {
-                    $query->where('flash_sale_slot_id', $slot->id)
-                        ->where('is_active', true)
-                        ->whereDate('starts_at', $date)
-                        ->whereIn('type', [PromotionType::PERCENTAGE_DISCOUNT, PromotionType::FIXED_DISCOUNT]);
-                })
+                ->whereHas('promotions', fn ($query) => $query->whereKey($flashSale->id))
+                ->withStock()
                 ->with([
                     'images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0),
-                    'store',
-                    'promotions' => function ($query) use ($slot, $date) {
-                        $query->where('flash_sale_slot_id', $slot->id)
-                            ->where('is_active', true)
-                            ->whereDate('starts_at', $date)
-                            ->whereIn('type', [PromotionType::PERCENTAGE_DISCOUNT, PromotionType::FIXED_DISCOUNT])
-                            ->orderBy('discount_value', 'desc');
-                    },
+                    'promotions' => fn ($query) => $query->whereKey($flashSale->id),
                 ])
                 ->get();
 
             $status = match (true) {
-                $now->between($startsAt, $endsAt) => 'active',
-                $now->lt($startsAt) => 'upcoming',
+                $now->between($flashSale->starts_at, $flashSale->ends_at) => 'active',
+                $now->lt($flashSale->starts_at) => 'upcoming',
                 default => 'ended',
             };
 
             return [
-                'slot' => $slot,
-                'starts_at' => $startsAt,
-                'ends_at' => $endsAt,
+                'slot' => (object) [
+                    'id' => $flashSale->id,
+                    'label' => $flashSale->name,
+                    'start_time' => $flashSale->starts_at->copy()->setTimezone(self::TIMEZONE)->format('H:i'),
+                    'end_time' => $flashSale->ends_at->copy()->setTimezone(self::TIMEZONE)->format('H:i'),
+                ],
+                'starts_at' => $flashSale->starts_at,
+                'ends_at' => $flashSale->ends_at,
                 'status' => $status,
                 'products' => $products,
             ];
@@ -95,14 +95,12 @@ class PublicProductController extends Controller
         $product->load([
             'images',
             'category',
-            'store.seller',
             'variants',
             'promotions' => function ($query) {
                 $query->where('is_active', true)
                     ->where('starts_at', '<=', now())
                     ->where('ends_at', '>=', now())
-                    ->whereIn('type', [PromotionType::PERCENTAGE_DISCOUNT, PromotionType::FIXED_DISCOUNT])
-                    ->orderBy('discount_value', 'desc');
+                    ->whereIn('type', [PromotionType::PERCENTAGE_DISCOUNT, PromotionType::FIXED_DISCOUNT, PromotionType::FLASH_SALE]);
             },
         ]);
 
@@ -117,7 +115,8 @@ class PublicProductController extends Controller
     {
         $products = Product::query()
             ->where('status', ProductStatus::ACTIVE)
-            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0), 'store'])
+            ->withStock()
+            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0)])
             ->withSum(['orderItems as order_items_sum_quantity' => function ($query) {
                 $query->whereHas('order', fn ($q) => $q->where('status', OrderStatus::COMPLETED));
             }], 'quantity')
@@ -129,28 +128,30 @@ class PublicProductController extends Controller
         return ApiResponse::success(PublicProductResource::collection($products), 'Best seller products retrieved successfully.');
     }
 
+    private function flashSaleQuery()
+    {
+        return Promotion::query()
+            ->where('type', PromotionType::FLASH_SALE)
+            ->where('is_active', true);
+    }
+
+    /**
+     * Today (WIB) while a flash sale is still running or upcoming today, otherwise the next date with one.
+     */
     private function resolveNearestFlashSaleDate(): ?string
     {
-        $today = now()->toDateString();
-
-        $hasToday = Promotion::query()
-            ->whereNotNull('flash_sale_slot_id')
-            ->where('is_active', true)
-            ->whereDate('starts_at', $today)
-            ->exists();
-
-        if ($hasToday) {
-            return $today;
-        }
-
-        $upcoming = Promotion::query()
-            ->whereNotNull('flash_sale_slot_id')
-            ->where('is_active', true)
-            ->whereDate('starts_at', '>', $today)
+        $next = $this->flashSaleQuery()
+            ->where('ends_at', '>=', now())
             ->orderBy('starts_at')
             ->first();
 
-        return $upcoming?->starts_at->toDateString();
+        if (! $next) {
+            return null;
+        }
+
+        return $next->starts_at->lte(now())
+            ? now(self::TIMEZONE)->toDateString()
+            : $next->starts_at->copy()->setTimezone(self::TIMEZONE)->toDateString();
     }
 
     /**
@@ -158,15 +159,13 @@ class PublicProductController extends Controller
      */
     private function availableFlashSaleDates(): array
     {
-        $today = now()->toDateString();
+        $today = now(self::TIMEZONE)->toDateString();
 
-        return Promotion::query()
-            ->whereNotNull('flash_sale_slot_id')
-            ->where('is_active', true)
-            ->whereDate('ends_at', '>=', $today)
+        return $this->flashSaleQuery()
+            ->where('ends_at', '>=', now())
             ->orderBy('starts_at')
             ->get(['starts_at'])
-            ->map(fn (Promotion $promotion) => $promotion->starts_at->toDateString())
+            ->map(fn (Promotion $promotion) => max($today, $promotion->starts_at->copy()->setTimezone(self::TIMEZONE)->toDateString()))
             ->unique()
             ->values()
             ->all();

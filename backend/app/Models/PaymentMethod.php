@@ -6,15 +6,14 @@ use App\Support\Enums\PaymentMethodType;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PaymentMethod extends Model
 {
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'store_id',
         'type',
+        'gateway_channel',
         'name',
         'description',
         'instructions',
@@ -31,10 +30,5 @@ class PaymentMethod extends Model
             'type' => PaymentMethodType::class,
             'is_enabled' => 'boolean',
         ];
-    }
-
-    public function store(): BelongsTo
-    {
-        return $this->belongsTo(Store::class);
     }
 }

@@ -1,4 +1,4 @@
-# Auto-sync D:\inovasionline -> WSL setiap file disimpan (FileSystemWatcher + debounce).
+# Auto-sync backend, frontend & frontend-admin -> WSL setiap file disimpan (FileSystemWatcher + debounce).
 # Jalankan: powershell -ExecutionPolicy Bypass -File scripts\wsl-watch.ps1
 param(
   [string]$Distro = 'Ubuntu-24.04',
@@ -8,10 +8,11 @@ param(
 $root = (Resolve-Path "$PSScriptRoot\..").Path
 $srcWsl = ((wsl -d $Distro -- wslpath -a $root.Replace([string][char]92, '/')) | Out-String).Trim()
 if (-not $srcWsl -or -not $srcWsl.StartsWith('/mnt/')) { throw "wslpath gagal: '$srcWsl'" }
-$skip = '[\\/](\.git|node_modules|\.next|vendor|apps|logs|framework)([\\/]|$)|[\\/]storage[\\/]app([\\/]|$)|[\\/]\.env$'
+$skip = '[\\/](\.git|node_modules|\.next|vendor|apps|download|scripts|logs|framework)([\\/]|$)|[\\/]storage[\\/]app([\\/]|$)|[\\/]\.env$'
 
+# Keep in sync with sync_once in wsl-sync.sh.
 function Sync-Now {
-  $cmd = "mkdir -p $Dest && rsync -a --delete --exclude='.git/' --exclude='node_modules/' --exclude='.next/' --exclude='backend/vendor/' --exclude='backend/.env' --exclude='backend/storage/logs/' --exclude='backend/storage/framework/' --exclude='backend/storage/app/' --exclude='backend/public/storage' --exclude='apps/' --exclude='.env' '$srcWsl/' $Dest/"
+  $cmd = "mkdir -p $Dest && rsync -a --delete --exclude='node_modules/' --exclude='.next/' --exclude='backend/vendor/' --exclude='backend/.env' --exclude='backend/storage/logs/' --exclude='backend/storage/framework/' --exclude='backend/storage/app/' --exclude='backend/public/storage' --exclude='backend/bootstrap/cache/*.php' --include='/backend/' --include='/frontend/' --include='/frontend-admin/' --include='/docker/' --include='/docker-compose.yml' --include='/.env.example' --include='/deploy-local.sh' --exclude='/*' '$srcWsl/' $Dest/"
   wsl -d $Distro -- bash -lc $cmd
   Write-Host ("[{0}] synced" -f (Get-Date -Format HH:mm:ss))
 }

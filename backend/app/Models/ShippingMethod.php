@@ -7,7 +7,6 @@ use App\Support\Enums\ShippingRateType;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ShippingMethod extends Model
@@ -15,7 +14,6 @@ class ShippingMethod extends Model
     use HasFactory, HasUlids;
 
     protected $fillable = [
-        'store_id',
         'type',
         'rate_type',
         'name',
@@ -25,6 +23,8 @@ class ShippingMethod extends Model
         'min_order_amount',
         'max_distance_km',
         'estimated_delivery_time',
+        'requires_schedule',
+        'schedule_days_ahead',
         'pickup_address',
         'pickup_instructions',
         'pickup_hours',
@@ -46,17 +46,25 @@ class ShippingMethod extends Model
             'pickup_hours' => 'array',
             'delivery_radius_km' => 'decimal:2',
             'free_shipping_min_amount' => 'decimal:2',
+            'requires_schedule' => 'boolean',
+            'schedule_days_ahead' => 'integer',
             'is_enabled' => 'boolean',
         ];
-    }
-
-    public function store(): BelongsTo
-    {
-        return $this->belongsTo(Store::class);
     }
 
     public function rates(): HasMany
     {
         return $this->hasMany(ShippingMethodRate::class);
+    }
+
+    /** Windows the buyer picks from when requires_schedule is on. */
+    public function deliverySchedules(): HasMany
+    {
+        return $this->hasMany(DeliverySchedule::class);
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
     }
 }

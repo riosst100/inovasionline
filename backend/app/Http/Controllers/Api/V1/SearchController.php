@@ -4,14 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PublicProductResource;
-use App\Http\Resources\PublicStoreResource;
 use App\Models\Product;
 use App\Models\SearchLog;
 use App\Models\SearchResultClick;
-use App\Models\Store;
 use App\Support\Enums\OrderStatus;
 use App\Support\Enums\ProductStatus;
-use App\Support\Enums\StoreStatus;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -78,7 +75,8 @@ class SearchController extends Controller
             'name',
             $keyword
         )
-            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0), 'store'])
+            ->withStock()
+            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0)])
             ->withSum(['orderItems as order_items_sum_quantity' => function ($query) {
                 $query->whereHas('order', fn ($q) => $q->where('status', OrderStatus::COMPLETED));
             }], 'quantity')
@@ -86,22 +84,8 @@ class SearchController extends Controller
             ->limit($limit)
             ->get();
 
-        $stores = $this->applyNameSearch(
-            Store::query()->where('status', StoreStatus::OPEN)->whereNotNull('approved_at'),
-            'name',
-            $keyword
-        )
-            ->withCount('products')
-            ->withCount(['orders as order_items_sum_quantity' => function ($query) {
-                $query->where('status', OrderStatus::COMPLETED);
-            }])
-            ->orderByDesc('order_items_sum_quantity')
-            ->limit($limit)
-            ->get();
-
         return ApiResponse::success([
             'products' => PublicProductResource::collection($products),
-            'stores' => PublicStoreResource::collection($stores),
         ], 'Search results retrieved successfully.');
     }
 
@@ -117,7 +101,8 @@ class SearchController extends Controller
             ->where('status', ProductStatus::ACTIVE)
             ->whereHas('searchResultClicks')
             ->withCount('searchResultClicks')
-            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0), 'store'])
+            ->withStock()
+            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0)])
             ->orderByDesc('search_result_clicks_count')
             ->limit($limit)
             ->get();
@@ -125,7 +110,8 @@ class SearchController extends Controller
         if ($products->isEmpty()) {
             $products = Product::query()
                 ->where('status', ProductStatus::ACTIVE)
-                ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0), 'store'])
+                ->withStock()
+                ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0)])
                 ->orderByDesc('view_count')
                 ->limit($limit)
                 ->get();

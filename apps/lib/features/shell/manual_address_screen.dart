@@ -6,12 +6,13 @@ import '../../providers/auth_provider.dart';
 import '../../providers/delivery_address_provider.dart';
 import '../../widgets/address_picker.dart';
 
-/// Lets a user whose GPS is outside the service area pick one of the served
-/// cities, plus district and village, by hand. The picker only offers the
-/// areas configured under Cakupan Kota.
+/// Lets the user pick one of the served cities, plus district and village,
+/// by hand: from the out-of-area screen, or "Pilih alamat manual" in the
+/// home header's address dropdown. The picker only offers the areas configured
+/// under Cakupan Kota.
 ///
-/// Meant to be hosted in its own [Navigator] (the permission gate sits above
-/// the app's router, and dropdown menus need a Navigator to open into).
+/// Needs a [Navigator] to sit in (dropdown menus open into it); the
+/// permission gate, which is above the app's router, hosts it in its own.
 class ManualAddressScreen extends ConsumerStatefulWidget {
   const ManualAddressScreen({
     super.key,

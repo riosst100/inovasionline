@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../config/theme.dart';
 import '../../models/chat_thread.dart';
 import '../../providers/core_providers.dart';
@@ -13,7 +14,6 @@ class ChatThreadInfoScreen extends ConsumerStatefulWidget {
     this.avatarUrl,
     this.avatarIcon,
     this.isDirectMessage = false,
-    this.isSeller = false,
   });
 
   final String threadId;
@@ -21,10 +21,10 @@ class ChatThreadInfoScreen extends ConsumerStatefulWidget {
   final String? avatarUrl;
   final IconData? avatarIcon;
   final bool isDirectMessage;
-  final bool isSeller;
 
   @override
-  ConsumerState<ChatThreadInfoScreen> createState() => _ChatThreadInfoScreenState();
+  ConsumerState<ChatThreadInfoScreen> createState() =>
+      _ChatThreadInfoScreenState();
 }
 
 class _ChatThreadInfoScreenState extends ConsumerState<ChatThreadInfoScreen> {
@@ -53,14 +53,18 @@ class _ChatThreadInfoScreenState extends ConsumerState<ChatThreadInfoScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels < _scrollController.position.maxScrollExtent - 200) return;
+    if (_scrollController.position.pixels <
+        _scrollController.position.maxScrollExtent - 200)
+      return;
     if (_loadingMore || !_hasMore) return;
     _loadParticipants();
   }
 
   Future<void> _loadThreadInfo() async {
     try {
-      final thread = await ref.read(chatServiceProvider).thread(widget.threadId);
+      final thread = await ref
+          .read(chatServiceProvider)
+          .thread(widget.threadId);
       if (!mounted) return;
       setState(() => _participantCount = thread.participantCount);
     } catch (_) {
@@ -71,7 +75,9 @@ class _ChatThreadInfoScreenState extends ConsumerState<ChatThreadInfoScreen> {
   Future<void> _loadParticipants() async {
     setState(() => _page == 1 ? _loading = true : _loadingMore = true);
     try {
-      final result = await ref.read(chatServiceProvider).participants(widget.threadId, page: _page);
+      final result = await ref
+          .read(chatServiceProvider)
+          .participants(widget.threadId, page: _page);
       if (!mounted) return;
       setState(() {
         _participants.addAll(result.data);
@@ -102,19 +108,32 @@ class _ChatThreadInfoScreenState extends ConsumerState<ChatThreadInfoScreen> {
                   radius: 44,
                   backgroundColor: AppColors.surface,
                   foregroundColor: AppColors.primary,
-                  backgroundImage: widget.avatarUrl != null ? NetworkImage(widget.avatarUrl!) : null,
-                  child: widget.avatarUrl == null ? Icon(widget.avatarIcon ?? Icons.person_outline, size: 40) : null,
+                  backgroundImage: widget.avatarUrl != null
+                      ? NetworkImage(widget.avatarUrl!)
+                      : null,
+                  child: widget.avatarUrl == null
+                      ? Icon(
+                          widget.avatarIcon ?? Icons.person_outline,
+                          size: 40,
+                        )
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 Text(
                   widget.title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   _typeLabel(),
-                  style: const TextStyle(color: AppColors.mutedForeground, fontSize: 13.5),
+                  style: const TextStyle(
+                    color: AppColors.mutedForeground,
+                    fontSize: 13.5,
+                  ),
                 ),
               ],
             ),
@@ -125,7 +144,11 @@ class _ChatThreadInfoScreenState extends ConsumerState<ChatThreadInfoScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(
                 'Anggota Grup',
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.foreground),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppColors.foreground,
+                ),
               ),
             ),
             if (_loading)
@@ -138,11 +161,14 @@ class _ChatThreadInfoScreenState extends ConsumerState<ChatThreadInfoScreen> {
             else
               Column(
                 children: [
-                  for (final participant in _participants) _ParticipantTile(participant: participant),
+                  for (final participant in _participants)
+                    _ParticipantTile(participant: participant),
                   if (_loadingMore)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
                 ],
               ),
@@ -173,8 +199,12 @@ class _ParticipantTile extends StatelessWidget {
       leading: CircleAvatar(
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.primary,
-        backgroundImage: participant.avatarUrl != null ? NetworkImage(participant.avatarUrl!) : null,
-        child: participant.avatarUrl == null ? const Icon(Icons.person_outline) : null,
+        backgroundImage: participant.avatarUrl != null
+            ? NetworkImage(participant.avatarUrl!)
+            : null,
+        child: participant.avatarUrl == null
+            ? const Icon(Icons.person_outline)
+            : null,
       ),
       title: Text(participant.name),
     );

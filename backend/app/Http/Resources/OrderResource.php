@@ -12,12 +12,6 @@ class OrderResource extends JsonResource
         return [
             'id' => $this->id,
             'order_number' => $this->order_number,
-            'store' => $this->whenLoaded('store', fn () => [
-                'id' => $this->store->id,
-                'name' => $this->store->name,
-                'slug' => $this->store->slug,
-                'logo_url' => $this->store->logo_path ? asset('storage/'.$this->store->logo_path) : null,
-            ]),
             'user' => $this->whenLoaded('user', fn () => [
                 'id' => $this->user->id,
                 'name' => $this->user->name,
@@ -39,8 +33,10 @@ class OrderResource extends JsonResource
             'paid_at' => $this->paid_at,
             'delivery_method' => $this->delivery_method,
             'delivery_address' => $this->delivery_address,
+            'delivery_date' => $this->delivery_date?->toDateString(),
+            'delivery_slot' => $this->delivery_slot,
             'customer_notes' => $this->customer_notes,
-            'seller_notes' => $this->seller_notes,
+            'admin_notes' => $this->admin_notes,
             'status_history' => $this->status_history,
             'accepted_at' => $this->accepted_at,
             'completed_at' => $this->completed_at,

@@ -19,6 +19,8 @@ class AppServiceProvider extends ServiceProvider
                 return new \App\Services\NotificationService(null);
             }
         });
+
+        $this->app->scoped(\App\Services\FlashSalePricing::class);
     }
 
     /**

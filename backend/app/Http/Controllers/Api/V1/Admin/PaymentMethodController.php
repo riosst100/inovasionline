@@ -13,8 +13,7 @@ class PaymentMethodController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $methods = PaymentMethod::with('store')
-            ->when($request->filled('store_id'), fn ($q) => $q->where('store_id', $request->string('store_id')))
+        $methods = PaymentMethod::query()
             ->when($request->has('is_enabled'), fn ($q) => $q->where('is_enabled', $request->boolean('is_enabled')))
             ->latest()
             ->paginate($request->integer('per_page', 15));

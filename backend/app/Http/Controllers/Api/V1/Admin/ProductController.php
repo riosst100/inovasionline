@@ -5,25 +5,26 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Services\ProductStockService;
 use App\Support\Enums\ProductStatus;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
-use App\Models\Store;
 
 class ProductController extends Controller
 {
+    public function __construct(private readonly ProductStockService $stockService) {}
+
     public function index(Request $request): JsonResponse
     {
         $search = trim($request->string('search')->toString());
 
         $products = Product::query()
-            ->with(['category:id,name', 'store:id,name', 'images'])
+            ->withStock()
+            ->with(['category:id,name', 'images'])
             ->when($search !== '', fn ($query) => $query->where('name', 'ilike', "%{$search}%"))
             ->when(
                 ProductStatus::tryFrom($request->string('status')->toString()),
@@ -51,50 +52,28 @@ class ProductController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'store_id' => ['nullable', 'exists:stores,id'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string'],
             'regular_price' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['nullable', 'numeric', 'min:0', 'lte:regular_price'],
-            'stock' => ['nullable', 'integer', 'min:0'],
             'stocks' => ['nullable', 'array'],
             'stocks.*.warehouse_id' => ['required', 'distinct', 'exists:warehouses,id'],
             'stocks.*.quantity' => ['required', 'integer', 'min:0'],
-            'sku' => ['nullable', 'string', 'max:100'],
+            'sku' => ['nullable', 'string', 'max:100', Rule::unique('products', 'sku')],
             'status' => ['required', Rule::enum(ProductStatus::class)],
+        ], [
+            'sku.unique' => 'SKU sudah digunakan.',
         ]);
 
-        $store = isset($data['store_id']) ? Store::find($data['store_id']) : Store::query()->oldest()->first();
-        abort_if(! $store, 422, 'Belum ada toko. Buat toko terlebih dahulu.');
-
-        if (! empty($data['sku']) && $store->products()->where('sku', $data['sku'])->exists()) {
-            throw ValidationException::withMessages(['sku' => 'SKU sudah digunakan.']);
-        }
-
         $stocks = $data['stocks'] ?? null;
-        unset($data['stocks'], $data['store_id']);
+        unset($data['stocks']);
 
-        $slug = Str::slug($data['name']) ?: 'produk';
-        $unique = $slug;
-        for ($i = 1; $store->products()->withTrashed()->where('slug', $unique)->exists(); $i++) {
-            $unique = "{$slug}-{$i}";
-        }
-
-        $product = DB::transaction(function () use ($store, $data, $stocks, $unique) {
-            if ($stocks !== null) {
-                $data['stock'] = collect($stocks)->sum('quantity');
-            }
-            $data['stock'] ??= 0;
-
-            $product = $store->products()->create([...$data, 'slug' => $unique]);
+        $product = DB::transaction(function () use ($data, $stocks) {
+            $product = Product::create([...$data, 'slug' => Product::uniqueSlug($data['name'])]);
 
             if ($stocks !== null) {
-                $product->warehouses()->sync(
-                    collect($stocks)->mapWithKeys(fn ($row) => [
-                        $row['warehouse_id'] => ['quantity' => $row['quantity']],
-                    ])->all()
-                );
+                $this->stockService->set($product, $this->stockMap($stocks), detach: true);
             }
 
             return $product;
@@ -112,7 +91,6 @@ class ProductController extends Controller
             'description' => ['nullable', 'string'],
             'regular_price' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['nullable', 'numeric', 'min:0', 'lte:regular_price'],
-            'stock' => ['nullable', 'integer', 'min:0'],
             'stocks' => ['nullable', 'array'],
             'stocks.*.warehouse_id' => ['required', 'distinct', 'exists:warehouses,id'],
             'stocks.*.quantity' => ['required', 'integer', 'min:0'],
@@ -125,14 +103,7 @@ class ProductController extends Controller
 
         DB::transaction(function () use ($product, $data, $stocks) {
             if ($stocks !== null) {
-                $product->warehouses()->sync(
-                    collect($stocks)->mapWithKeys(fn ($row) => [
-                        $row['warehouse_id'] => ['quantity' => $row['quantity']],
-                    ])->all()
-                );
-                $data['stock'] = collect($stocks)->sum('quantity');
-            } else {
-                $data['stock'] ??= $product->stock;
+                $this->stockService->set($product, $this->stockMap($stocks), detach: true);
             }
 
             $product->update($data);
@@ -233,7 +204,7 @@ class ProductController extends Controller
 
     private function freshResponse(Product $product, string $message): JsonResponse
     {
-        $product->load(['category:id,name', 'store:id,name', 'images', 'warehouses:id,name']);
+        $product->load(['category:id,name', 'images', 'warehouses:id,name']);
 
         return ApiResponse::success($this->transform($product), $message);
     }
@@ -245,7 +216,7 @@ class ProductController extends Controller
         ]);
 
         $product->update(['status' => $data['status']]);
-        $product->load(['category:id,name', 'store:id,name', 'images']);
+        $product->load(['category:id,name', 'images']);
 
         return ApiResponse::success($this->transform($product), 'Product status updated successfully.');
     }
@@ -253,6 +224,15 @@ class ProductController extends Controller
     /**
      * @return array<string, mixed>
      */
+    /**
+     * @param  array<int, array{warehouse_id: string, quantity: int}>  $stocks
+     * @return array<string, int>
+     */
+    private function stockMap(array $stocks): array
+    {
+        return collect($stocks)->mapWithKeys(fn ($row) => [$row['warehouse_id'] => (int) $row['quantity']])->all();
+    }
+
     private function transform(Product $product): array
     {
         $path = $product->images->first()?->path;
@@ -270,7 +250,6 @@ class ProductController extends Controller
             'stock' => $product->stock,
             'status' => $product->status instanceof \BackedEnum ? $product->status->value : $product->status,
             'category_name' => $product->category?->name,
-            'store_name' => $product->store?->name,
             'stocks' => $product->relationLoaded('warehouses')
                 ? $product->warehouses->map(fn ($w) => [
                     'warehouse_id' => $w->id,

@@ -38,6 +38,7 @@ class User extends Authenticatable
         'district_code',
         'village_code',
     ];
+    // wallet_balance is intentionally not fillable: only WalletService changes it.
 
     protected $hidden = [
         'password',
@@ -49,6 +50,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
+            'wallet_balance' => 'decimal:2',
+            'wallet_bonus_claimed_at' => 'datetime',
             'blocked_at' => 'datetime',
             'banned_features' => 'array',
             'date_of_birth' => 'date',
@@ -83,16 +86,6 @@ class User extends Authenticatable
         return in_array('*', $perms, true) || in_array($permission, $perms, true);
     }
 
-    public function seller(): HasOne
-    {
-        return $this->hasOne(Seller::class);
-    }
-
-    public function sellerApplications(): HasMany
-    {
-        return $this->hasMany(SellerApplication::class);
-    }
-
     public function userVerifications(): HasMany
     {
         return $this->hasMany(UserVerification::class);
@@ -103,9 +96,9 @@ class User extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
-    public function storeMemberships(): HasMany
+    public function walletTransactions(): HasMany
     {
-        return $this->hasMany(StoreMember::class);
+        return $this->hasMany(WalletTransaction::class);
     }
 
     public function photographer(): HasOne
@@ -134,11 +127,6 @@ class User extends Authenticatable
     public function photoPurchases(): HasMany
     {
         return $this->hasMany(PhotoPurchase::class);
-    }
-
-    public function isSeller(): bool
-    {
-        return in_array($this->role, [UserRole::SELLER_OWNER, UserRole::SELLER_STAFF], true);
     }
 
     public function isPlatformAdmin(): bool
@@ -185,5 +173,10 @@ class User extends Authenticatable
     public function deviceTokens(): HasMany
     {
         return $this->hasMany(DeviceToken::class);
+    }
+
+    public function loginLogs(): HasMany
+    {
+        return $this->hasMany(UserLoginLog::class);
     }
 }

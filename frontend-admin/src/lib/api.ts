@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, NavBadgeSettings, DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -26,8 +26,18 @@ const trimCodes = (items: RegionItem[]): RegionItem[] => items.map((i) => ({ ...
 
 export async function apiRequest<T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs = 15000
 ): Promise<T> {
+  return (await apiRequestFull<T>(endpoint, options, timeoutMs)).data;
+}
+
+/** Like apiRequest, but resolves with the whole envelope (incl. pagination `meta`). */
+export async function apiRequestFull<T = any>(
+  endpoint: string,
+  options: RequestInit = {},
+  timeoutMs = 15000
+): Promise<ApiResponse<T>> {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${API_BASE}${cleanEndpoint}`;
 
@@ -40,7 +50,7 @@ export async function apiRequest<T = any>(
 
   // Abort hung requests so the UI never sits on a loader forever.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
     response = await fetch(url, {
@@ -77,7 +87,34 @@ export async function apiRequest<T = any>(
     throw new ApiError(data.message || 'Terjadi kesalahan sistem.', data.errors, response.status);
   }
 
-  return data.data;
+  return data;
+}
+
+/** Fetch a file from the API (with the session cookie) and save it in the browser. */
+export async function apiDownload(endpoint: string, fileName: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
+      credentials: 'include',
+      headers: { Accept: '*/*' },
+    });
+  } catch {
+    throw new ApiError('Tidak dapat terhubung ke server.', undefined, 0);
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(data?.message || 'Gagal mengunduh file.', undefined, response.status);
+  }
+
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export const adminApi = {
@@ -246,6 +283,14 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify({ ...data, phone: data.phone || null }),
     });
+  },
+
+  async getCustomerDetail(id: string): Promise<CustomerDetail> {
+    return apiRequest<CustomerDetail>(`/admin/customers/${id}`);
+  },
+
+  async revokeCustomerSession(id: string, sessionId: string): Promise<void> {
+    await apiRequest(`/admin/customers/${id}/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
   },
 
   async blockCustomer(id: string, reason?: string): Promise<Customer> {
@@ -511,7 +556,108 @@ export const adminApi = {
     });
   },
 
+  async getWalletBonus(): Promise<WalletBonusSettings> {
+    return apiRequest<WalletBonusSettings>('/admin/wallet-bonus');
+  },
+
+  async saveWalletBonus(payload: WalletBonusSettings): Promise<WalletBonusSettings> {
+    return apiRequest<WalletBonusSettings>('/admin/wallet-bonus', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getNavBadge(): Promise<NavBadgeSettings> {
+    return apiRequest<NavBadgeSettings>('/admin/nav-badge');
+  },
+
+  async saveNavBadge(payload: NavBadgeSettings): Promise<NavBadgeSettings> {
+    return apiRequest<NavBadgeSettings>('/admin/nav-badge', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getShippingMethods(): Promise<ShippingMethod[]> {
+    return apiRequest<ShippingMethod[]>('/admin/shipping-methods?per_page=100');
+  },
+
+  async saveShippingMethod(data: Partial<ShippingMethod>, id?: string): Promise<ShippingMethod> {
+    return apiRequest<ShippingMethod>(id ? `/admin/shipping-methods/${id}` : '/admin/shipping-methods', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteShippingMethod(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/shipping-methods/${id}`, { method: 'DELETE' });
+  },
+
+  async toggleShippingMethod(id: string): Promise<ShippingMethod> {
+    return apiRequest<ShippingMethod>(`/admin/shipping-methods/${id}/toggle`, { method: 'POST' });
+  },
+
+  async getDeliverySchedules(shippingMethodId: string): Promise<DeliverySchedule[]> {
+    return apiRequest<DeliverySchedule[]>(
+      `/admin/delivery-schedules?shipping_method_id=${encodeURIComponent(shippingMethodId)}`
+    );
+  },
+
+  async getDeliveryHolidays(shippingMethodId?: string): Promise<DeliveryHoliday[]> {
+    const q = shippingMethodId ? `?shipping_method_id=${encodeURIComponent(shippingMethodId)}` : '';
+    return apiRequest<DeliveryHoliday[]>(`/admin/delivery-holidays${q}`);
+  },
+
+  async saveDeliveryHoliday(data: Partial<DeliveryHoliday>, id?: string): Promise<DeliveryHoliday> {
+    return apiRequest<DeliveryHoliday>(id ? `/admin/delivery-holidays/${id}` : '/admin/delivery-holidays', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteDeliveryHoliday(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/delivery-holidays/${id}`, { method: 'DELETE' });
+  },
+
+  async saveDeliverySchedule(data: Partial<DeliverySchedule>, id?: string): Promise<DeliverySchedule> {
+    return apiRequest<DeliverySchedule>(id ? `/admin/delivery-schedules/${id}` : '/admin/delivery-schedules', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteDeliverySchedule(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/delivery-schedules/${id}`, { method: 'DELETE' });
+  },
+
   async getOrders(): Promise<PaginatedData<any>> {
     return apiRequest<PaginatedData<any>>('/admin/orders');
+  },
+
+  async getFlashSales(params: { search?: string; status?: string; page?: number } = {}): Promise<ApiResponse<FlashSale[]>> {
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.status) query.append('status', params.status);
+    if (params.page) query.append('page', params.page.toString());
+    return apiRequestFull<FlashSale[]>(`/admin/flash-sales?${query.toString()}`);
+  },
+
+  async getFlashSale(id: string): Promise<FlashSale> {
+    return apiRequest<FlashSale>(`/admin/flash-sales/${id}`);
+  },
+
+  async saveFlashSale(data: FlashSalePayload, id?: string): Promise<FlashSale> {
+    return apiRequest<FlashSale>(id ? `/admin/flash-sales/${id}` : '/admin/flash-sales', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async toggleFlashSale(id: string): Promise<FlashSale> {
+    return apiRequest<FlashSale>(`/admin/flash-sales/${id}/toggle`, { method: 'POST' });
+  },
+
+  async deleteFlashSale(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/flash-sales/${id}`, { method: 'DELETE' });
   },
 };

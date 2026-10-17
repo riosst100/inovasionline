@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "962366033380-11e25mhk15rts059qmsc957p82onof2r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.inovasionline.app",
+            "certificate_hash": "ef8766adba45ab6ecc5de0559274f79587ad16e5"
+          }
+        },
+        {
           "client_id": "962366033380-7vsj0faq915gh2pfubgecgle6huj08u2.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -21,6 +29,35 @@
             "certificate_hash": "15192317190aa9984c7f2453e2ab244cc2ea0b8e"
           }
         },
+        {
+          "client_id": "962366033380-9fog0s6egq0oq5k0d12h68c7vt8eg53q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUClz3FZvWgB12VQiKMRO9hOObW6KVtvo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "962366033380-169mr3kth1sl22fh94ek79ioalj7us4b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:962366033380:android:680d0d414ea1c61f7f4bf1",
+        "android_client_info": {
+          "package_name": "com.inovasionline.app.dev"
+        }
+      },
+      "oauth_client": [
         {
           "client_id": "962366033380-9fog0s6egq0oq5k0d12h68c7vt8eg53q.apps.googleusercontent.com",
           "client_type": 3
@@ -67,6 +104,14 @@
           }
         },
         {
+          "client_id": "962366033380-vlmpd625vf2qpjo5pnnppbqi2b31knk6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.inovasionline.twa",
+            "certificate_hash": "ef8766adba45ab6ecc5de0559274f79587ad16e5"
+          }
+        },
+        {
           "client_id": "962366033380-9fog0s6egq0oq5k0d12h68c7vt8eg53q.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -95,6 +140,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "962366033380-159hli94cb0lng4v6i2o80n6uurb7ntm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.inovasionline.twa.dev",
+            "certificate_hash": "ef8766adba45ab6ecc5de0559274f79587ad16e5"
+          }
+        },
         {
           "client_id": "962366033380-ge4fkkh9qcmnlagk4nsl8rqs49p8rmt7.apps.googleusercontent.com",
           "client_type": 1,

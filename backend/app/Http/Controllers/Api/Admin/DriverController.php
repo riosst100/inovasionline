@@ -172,7 +172,7 @@ class DriverController extends Controller
     {
         $paginator = Order::query()
             ->where('driver_id', $driver->id)
-            ->with(['user', 'store', 'items.product'])
+            ->with(['user', 'items.product'])
             ->latest()
             ->paginate($request->integer('per_page', 10));
 

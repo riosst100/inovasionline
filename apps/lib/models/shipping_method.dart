@@ -1,7 +1,6 @@
 class ShippingMethod {
   ShippingMethod({
     required this.id,
-    required this.storeId,
     required this.type,
     required this.rateType,
     required this.name,
@@ -15,11 +14,11 @@ class ShippingMethod {
     this.pickupAddress,
     this.pickupInstructions,
     this.freeShippingMinAmount,
+    this.requiresSchedule = false,
   });
 
   factory ShippingMethod.fromJson(Map<String, dynamic> json) => ShippingMethod(
         id: json['id'] as String,
-        storeId: json['store_id'] as String,
         type: json['type'] as String,
         rateType: json['rate_type'] as String? ?? 'flat',
         name: json['name'] as String,
@@ -32,12 +31,12 @@ class ShippingMethod {
         pickupInstructions: json['pickup_instructions'] as String?,
         freeShippingMinAmount:
             json['free_shipping_min_amount'] != null ? double.tryParse(json['free_shipping_min_amount'].toString()) : null,
+        requiresSchedule: json['requires_schedule'] as bool? ?? false,
         isEnabled: json['is_enabled'] as bool? ?? true,
         sortOrder: json['sort_order'] as int? ?? 0,
       );
 
   final String id;
-  final String storeId;
   final String type;
   final String rateType;
   final String name;
@@ -49,6 +48,9 @@ class ShippingMethod {
   final String? pickupAddress;
   final String? pickupInstructions;
   final double? freeShippingMinAmount;
+
+  /// IO Same Day: the buyer picks a delivery schedule at checkout.
+  final bool requiresSchedule;
   final bool isEnabled;
   final int sortOrder;
 

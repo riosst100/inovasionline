@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,22 +12,40 @@ import 'config/theme.dart';
 import 'features/shell/blocked_account_gate.dart';
 import 'features/shell/permission_gate.dart';
 import 'firebase_options.dart';
+import 'providers/auth_provider.dart';
 import 'services/push_notification_handler.dart';
 
 Future<void> bootstrap({required String envFile, required bool isDev}) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: envFile);
-  await initializeDateFormatting('id_ID');
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
+  // Independent of each other, so run side by side: the native splash stays
+  // up until all of this is done.
+  await Future.wait([
+    dotenv.load(fileName: envFile),
+    initializeDateFormatting('id_ID'),
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]),
+    precacheSplashLogo(),
   ]);
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform(isDev: isDev),
-  );
 
   final container = ProviderContainer();
-  await PushNotificationHandler(container).initialize();
+  // Starts restoring the session (currentUser API call) right away, so it
+  // runs during the splash and intro instead of after them.
+  container.read(authProvider);
+
+  // Firebase + push are not needed for the first frames, so they are set up
+  // behind the intro; whatever uses FirebaseMessaging awaits firebaseReady.
+  unawaited(() async {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform(isDev: isDev),
+      );
+      await PushNotificationHandler(container).initialize();
+    } finally {
+      firebaseReady.complete();
+    }
+  }());
 
   runApp(
     UncontrolledProviderScope(
@@ -49,10 +69,19 @@ class InovasiOnlineApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routerConfig: router,
-      builder: (context, child) =>
-          PermissionGate(
+      // Android 15+ forces edge-to-edge; keep every screen above the system
+      // navigation buttons on a solid strip instead of drawing behind them.
+      builder: (context, child) => ColoredBox(
+        color: Colors.white,
+        child: SafeArea(
+          top: false,
+          left: false,
+          right: false,
+          child: PermissionGate(
             child: BlockedAccountGate(child: child ?? const SizedBox.shrink()),
           ),
+        ),
+      ),
     );
   }
 }

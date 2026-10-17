@@ -11,6 +11,9 @@ wait_for_api() {
 
 case "$1" in
     serve)
+        # storage/ subfolders are not synced to WSL (scripts/wsl-sync.sh), so recreate them.
+        mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views \
+            storage/logs storage/app/public bootstrap/cache
         rm -f "$READY_MARKER"
 
         [ -f .env ] || cp .env.example .env

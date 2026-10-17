@@ -3,14 +3,19 @@
 namespace App\Services;
 
 use App\Models\Order;
-use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\Enums\OrderStatus;
+use App\Support\Enums\PaymentStatus;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class OrderCancellationService
 {
+    public function __construct(
+        private readonly ProductStockService $stockService = new ProductStockService,
+        private readonly WalletService $walletService = new WalletService,
+    ) {}
+
     public function cancel(Order $order, string $by): Order
     {
         if (! $order->canTransitionTo(OrderStatus::CANCELLED)) {
@@ -24,7 +29,7 @@ class OrderCancellationService
                 if ($item->product_variant_id) {
                     ProductVariant::where('id', $item->product_variant_id)->increment('stock', $item->quantity);
                 } elseif ($item->product_id) {
-                    Product::where('id', $item->product_id)->increment('stock', $item->quantity);
+                    $this->stockService->release($item->product_id, $item->stock_allocations, $item->quantity);
                 }
             }
 
@@ -36,6 +41,11 @@ class OrderCancellationService
                 ],
                 'cancelled_at' => now(),
             ]);
+
+            // Whatever the original payment method, paid money always comes back as balance.
+            if ($order->payment_status === PaymentStatus::PAID) {
+                $this->walletService->refundOrder($order);
+            }
 
             return $order->fresh();
         });

@@ -21,6 +21,7 @@ class OrderItem extends Model
         'product_image_path',
         'unit_price',
         'quantity',
+        'stock_allocations',
         'discount_amount',
         'line_total',
         'notes',
@@ -32,6 +33,8 @@ class OrderItem extends Model
             'unit_price' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'line_total' => 'decimal:2',
+            // [{warehouse_id, quantity}] taken at checkout, returned on cancellation.
+            'stock_allocations' => 'array',
         ];
     }
 

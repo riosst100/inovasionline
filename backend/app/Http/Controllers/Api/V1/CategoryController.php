@@ -40,7 +40,8 @@ class CategoryController extends Controller
         $products = Product::query()
             ->whereIn('category_id', $categoryIds)
             ->where('status', ProductStatus::ACTIVE)
-            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0), 'store'])
+            ->withStock()
+            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0)])
             ->withSum(['orderItems as order_items_sum_quantity' => function ($query) {
                 $query->whereHas('order', fn ($q) => $q->where('status', OrderStatus::COMPLETED));
             }], 'quantity')

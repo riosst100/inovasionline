@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'payment_method.dart';
 import 'shipping_method.dart';
 
@@ -46,22 +47,6 @@ class OrderItem {
   final String? notes;
 }
 
-class OrderStoreSummary {
-  OrderStoreSummary({required this.id, required this.name, required this.slug, this.logoUrl});
-
-  factory OrderStoreSummary.fromJson(Map<String, dynamic> json) => OrderStoreSummary(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        slug: json['slug'] as String,
-        logoUrl: json['logo_url'] as String?,
-      );
-
-  final String id;
-  final String name;
-  final String slug;
-  final String? logoUrl;
-}
-
 class OrderStatusHistoryEntry {
   OrderStatusHistoryEntry({required this.status, required this.at, required this.by});
 
@@ -91,20 +76,20 @@ class Order {
     required this.items,
     required this.statusHistory,
     required this.createdAt,
-    this.store,
     this.paymentMethod,
     this.shippingMethod,
     this.deliveryMethod,
     this.deliveryAddress,
+    this.deliveryDate,
+    this.deliverySlot,
     this.customerNotes,
-    this.sellerNotes,
+    this.adminNotes,
     this.paymentRedirectUrl,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
         id: json['id'] as String,
         orderNumber: json['order_number'] as String,
-        store: json['store'] != null ? OrderStoreSummary.fromJson(json['store'] as Map<String, dynamic>) : null,
         paymentMethod:
             json['payment_method'] != null ? PaymentMethod.fromJson(json['payment_method'] as Map<String, dynamic>) : null,
         shippingMethod:
@@ -119,8 +104,10 @@ class Order {
         paymentStatus: json['payment_status'] as String? ?? 'unpaid',
         deliveryMethod: json['delivery_method'] as String?,
         deliveryAddress: (json['delivery_address'] as Map?)?.cast<String, dynamic>(),
+        deliveryDate: json['delivery_date'] != null ? DateTime.tryParse(json['delivery_date'].toString()) : null,
+        deliverySlot: (json['delivery_slot'] as Map?)?.cast<String, dynamic>(),
         customerNotes: json['customer_notes'] as String?,
-        sellerNotes: json['seller_notes'] as String?,
+        adminNotes: json['admin_notes'] as String?,
         paymentRedirectUrl: json['payment_redirect_url'] as String?,
         statusHistory: (json['status_history'] as List<dynamic>? ?? [])
             .map((e) => OrderStatusHistoryEntry.fromJson(e as Map<String, dynamic>))
@@ -131,7 +118,6 @@ class Order {
 
   final String id;
   final String orderNumber;
-  final OrderStoreSummary? store;
   final PaymentMethod? paymentMethod;
   final ShippingMethod? shippingMethod;
   final double subtotal;
@@ -144,14 +130,44 @@ class Order {
   final String paymentStatus;
   final String? deliveryMethod;
   final Map<String, dynamic>? deliveryAddress;
+
+  /// IO Same Day: the booked day and window ({label, start_time, end_time}).
+  final DateTime? deliveryDate;
+  final Map<String, dynamic>? deliverySlot;
   final String? customerNotes;
-  final String? sellerNotes;
+  final String? adminNotes;
   final String? paymentRedirectUrl;
   final List<OrderStatusHistoryEntry> statusHistory;
   final List<OrderItem> items;
   final String createdAt;
 
+  /// e.g. "Sabtu, 18 Okt 2026 · Pagi (09:00 - 12:00)"; null when no schedule was booked.
+  String? get deliverySchedule {
+    final date = deliveryDate;
+    final slot = deliverySlot;
+    if (date == null || slot == null) return null;
+    return '${DateFormat('EEEE, d MMM yyyy', 'id_ID').format(date)} · '
+        '${slot['label']} (${slot['start_time']} - ${slot['end_time']})';
+  }
+
   bool get isPending => status == 'pending';
+
+  /// New orders start as processing; only unpaid online payments sit in pending.
+  String get statusLabel => switch (status) {
+        'pending' => needsOnlinePayment ? 'Menunggu Pembayaran' : 'Menunggu Konfirmasi',
+        'accepted' => 'Pesanan Diterima',
+        'processing' => 'Pesanan sedang disiapkan',
+        'ready' => 'Siap Dikirim/Diambil',
+        'completed' => 'Selesai',
+        'cancelled' => 'Dibatalkan',
+        _ => status,
+      };
+
+  /// The buyer may cancel until the order is ready (mirrors Order::TRANSITIONS on the backend).
+  bool get canCancel => status == 'pending' || status == 'accepted' || status == 'processing';
+
+  /// Still in progress: not completed and not cancelled.
+  bool get isActive => status != 'completed' && status != 'cancelled';
 
   bool get needsOnlinePayment =>
       isPending && paymentStatus != 'paid' && paymentMethod?.type == 'payment_gateway';

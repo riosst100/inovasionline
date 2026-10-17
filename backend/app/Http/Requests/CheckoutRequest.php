@@ -14,11 +14,13 @@ class CheckoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'store_id' => ['required', 'string', 'exists:stores,id'],
             'cart_item_ids' => ['nullable', 'array', 'min:1'],
             'cart_item_ids.*' => ['string', 'exists:cart_items,id'],
             'payment_method_id' => ['required', 'string', 'exists:payment_methods,id'],
             'shipping_method_id' => ['required', 'string', 'exists:shipping_methods,id'],
+            // Required for IO Same Day; enforced in CheckoutService, which knows the method type.
+            'delivery_schedule_id' => ['nullable', 'string', 'exists:delivery_schedules,id'],
+            'delivery_date' => ['nullable', 'date_format:Y-m-d'],
             'recipient_name' => ['required', 'string', 'max:255'],
             'recipient_phone' => ['required', 'string', 'max:30'],
             'province_code' => ['required', 'string', 'exists:indonesia_provinces,code'],

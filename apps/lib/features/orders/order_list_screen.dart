@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/order.dart';
+import '../../providers/auth_provider.dart';
 import 'order_providers.dart';
 
 class OrderListScreen extends ConsumerWidget {
@@ -11,6 +12,32 @@ class OrderListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // This is a bottom-nav tab, so signed-out visitors can land here too.
+    final authenticated = ref.watch(authProvider.select((s) => s.status == AuthStatus.authenticated));
+    if (!authenticated) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pesanan Saya')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.receipt_long_outlined, size: 56, color: AppColors.mutedForeground),
+                const SizedBox(height: 12),
+                const Text('Masuk untuk melihat pesanan kamu.', style: TextStyle(color: AppColors.mutedForeground)),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => context.push('/account/login'),
+                  child: const Text('Masuk'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final ordersAsync = ref.watch(myOrdersProvider);
 
     return Scaffold(
@@ -101,7 +128,7 @@ class _StatusBadge extends StatelessWidget {
   static const _labels = {
     'pending': 'Menunggu',
     'accepted': 'Diterima',
-    'processing': 'Diproses',
+    'processing': 'Disiapkan',
     'ready': 'Siap',
     'completed': 'Selesai',
     'cancelled': 'Dibatalkan',

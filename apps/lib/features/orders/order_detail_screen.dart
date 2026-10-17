@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 import '../../core/utils/formatters.dart';
+import '../../models/order.dart';
 import '../../providers/core_providers.dart';
 import 'order_providers.dart';
 
@@ -11,21 +12,28 @@ class OrderDetailScreen extends ConsumerWidget {
 
   final String orderId;
 
+  /// For status history entries; the current status uses [Order.statusLabel].
   static const _statusLabels = {
-    'pending': 'Menunggu Konfirmasi',
+    'pending': 'Pesanan dibuat',
     'accepted': 'Diterima',
-    'processing': 'Diproses',
+    'processing': 'Pesanan sedang disiapkan',
     'ready': 'Siap Dikirim/Diambil',
     'completed': 'Selesai',
     'cancelled': 'Dibatalkan',
   };
 
-  Future<void> _confirmCancel(BuildContext context, WidgetRef ref) async {
+  Future<void> _confirmCancel(BuildContext context, WidgetRef ref, Order order) async {
+    final paid = order.paymentStatus == 'paid';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Batalkan Pesanan'),
-        content: const Text('Apakah Anda yakin ingin membatalkan pesanan ini?'),
+        content: Text(
+          paid
+              ? 'Pesanan ini sudah dibayar. Dana ${formatCurrency(order.grandTotal)} akan langsung '
+                  'dikembalikan ke Saldo Inovasi kamu. Lanjutkan pembatalan?'
+              : 'Apakah Anda yakin ingin membatalkan pesanan ini?',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Tidak')),
           TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Ya, Batalkan')),
@@ -40,7 +48,12 @@ class OrderDetailScreen extends ConsumerWidget {
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pesanan berhasil dibatalkan.'), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text(paid
+              ? 'Pesanan dibatalkan. ${formatCurrency(order.grandTotal)} sudah masuk ke Saldo Inovasi.'
+              : 'Pesanan berhasil dibatalkan.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } else {
       final error = ref.read(orderCancelProvider).error;
@@ -84,9 +97,17 @@ class OrderDetailScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(order.orderNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Expanded(
+                        child: Text(
+                          order.orderNumber,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Text(
-                        _statusLabels[order.status] ?? order.status,
+                        order.statusLabel,
                         style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primary),
                       ),
                     ],
@@ -160,17 +181,48 @@ class OrderDetailScreen extends ConsumerWidget {
                     ],
                     const SizedBox(height: 6),
                     Text(
-                      order.paymentStatus == 'paid' ? 'Sudah dibayar' : 'Belum dibayar',
+                      switch (order.paymentStatus) {
+                        'paid' => 'Sudah dibayar',
+                        'refunded' => 'Dana dikembalikan ke Saldo Inovasi',
+                        'failed' => 'Pembayaran gagal / kedaluwarsa',
+                        _ => 'Belum dibayar',
+                      },
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: order.paymentStatus == 'paid' ? AppColors.success : AppColors.primary,
+                        color: switch (order.paymentStatus) {
+                          'paid' || 'refunded' => AppColors.success,
+                          'failed' => AppColors.mutedForeground,
+                          _ => AppColors.primary,
+                        },
                       ),
                     ),
                   ],
                 ),
               ),
             const SizedBox(height: 12),
+            if (order.shippingMethod != null) ...[
+              _SectionCard(
+                title: 'Pengiriman',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(order.shippingMethod!.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    if (order.deliverySchedule != null) ...[
+                      const SizedBox(height: 4),
+                      Text('Jadwal: ${order.deliverySchedule!}', style: const TextStyle(fontSize: 12.5)),
+                    ] else if (order.shippingMethod!.estimatedDeliveryTime != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Estimasi: ${order.shippingMethod!.estimatedDeliveryTime!}',
+                        style: const TextStyle(fontSize: 12.5, color: AppColors.mutedForeground),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             if (order.deliveryAddress != null)
               _SectionCard(
                 title: 'Alamat Pengiriman',
@@ -221,12 +273,12 @@ class OrderDetailScreen extends ConsumerWidget {
                 ),
               ),
             ],
-            if (order.isPending) ...[
+            if (order.canCancel) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: cancelState.cancelling ? null : () => _confirmCancel(context, ref),
+                  onPressed: cancelState.cancelling ? null : () => _confirmCancel(context, ref, order),
                   style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
                   child: cancelState.cancelling
                       ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
@@ -286,7 +338,10 @@ class _SummaryRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: bold ? 14 : 12.5, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+          Expanded(
+            child: Text(label, style: TextStyle(fontSize: bold ? 14 : 12.5, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+          ),
+          const SizedBox(width: 8),
           Text(
             formatCurrency(amount),
             style: TextStyle(

@@ -3,8 +3,21 @@
 import Link from 'next/link';
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
+import ImportExportActions from '../../../components/data-transfer/ImportExportActions';
+import DataTransferProgress from '../../../components/data-transfer/DataTransferProgress';
 import { adminApi } from '../../../lib/api';
+import { useDataTransfers } from '../../../lib/dataTransfer';
+import { DataTransfer } from '../../../types';
 import { Loader2, Package, Pencil, Plus, Trash2, EyeOff } from 'lucide-react';
+
+const IMPORT_HINT = (
+  <>
+    Kolom: <b>name</b> & <b>regular_price</b> (wajib untuk produk baru), id, sku, store, category (slug/nama),
+    product_type, status, sale_price, cost_price, short_description, description, weight, length, width, height,
+    min_stock. Baris dengan id/sku yang sudah ada akan <b>diperbarui</b>, selain itu dibuat baru. Stok tidak ada di
+    file ini — gunakan import/export di menu <b>Stok Produk</b>. Gambar produk tidak ikut diimport.
+  </>
+);
 
 const STATUSES: Record<string, { label: string; badge: string }> = {
   active: { label: 'Aktif', badge: 'bg-emerald-100 text-emerald-700' },
@@ -40,6 +53,14 @@ export default function AdminProductsPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [load]);
+
+  const onTransferFinished = useCallback(
+    (t: DataTransfer) => {
+      if (t.type === 'import' && t.status === 'completed') load();
+    },
+    [load]
+  );
+  const transfers = useDataTransfers({ resource: 'products', perPage: 5 }, onTransferFinished);
 
   const changeStatus = async (id: string, next: string) => {
     setUpdatingId(id);
@@ -111,7 +132,13 @@ export default function AdminProductsPage() {
               Hanya produk berstatus <b>Aktif</b> yang tampil di aplikasi.
             </p>
           </div>
-          <div className="flex w-full gap-2 sm:w-auto">
+          <div className="flex w-full flex-wrap items-start gap-2 sm:w-auto">
+            <ImportExportActions
+              resource="products"
+              onStarted={transfers.track}
+              exportFilters={{ search, status }}
+              importHint={IMPORT_HINT}
+            />
             <Link
               href="/dashboard/products/new"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
@@ -138,6 +165,8 @@ export default function AdminProductsPage() {
             />
           </div>
         </div>
+
+        <DataTransferProgress items={transfers.items} resource="products" />
 
         {error && <p className="text-xs text-red-600">{error}</p>}
 

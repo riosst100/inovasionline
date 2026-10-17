@@ -71,7 +71,6 @@ export interface Customer {
   phone: string | null;
   role: string;
   avatar_url: string | null;
-  is_seller: boolean;
   is_verified: boolean;
   is_blocked: boolean;
   blocked_at: string | null;
@@ -79,6 +78,63 @@ export interface Customer {
   banned_features: BannableFeature[];
   ban_reason: string | null;
   created_at: string;
+}
+
+export type LoginMethod = 'password' | 'google' | 'register';
+
+export interface CustomerDetail {
+  customer: Customer & {
+    gender: string | null;
+    date_of_birth: string | null;
+    address_label: string | null;
+    wallet_balance: string | number | null;
+    email_verified_at: string | null;
+    phone_verified_at: string | null;
+  };
+  login: {
+    has_password: boolean;
+    google_linked: boolean;
+    email_verified_at: string | null;
+    phone_verified_at: string | null;
+    last_login_at: string | null;
+    last_login_ip: string | null;
+    last_login_method: LoginMethod | null;
+    login_count: number;
+    active_session_count: number;
+  };
+  sessions: {
+    id: string;
+    type: 'token' | 'web';
+    device: string;
+    ip_address: string | null;
+    user_agent: string | null;
+    last_active_at: string | null;
+    created_at: string | null;
+    expires_at: string | null;
+  }[];
+  push_devices: {
+    id: string;
+    platform: string;
+    token_preview: string;
+    registered_at: string | null;
+    updated_at: string | null;
+  }[];
+  ip_addresses: {
+    ip_address: string;
+    login_count: number;
+    active_sessions: number;
+    first_seen_at: string | null;
+    last_seen_at: string | null;
+  }[];
+  login_history: {
+    id: number;
+    method: LoginMethod;
+    client: 'mobile' | 'web';
+    device: string | null;
+    ip_address: string | null;
+    user_agent: string | null;
+    created_at: string | null;
+  }[];
 }
 
 export interface PermissionItem {
@@ -98,6 +154,44 @@ export interface ApiResponse<T = any> {
   message: string;
   data: T;
   errors?: Record<string, string[]>;
+  meta?: PaginationMeta;
+}
+
+export interface PaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+export type DataTransferType = 'import' | 'export';
+export type DataTransferFormat = 'csv' | 'xlsx';
+export type DataTransferStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+/** Queued CSV/XLSX import or export (`/api/admin/data-transfers`). */
+export interface DataTransfer {
+  id: string;
+  type: DataTransferType;
+  /** Resource key, e.g. "categories", "products" */
+  resource: string;
+  format: DataTransferFormat;
+  status: DataTransferStatus;
+  file_name: string | null;
+  has_file: boolean;
+  total_rows: number;
+  processed_rows: number;
+  created_rows: number;
+  updated_rows: number;
+  failed_rows: number;
+  /** 0-100 */
+  progress: number;
+  /** Only present on the detail endpoint */
+  row_errors?: { row: number; message: string }[];
+  error_message: string | null;
+  admin_user?: { id: string; name: string } | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
 }
 
 export interface PaginatedData<T> {
@@ -194,6 +288,64 @@ export interface WarehouseCoverage {
   village_name: string | null;
 }
 
+export interface ShippingMethod {
+  id: string;
+  type: string;
+  name: string;
+  description: string | null;
+  base_fee: number;
+  estimated_delivery_time: string | null;
+  free_shipping_min_amount: number | null;
+  /** Pembeli wajib memilih jadwal pengiriman saat checkout */
+  requires_schedule: boolean;
+  /** Bisa dipesan untuk hari ini s.d. (n - 1) hari ke depan */
+  schedule_days_ahead: number;
+  delivery_schedules_count?: number;
+  is_enabled: boolean;
+  sort_order: number;
+}
+
+export interface DeliveryHoliday {
+  id: string;
+  /** null = berlaku untuk semua metode pengiriman */
+  shipping_method_id: string | null;
+  shipping_method_name: string | null;
+  /** Y-m-d */
+  date: string;
+  name: string;
+}
+
+export interface DeliverySchedule {
+  id: string;
+  shipping_method_id: string;
+  label: string;
+  /** HH:MM, waktu lokal (WIB) */
+  start_time: string;
+  end_time: string;
+  /** Pemesanan ditutup sekian menit sebelum jam mulai */
+  cutoff_minutes: number;
+  /** Maks. pesanan per hari; null = tanpa batas */
+  quota: number | null;
+  /** Hari ISO (1 = Senin … 7 = Minggu); null = setiap hari */
+  days: number[] | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface WalletBonusTier {
+  from: number;
+  to: number;
+  /** Chance of this range, in % (all tiers add up to 100). */
+  weight: number;
+}
+
+export interface WalletBonusSettings {
+  is_active: boolean;
+  /** Amounts are rolled in multiples of this. */
+  step: number;
+  tiers: WalletBonusTier[];
+}
+
 export interface ServiceFeeSettings {
   is_active: boolean;
   label: string;
@@ -203,8 +355,76 @@ export interface ServiceFeeSettings {
   max_fee: number | null;
 }
 
+export interface WalletRow {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  balance: number;
+}
+
+export interface WalletTransactionRow {
+  id: string;
+  type: 'topup' | 'payment' | 'refund' | 'adjustment' | 'bonus';
+  /** Signed: + credit, - debit */
+  amount: number;
+  balance_after: number;
+  description: string;
+  order_id: string | null;
+  admin?: { id: string; name: string } | null;
+  created_at: string;
+}
+
+export interface WalletDetail {
+  user: { id: string; name: string; email: string | null; phone: string | null };
+  balance: number;
+  transactions: WalletTransactionRow[];
+}
+
+export interface NavBadgeSettings {
+  is_active: boolean;
+  label: string;
+  /** ISO 8601, null = no limit */
+  starts_at: string | null;
+  ends_at: string | null;
+  /** Read-only: active and inside the schedule right now */
+  is_visible?: boolean;
+}
+
 export interface ServiceCityOptions {
   /** Kode kota yang dijangkau aplikasi */
   selected: string[];
   provinces: { code: string; name: string; cities: RegionItem[] }[];
+}
+
+export type FlashSaleStatus = 'running' | 'upcoming' | 'ended' | 'inactive';
+
+export interface FlashSaleProduct {
+  product_id: string;
+  name: string;
+  sku: string | null;
+  image_url: string | null;
+  regular_price: number;
+  sale_price: number | null;
+  flash_sale_price: number | null;
+}
+
+export interface FlashSale {
+  id: string;
+  name: string;
+  /** ISO 8601 */
+  starts_at: string;
+  ends_at: string;
+  is_active: boolean;
+  status: FlashSaleStatus;
+  products_count?: number;
+  products?: FlashSaleProduct[];
+}
+
+export interface FlashSalePayload {
+  name: string;
+  starts_at: string;
+  ends_at: string;
+  is_active: boolean;
+  products: { product_id: string; flash_sale_price: number }[];
 }

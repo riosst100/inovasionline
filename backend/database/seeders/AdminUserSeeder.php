@@ -6,7 +6,6 @@ use App\Models\AdminUser;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Role;
-use App\Models\Store;
 use App\Models\User;
 use App\Support\Enums\OrderStatus;
 use App\Support\Enums\PaymentStatus;
@@ -123,13 +122,11 @@ class AdminUserSeeder extends Seeder
         );
 
         // 4. Seed Sample Orders assigned to Driver 1
-        $store = Store::first();
         $customer = User::first();
 
-        if ($store && $customer && Order::where('driver_id', $driver1->id)->count() === 0) {
+        if ($customer && Order::where('driver_id', $driver1->id)->count() === 0) {
             Order::create([
                 'order_number' => 'ORD-' . strtoupper(Str::random(8)),
-                'store_id' => $store->id,
                 'user_id' => $customer->id,
                 'driver_id' => $driver1->id,
                 'subtotal' => 125000,
@@ -149,7 +146,6 @@ class AdminUserSeeder extends Seeder
 
             Order::create([
                 'order_number' => 'ORD-' . strtoupper(Str::random(8)),
-                'store_id' => $store->id,
                 'user_id' => $customer->id,
                 'driver_id' => $driver1->id,
                 'subtotal' => 85000,

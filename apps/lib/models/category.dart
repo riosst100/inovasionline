@@ -5,7 +5,6 @@ class Category {
     required this.slug,
     this.parentId,
     this.description,
-    this.icon,
     this.imageUrl,
     this.isActive = true,
     this.productsCount,
@@ -17,7 +16,6 @@ class Category {
         name: json['name'] as String,
         slug: json['slug'] as String,
         description: json['description'] as String?,
-        icon: json['icon'] as String?,
         imageUrl: json['image_url'] as String?,
         isActive: json['is_active'] as bool? ?? true,
         productsCount: (json['products_count'] as num?)?.toInt(),
@@ -28,7 +26,6 @@ class Category {
   final String name;
   final String slug;
   final String? description;
-  final String? icon;
   final String? imageUrl;
   final bool isActive;
 
@@ -37,13 +34,12 @@ class Category {
 
   bool get isEmpty => productsCount == 0;
 
-  Category copyWith({String? icon, String? imageUrl}) => Category(
+  Category copyWith({String? imageUrl}) => Category(
         id: id,
         parentId: parentId,
         name: name,
         slug: slug,
         description: description,
-        icon: icon ?? this.icon,
         imageUrl: imageUrl ?? this.imageUrl,
         isActive: isActive,
         productsCount: productsCount,

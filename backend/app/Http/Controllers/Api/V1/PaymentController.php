@@ -34,9 +34,26 @@ class PaymentController extends Controller
             return ApiResponse::error($e->getMessage(), [], 422);
         }
 
-        $order->load(['store', 'items', 'paymentMethod', 'shippingMethod']);
+        $order->load(['items', 'paymentMethod', 'shippingMethod']);
 
         return ApiResponse::success(new OrderResource($order), 'Payment transaction ready.');
+    }
+
+    public function status(Request $request, Order $order): JsonResponse
+    {
+        if ($order->user_id !== $request->user()->id) {
+            return ApiResponse::error('This order does not belong to you.', [], 403);
+        }
+
+        try {
+            $order = $this->midtrans->syncStatus($order);
+        } catch (RuntimeException $e) {
+            report($e);
+        }
+
+        $order->load(['items', 'paymentMethod', 'shippingMethod']);
+
+        return ApiResponse::success(new OrderResource($order), 'Payment status retrieved.');
     }
 
     public function notification(Request $request): JsonResponse

@@ -117,7 +117,13 @@ flutter:
     - assets/images/logo_app.png
     - assets/images/logo_mark.png
     - assets/images/logo_google.webp
-    - assets/images/logo_splash.png
+    - assets/images/logo_splash_mark.png
+
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

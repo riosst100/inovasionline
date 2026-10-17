@@ -34,7 +34,6 @@ class UserResource extends JsonResource
             'contact_url' => $this->isBlocked() ? config('services.support.contact_url') : null,
             'banned_features' => $this->banned_features ?? [],
             'ban_reason' => $this->ban_reason,
-            'is_seller' => $this->isSeller(),
             'is_verified' => $this->isVerified(),
             'has_address' => $this->hasAddress(),
             'address_label' => $this->hasAddress() ? app(RegionLocator::class)->labelForVillage($this->village_code) : null,

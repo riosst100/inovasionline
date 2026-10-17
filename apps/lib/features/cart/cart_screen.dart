@@ -33,9 +33,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     });
   }
 
-  void _toggleGroup(CartStoreGroup group, bool selected) {
+  void _toggleAll(List<CartItem> items, bool selected) {
     setState(() {
-      final ids = group.items.map((item) => item.id);
+      final ids = items.map((item) => item.id);
       if (selected) {
         _selectedItemIds.addAll(ids);
       } else {
@@ -65,48 +65,40 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ? const Center(child: CircularProgressIndicator())
             : cart == null || cart.isEmpty
                 ? const _EmptyCart()
-                : ListView.builder(
+                : ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + MediaQuery.paddingOf(context).bottom),
-                    itemCount: cart.stores.length,
-                    itemBuilder: (context, index) => _StoreGroupCard(
-                      group: cart.stores[index],
-                      selectedItemIds: _selectedItemIds,
-                      onToggleItem: _toggleItem,
-                      onToggleGroup: _toggleGroup,
-                    ),
+                    children: [
+                      _CartItemsCard(
+                        items: cart.items,
+                        selectedItemIds: _selectedItemIds,
+                        onToggleItem: _toggleItem,
+                        onToggleAll: _toggleAll,
+                      ),
+                    ],
                   ),
       ),
       bottomNavigationBar: cart == null || cart.isEmpty
           ? null
           : _CheckoutBar(
-              groups: [
-                for (final g in cart.stores)
-                  if (g.items.any((i) => _selectedItemIds.contains(i.id)))
-                    CartStoreGroup(
-                      store: g.store,
-                      items: g.items.where((i) => _selectedItemIds.contains(i.id)).toList(),
-                      subtotal: g.items
-                          .where((i) => _selectedItemIds.contains(i.id))
-                          .fold<double>(0, (sum, i) => sum + i.lineTotal),
-                    ),
-              ],
+              selection: CartSelection(
+                items: cart.items.where((i) => _selectedItemIds.contains(i.id)).toList(),
+              ),
             ),
     );
   }
 }
 
 class _CheckoutBar extends StatelessWidget {
-  const _CheckoutBar({required this.groups});
+  const _CheckoutBar({required this.selection});
 
-  /// Selected items, grouped by store.
-  final List<CartStoreGroup> groups;
+  final CartSelection selection;
 
   @override
   Widget build(BuildContext context) {
-    final total = groups.fold<double>(0, (sum, g) => sum + g.subtotal);
-    final count = groups.fold<int>(0, (sum, g) => sum + g.items.length);
-    final canCheckout = groups.length == 1;
+    final total = selection.subtotal;
+    final count = selection.items.length;
+    final canCheckout = count > 0;
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 12, 12 + MediaQuery.paddingOf(context).bottom),
@@ -138,7 +130,7 @@ class _CheckoutBar extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           ElevatedButton.icon(
-            onPressed: canCheckout ? () => context.push('/checkout', extra: groups.first) : null,
+            onPressed: canCheckout ? () => context.push('/checkout', extra: selection) : null,
             icon: const Icon(Icons.shopping_bag_outlined, size: 18),
             label: const Text('Checkout'),
             style: ElevatedButton.styleFrom(
@@ -200,23 +192,23 @@ class _EmptyCart extends StatelessWidget {
   }
 }
 
-class _StoreGroupCard extends ConsumerWidget {
-  const _StoreGroupCard({
-    required this.group,
+class _CartItemsCard extends ConsumerWidget {
+  const _CartItemsCard({
+    required this.items,
     required this.selectedItemIds,
     required this.onToggleItem,
-    required this.onToggleGroup,
+    required this.onToggleAll,
   });
 
-  final CartStoreGroup group;
+  final List<CartItem> items;
   final Set<String> selectedItemIds;
   final void Function(String itemId, bool selected) onToggleItem;
-  final void Function(CartStoreGroup group, bool selected) onToggleGroup;
+  final void Function(List<CartItem> items, bool selected) onToggleAll;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedItems = group.items.where((item) => selectedItemIds.contains(item.id)).toList();
-    final allSelected = selectedItems.length == group.items.length;
+    final selectedItems = items.where((item) => selectedItemIds.contains(item.id)).toList();
+    final allSelected = selectedItems.length == items.length;
     final someSelected = selectedItems.isNotEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -237,7 +229,7 @@ class _StoreGroupCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: () => onToggleGroup(group, !allSelected),
+            onTap: () => onToggleAll(items, !allSelected),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
               child: Row(
@@ -246,12 +238,12 @@ class _StoreGroupCard extends ConsumerWidget {
                     value: allSelected ? true : (someSelected ? null : false),
                     tristate: true,
                     visualDensity: VisualDensity.compact,
-                    onChanged: (value) => onToggleGroup(group, !allSelected),
+                    onChanged: (value) => onToggleAll(items, !allSelected),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'Pilih Semua (${group.items.length})',
+                      'Pilih Semua (${items.length})',
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                     ),
                   ),
@@ -264,12 +256,12 @@ class _StoreGroupCard extends ConsumerWidget {
             ),
           ),
           const Divider(height: 1),
-          for (var i = 0; i < group.items.length; i++) ...[
+          for (var i = 0; i < items.length; i++) ...[
             if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
             _CartItemTile(
-              item: group.items[i],
-              selected: selectedItemIds.contains(group.items[i].id),
-              onSelectedChanged: (selected) => onToggleItem(group.items[i].id, selected),
+              item: items[i],
+              selected: selectedItemIds.contains(items[i].id),
+              onSelectedChanged: (selected) => onToggleItem(items[i].id, selected),
             ),
           ],
         ],

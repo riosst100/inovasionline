@@ -26,11 +26,12 @@ class ProductGridDelegate extends SliverGridDelegate {
   /// [ProductCard.compact].
   final bool compact;
 
-  // Non-text padding/margins in the details area + scalable text area.
-  static const double _fixedDetails = 34;
-  static const double _textDetails = 100;
-  static const double _compactFixedDetails = 28;
-  static const double _compactTextDetails = 92;
+  // Non-text padding/margins in the details area (incl. the add-to-cart
+  // button) + scalable text area.
+  static const double _fixedDetails = 50;
+  static const double _textDetails = 92;
+  static const double _compactFixedDetails = 42;
+  static const double _compactTextDetails = 84;
 
   /// Card height for a given card width (used by horizontal lists).
   static double tileHeight(double width, double textScale, {bool compact = false}) =>
@@ -68,14 +69,12 @@ class ProductCard extends ConsumerWidget {
     required this.product,
     required this.onTap,
     this.badgeText,
-    this.etaText = '15 Menit',
     this.compact = false,
   });
 
   final Product product;
   final VoidCallback onTap;
   final String? badgeText;
-  final String etaText;
 
   /// Smaller type and padding for 3-per-row grids.
   final bool compact;
@@ -83,7 +82,6 @@ class ProductCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final edge = compact ? 6.0 : 8.0;
-    final addSize = compact ? 26.0 : 32.0;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -153,68 +151,6 @@ class ProductCard extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.3,
                           color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Quick Add (+) Button on Top Right
-                  Positioned(
-                    top: edge,
-                    right: edge,
-                    child: Material(
-                      color: Colors.white,
-                      shape: const CircleBorder(),
-                      elevation: 2,
-                      shadowColor: Colors.black.withValues(alpha: 0.15),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () async {
-                          if (ref.read(authProvider).status != AuthStatus.authenticated) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Masuk dulu untuk menambahkan ke keranjang')),
-                            );
-                            context.push('/account/login');
-                            return;
-                          }
-                          final success = await ref
-                              .read(cartProvider.notifier)
-                              .addItem(productId: product.id);
-                          if (!context.mounted) return;
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: Colors.white, size: 20),
-                                    SizedBox(width: 10),
-                                    Text('Ditambahkan ke keranjang.'),
-                                  ],
-                                ),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  ref.read(cartProvider).error ?? 'Gagal menambahkan ke keranjang.',
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        child: Container(
-                          width: addSize,
-                          height: addSize,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF0D9488).withValues(alpha: 0.3), width: 1.2),
-                          ),
-                          child: Icon(
-                            Icons.add,
-                            size: compact ? 16 : 18,
-                            color: Color(0xFF0D9488),
-                          ),
                         ),
                       ),
                     ),
@@ -303,35 +239,124 @@ class ProductCard extends ConsumerWidget {
                       ],
                     ),
 
-                    // Delivery ETA Badge
-                    Container(
-                      margin: const EdgeInsets.only(top: 6),
-                      padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 6, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.timer_outlined, size: compact ? 11 : 12, color: const Color(0xFF0D9488)),
-                          const SizedBox(width: 3),
-                          Text(
-                            etaText,
-                            style: TextStyle(
-                              fontSize: compact ? 9.5 : 10.5,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF0D9488),
-                            ),
-                          ),
-                        ],
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: _AddToCartButton(product: product, compact: compact),
                     ),
                   ],
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AddToCartButton extends ConsumerStatefulWidget {
+  const _AddToCartButton({required this.product, required this.compact});
+
+  final Product product;
+  final bool compact;
+
+  @override
+  ConsumerState<_AddToCartButton> createState() => _AddToCartButtonState();
+}
+
+class _AddToCartButtonState extends ConsumerState<_AddToCartButton> {
+  bool _adding = false;
+
+  Future<void> _addToCart() async {
+    if (ref.read(authProvider).status != AuthStatus.authenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Masuk dulu untuk menambahkan ke keranjang')),
+      );
+      context.push('/account/login');
+      return;
+    }
+
+    setState(() => _adding = true);
+    final success = await ref
+        .read(cartProvider.notifier)
+        .addItem(productId: widget.product.id);
+    if (!mounted) return;
+    setState(() => _adding = false);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Text('Ditambahkan ke keranjang.'),
+            ],
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ref.read(cartProvider).error ?? 'Gagal menambahkan ke keranjang.',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = widget.compact;
+    final height = compact ? 28.0 : 32.0;
+
+    return SizedBox(
+      width: double.infinity,
+      height: height,
+      child: Material(
+        color: const Color(0xFF0D9488),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: _adding ? null : _addToCart,
+          borderRadius: BorderRadius.circular(10),
+          child: Center(
+            child: _adding
+                ? SizedBox(
+                    width: compact ? 13 : 15,
+                    height: compact ? 13 : 15,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_shopping_cart_rounded,
+                            size: compact ? 13 : 15,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            compact ? 'Keranjang' : 'Tambah ke Keranjang',
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: compact ? 10.5 : 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
         ),
       ),
     );

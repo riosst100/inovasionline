@@ -5,7 +5,6 @@ class User {
     this.email,
     required this.phone,
     required this.role,
-    required this.isSeller,
     required this.hasAddress,
     this.addressLabel,
     this.avatarUrl,
@@ -30,7 +29,6 @@ class User {
     phone: json['phone'] as String?,
     role: json['role'] as String?,
     avatarUrl: json['avatar_url'] as String?,
-    isSeller: json['is_seller'] as bool? ?? false,
     hasAddress: json['has_address'] as bool? ?? false,
     addressLabel: json['address_label'] as String?,
     emailVerifiedAt: json['email_verified_at'] as String?,
@@ -55,7 +53,6 @@ class User {
   final String? phone;
   final String? role;
   final String? avatarUrl;
-  final bool isSeller;
   final bool hasAddress;
   final String? addressLabel;
   final String? emailVerifiedAt;

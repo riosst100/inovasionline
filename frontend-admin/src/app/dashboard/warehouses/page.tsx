@@ -3,9 +3,21 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminLayout from '../../../components/layout/AdminLayout';
+import ImportExportActions from '../../../components/data-transfer/ImportExportActions';
+import DataTransferProgress from '../../../components/data-transfer/DataTransferProgress';
 import { adminApi, ApiError } from '../../../lib/api';
+import { useDataTransfers } from '../../../lib/dataTransfer';
 import { titleCase } from '../../../lib/text';
-import { Warehouse } from '../../../types';
+import { DataTransfer, Warehouse } from '../../../types';
+
+const IMPORT_HINT = (
+  <>
+    Kolom: <b>code</b> & <b>name</b> (wajib), address, city, province, postal_code, latitude, longitude,
+    contact_name, contact_phone, notes, is_active (1/0), dan <b>coverage</b> berisi kode kecamatan/desa dipisah
+    titik koma (;). Gudang dengan code yang sudah ada akan <b>diperbarui</b>; kolom coverage yang diisi/dikosongkan
+    akan mengganti seluruh cakupan gudang tersebut.
+  </>
+);
 import { AlertCircle, CheckCircle2, ExternalLink, Loader2, MapPin, Pencil, Phone, Plus, Trash2 } from 'lucide-react';
 
 function CoverageCell({ w }: { w: Warehouse }) {
@@ -56,6 +68,14 @@ export default function WarehousesPage() {
     load();
   }, [load]);
 
+  const onTransferFinished = useCallback(
+    (t: DataTransfer) => {
+      if (t.type === 'import' && t.status === 'completed') load();
+    },
+    [load]
+  );
+  const transfers = useDataTransfers({ resource: 'warehouses', perPage: 5 }, onTransferFinished);
+
   const remove = async (w: Warehouse) => {
     if (!confirm(`Hapus "${w.name}"?`)) return;
     setDeletingId(w.id);
@@ -91,13 +111,18 @@ export default function WarehousesPage() {
               Daftar lokasi penyimpanan. Stok produk nantinya dapat berasal dari beberapa gudang.
             </p>
           </div>
-          <Link
-            href="/dashboard/warehouses/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            <Plus className="h-4 w-4" /> Tambah Gudang
-          </Link>
+          <div className="flex flex-wrap items-start gap-2">
+            <ImportExportActions resource="warehouses" onStarted={transfers.track} importHint={IMPORT_HINT} />
+            <Link
+              href="/dashboard/warehouses/new"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              <Plus className="h-4 w-4" /> Tambah Gudang
+            </Link>
+          </div>
         </div>
+
+        <DataTransferProgress items={transfers.items} resource="warehouses" />
 
         {error && (
           <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">

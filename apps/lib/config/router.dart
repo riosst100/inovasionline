@@ -18,6 +18,8 @@ import '../features/posts/posts_screen.dart';
 import '../features/products/product_detail_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/shell/main_shell.dart';
+import '../features/wallet/topup_screen.dart';
+import '../features/wallet/wallet_screen.dart';
 import '../models/cart.dart';
 
 final router = GoRouter(
@@ -26,12 +28,8 @@ final router = GoRouter(
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>
           MainShell(navigationShell: navigationShell),
+      // Order must match the destinations in MainShell.
       branches: [
-        StatefulShellBranch(
-          routes: [
-            GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
-          ],
-        ),
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -45,6 +43,19 @@ final router = GoRouter(
             GoRoute(
               path: '/chat',
               builder: (context, state) => const ChatScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/orders',
+              builder: (context, state) => const OrderListScreen(),
             ),
           ],
         ),
@@ -95,11 +106,19 @@ final router = GoRouter(
     GoRoute(
       path: '/checkout',
       builder: (context, state) =>
-          CheckoutScreen(group: state.extra as CartStoreGroup),
+          CheckoutScreen(selection: state.extra as CartSelection),
+    ),
+    GoRoute(path: '/wallet', builder: (context, state) => const WalletScreen()),
+    GoRoute(
+      path: '/wallet/topup',
+      builder: (context, state) => const TopupScreen(),
     ),
     GoRoute(
-      path: '/orders',
-      builder: (context, state) => const OrderListScreen(),
+      path: '/wallet/topups/:id/pay',
+      builder: (context, state) => PaymentWebViewScreen.topup(
+        topupId: state.pathParameters['id']!,
+        redirectUrl: state.extra as String,
+      ),
     ),
     GoRoute(
       path: '/orders/:id',
@@ -108,8 +127,10 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/orders/:id/pay',
-      builder: (context, state) =>
-          PaymentWebViewScreen(redirectUrl: state.extra as String),
+      builder: (context, state) => PaymentWebViewScreen(
+        orderId: state.pathParameters['id']!,
+        redirectUrl: state.extra as String,
+      ),
     ),
   ],
 );

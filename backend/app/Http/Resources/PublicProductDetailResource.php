@@ -2,20 +2,18 @@
 
 namespace App\Http\Resources;
 
-use App\Support\Enums\PromotionType;
+use App\Http\Resources\Concerns\ResolvesPromotionPrice;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class PublicProductDetailResource extends JsonResource
 {
+    use ResolvesPromotionPrice;
+
     public function toArray(Request $request): array
     {
         $regularPrice = (float) $this->regular_price;
-        $promotion = $this->relationLoaded('promotions') ? $this->promotions->first() : null;
-
-        $salePrice = $promotion
-            ? $this->computeSalePrice($regularPrice, $promotion)
-            : ($this->sale_price !== null ? (float) $this->sale_price : null);
+        [$salePrice, $promotion] = $this->resolvePromotionPrice($regularPrice);
 
         $discountPercent = $salePrice !== null && $regularPrice > 0
             ? (int) round((($regularPrice - $salePrice) / $regularPrice) * 100)
@@ -58,28 +56,7 @@ class PublicProductDetailResource extends JsonResource
                 'slug' => $this->category->slug,
             ]),
 
-            'store' => $this->whenLoaded('store', fn () => [
-                'id' => $this->store->id,
-                'name' => $this->store->name,
-                'slug' => $this->store->slug,
-                'logo_url' => $this->store->logo_path ? asset('storage/'.$this->store->logo_path) : null,
-                'city' => $this->store->city,
-                'delivery_available' => $this->store->delivery_available,
-                'owner_user_id' => $this->store->seller?->user_id,
-            ]),
-
             'created_at' => $this->created_at,
         ];
-    }
-
-    private function computeSalePrice(float $regularPrice, mixed $promotion): float
-    {
-        $discountValue = (float) $promotion->discount_value;
-
-        $salePrice = $promotion->type === PromotionType::PERCENTAGE_DISCOUNT
-            ? $regularPrice - ($regularPrice * $discountValue / 100)
-            : $regularPrice - $discountValue;
-
-        return max(0, $salePrice);
     }
 }

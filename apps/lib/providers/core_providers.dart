@@ -11,10 +11,10 @@ import '../services/checkout_service.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
 import '../services/order_service.dart';
+import '../services/wallet_service.dart';
 import '../services/post_service.dart';
 import '../services/region_service.dart';
 import '../services/search_service.dart';
-import '../services/store_service.dart';
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
 
@@ -35,10 +35,6 @@ final catalogServiceProvider = Provider<CatalogService>(
 
 final searchServiceProvider = Provider<SearchService>(
   (ref) => SearchService(ref.watch(apiClientProvider)),
-);
-
-final storeServiceProvider = Provider<StoreService>(
-  (ref) => StoreService(ref.watch(apiClientProvider)),
 );
 
 final bannerServiceProvider = Provider<BannerService>(
@@ -63,6 +59,10 @@ final checkoutServiceProvider = Provider<CheckoutService>(
 
 final orderServiceProvider = Provider<OrderService>(
   (ref) => OrderService(ref.watch(apiClientProvider)),
+);
+
+final walletServiceProvider = Provider<WalletService>(
+  (ref) => WalletService(ref.watch(apiClientProvider)),
 );
 
 final postServiceProvider = Provider<PostService>(
