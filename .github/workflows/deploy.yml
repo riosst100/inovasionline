@@ -18,12 +18,24 @@ jobs:
       apps: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apps == 'true' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
         with:
-          filters: |
-            apps:
-              - 'apps/**'
+          fetch-depth: 0
+      - name: Compare apps/ with the published APK
+        id: filter
+        run: |
+          # Diff against the commit the live APK was built from, not the previous push,
+          # so apps/ changes from a failed run still get published by the next one.
+          PUBLISHED=$(curl -fsS --max-time 15 https://inovasionline.com/download/release.json | jq -r '.commit // empty' || true)
+          if [ -z "$PUBLISHED" ] || ! git cat-file -e "$PUBLISHED^{commit}" 2>/dev/null; then
+            echo "Published commit unknown ('$PUBLISHED'); building APK"
+            echo "apps=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$PUBLISHED" HEAD -- apps/; then
+            echo "apps/ unchanged since published $PUBLISHED"
+            echo "apps=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "apps/ changed since published $PUBLISHED"
+            echo "apps=true" >> "$GITHUB_OUTPUT"
+          fi
 
   frontend-admin:
     name: Frontend admin build
@@ -172,6 +184,9 @@ jobs:
   publish-apk:
     name: Publish APK to inovasionline.com/download
     needs: [apk, deploy]
+    # A failed web build must not drop a good APK: the next push won't rebuild it
+    # unless it touches apps/ again.
+    if: always() && needs.apk.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -195,5 +210,5 @@ jobs:
             set -e
             bash /var/www/html/inovasionline/scripts/publish-apk.sh \
               /tmp/inovasionline-apk-${{ github.run_id }}/inovasionline.apk \
-              "${{ needs.apk.outputs.version }}" "${{ needs.apk.outputs.build }}"
+              "${{ needs.apk.outputs.version }}" "${{ needs.apk.outputs.build }}" "${{ github.sha }}"
             rm -rf /tmp/inovasionline-apk-${{ github.run_id }}

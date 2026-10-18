@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Publish a built APK to inovasionline.com/download (served by nginx from download/).
-# Usage: publish-apk.sh <apk-path> <version-name> <build-number>
+# Usage: publish-apk.sh <apk-path> <version-name> <build-number> [commit-sha]
 set -euo pipefail
 
 APK_SRC="$1"
 VERSION="$2"
 BUILD="$3"
+COMMIT="${4:-}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$ROOT/download"
 APK_NAME="inovasionline.apk"
@@ -23,6 +24,7 @@ cat > "$DEST/.release.json.tmp" <<JSON
 {
   "version": "$VERSION",
   "buildNumber": $BUILD,
+  "commit": "$COMMIT",
   "date": "$(date -Iseconds)",
   "filename": "$APK_NAME",
   "size": $SIZE,
