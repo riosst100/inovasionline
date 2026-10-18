@@ -3,21 +3,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { apiRequest, apiRequestFull, ApiError } from '../../../lib/api';
-import { WalletDetail, WalletRow, WalletTransactionRow } from '../../../types';
+import { WalletDetail, WalletRow } from '../../../types';
+import { formatDateTime as formatDate, rupiah, TRANSACTION_TYPE_LABEL as TYPE_LABEL } from '../../../lib/wallet';
 import { AlertCircle, Loader2, Search, Wallet, X } from 'lucide-react';
-
-const rupiah = (n: number) => 'Rp' + Math.round(Math.abs(n)).toLocaleString('id-ID');
-
-const TYPE_LABEL: Record<WalletTransactionRow['type'], string> = {
-  topup: 'Top Up',
-  payment: 'Pembayaran',
-  refund: 'Pengembalian Dana',
-  adjustment: 'Penyesuaian',
-  bonus: 'Bonus',
-};
-
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export default function WalletsPage() {
   const [rows, setRows] = useState<WalletRow[]>([]);

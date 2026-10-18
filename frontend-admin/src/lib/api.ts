@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, NavBadgeSettings, DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, AdChestSettings, NavBadgeSettings, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -573,6 +573,39 @@ export const adminApi = {
 
   async saveNavBadge(payload: NavBadgeSettings): Promise<NavBadgeSettings> {
     return apiRequest<NavBadgeSettings>('/admin/nav-badge', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getOrderSettings(): Promise<OrderSettings> {
+    return apiRequest<OrderSettings>('/admin/order-settings');
+  },
+
+  async saveOrderSettings(payload: OrderSettings): Promise<OrderSettings> {
+    return apiRequest<OrderSettings>('/admin/order-settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAdChest(): Promise<AdChestSettings> {
+    return apiRequest<AdChestSettings>('/admin/ad-chest');
+  },
+
+  async saveAdChest(payload: AdChestSettings): Promise<AdChestSettings> {
+    return apiRequest<AdChestSettings>('/admin/ad-chest', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAdmob(): Promise<AdmobSettings> {
+    return apiRequest<AdmobSettings>('/admin/admob');
+  },
+
+  async saveAdmob(payload: AdmobSettings): Promise<AdmobSettings> {
+    return apiRequest<AdmobSettings>('/admin/admob', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });

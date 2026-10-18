@@ -50,6 +50,14 @@ class AdminAuthController extends Controller
             'user_agent' => mb_substr((string) $request->userAgent(), 0, 500),
         ])->save();
 
+        // The mobile admin app has no cookie jar; it gets the token itself and sends it as Bearer.
+        if ($request->header('X-Client') === 'mobile') {
+            return ApiResponse::success([
+                'user' => new AdminUserResource($adminUser),
+                'token' => $token->plainTextToken,
+            ], 'Login admin berhasil.');
+        }
+
         return ApiResponse::success([
             'user' => new AdminUserResource($adminUser),
         ], 'Login admin berhasil.')->withCookie($this->sessionCookie($token->plainTextToken, $days));

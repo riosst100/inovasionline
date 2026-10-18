@@ -85,6 +85,10 @@ class Order {
     this.customerNotes,
     this.adminNotes,
     this.paymentRedirectUrl,
+    this.serverCanCancel,
+    this.cancelDeadline,
+    this.cancelOnHold = false,
+    this.cancelSecondsLeft,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
@@ -109,6 +113,13 @@ class Order {
         customerNotes: json['customer_notes'] as String?,
         adminNotes: json['admin_notes'] as String?,
         paymentRedirectUrl: json['payment_redirect_url'] as String?,
+        serverCanCancel: json['can_cancel'] as bool?,
+        cancelOnHold: json['cancel_on_hold'] as bool? ?? false,
+        cancelSecondsLeft: (json['cancel_seconds_left'] as num?)?.toInt(),
+        // Server sends seconds left (not a timestamp) so a skewed device clock doesn't matter.
+        cancelDeadline: json['cancel_seconds_left'] is num
+            ? DateTime.now().add(Duration(seconds: (json['cancel_seconds_left'] as num).toInt()))
+            : null,
         statusHistory: (json['status_history'] as List<dynamic>? ?? [])
             .map((e) => OrderStatusHistoryEntry.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -137,6 +148,14 @@ class Order {
   final String? customerNotes;
   final String? adminNotes;
   final String? paymentRedirectUrl;
+  final bool? serverCanCancel;
+
+  /// While being prepared, the buyer may only cancel until this (device-local) moment.
+  final DateTime? cancelDeadline;
+
+  /// The buyer has the cancel confirmation open: the countdown is frozen at [cancelSecondsLeft].
+  final bool cancelOnHold;
+  final int? cancelSecondsLeft;
   final List<OrderStatusHistoryEntry> statusHistory;
   final List<OrderItem> items;
   final String createdAt;
@@ -156,15 +175,20 @@ class Order {
   String get statusLabel => switch (status) {
         'pending' => needsOnlinePayment ? 'Menunggu Pembayaran' : 'Menunggu Konfirmasi',
         'accepted' => 'Pesanan Diterima',
-        'processing' => 'Pesanan sedang disiapkan',
+        'processing' => cancelOnHold ? 'Ditahan, menunggu konfirmasi batal' : 'Pesanan sedang disiapkan',
         'ready' => 'Siap Dikirim/Diambil',
         'completed' => 'Selesai',
         'cancelled' => 'Dibatalkan',
         _ => status,
       };
 
-  /// The buyer may cancel until the order is ready (mirrors Order::TRANSITIONS on the backend).
-  bool get canCancel => status == 'pending' || status == 'accepted' || status == 'processing';
+  /// Before preparation the buyer may always cancel; once processing, only until
+  /// [cancelDeadline] (admin-configured window, see Order::buyerCanCancel on the backend).
+  bool get canCancel {
+    final allowed = serverCanCancel ?? (status == 'pending' || status == 'accepted' || status == 'processing');
+    final deadline = cancelDeadline;
+    return allowed && (cancelOnHold || deadline == null || DateTime.now().isBefore(deadline));
+  }
 
   /// Still in progress: not completed and not cancelled.
   bool get isActive => status != 'completed' && status != 'cancelled';

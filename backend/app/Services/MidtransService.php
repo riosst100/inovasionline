@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\WalletTopup;
 use App\Support\Enums\OrderStatus;
 use App\Support\Enums\PaymentStatus;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -241,6 +242,25 @@ class MidtransService
         return $topup->fresh();
     }
 
+    /**
+     * Admin detail view: re-checks a running top-up, or backfills the payment details of
+     * one settled before they were stored.
+     */
+    public function refreshTopup(WalletTopup $topup): WalletTopup
+    {
+        if (! $topup->payment_token) {
+            return $topup;
+        }
+
+        if ($topup->status === WalletTopup::STATUS_PENDING || ($topup->status === WalletTopup::STATUS_PAID && ! $topup->payment_details)) {
+            if ($status = $this->fetchStatus($topup->topup_number)) {
+                $this->handleNotification($status);
+            }
+        }
+
+        return $topup->fresh();
+    }
+
     private function handleTopupNotification(array $payload): void
     {
         $topup = WalletTopup::where('topup_number', $payload['order_id'] ?? '')->first();
@@ -259,14 +279,18 @@ class MidtransService
         DB::transaction(function () use ($topup, $payload, $transactionStatus, $fraudStatus) {
             $topup = WalletTopup::whereKey($topup->id)->lockForUpdate()->first();
 
-            if ($topup->status === WalletTopup::STATUS_PAID) {
-                return;
-            }
-
             $topup->fill([
                 'midtrans_transaction_id' => $payload['transaction_id'] ?? $topup->midtrans_transaction_id,
                 'midtrans_payment_type' => $payload['payment_type'] ?? $topup->midtrans_payment_type,
+                'payment_details' => Arr::except($payload, ['signature_key']),
             ]);
+
+            // Already credited: only keep the payment details fresh.
+            if ($topup->getOriginal('status') === WalletTopup::STATUS_PAID) {
+                $topup->save();
+
+                return;
+            }
 
             if ($transactionStatus === 'settlement' || ($transactionStatus === 'capture' && $fraudStatus === 'accept')) {
                 $topup->status = WalletTopup::STATUS_PAID;

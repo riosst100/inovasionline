@@ -5,8 +5,12 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\WalletTopupResource;
 use App\Http\Resources\WalletTransactionResource;
+use App\Models\AdReward;
 use App\Models\User;
 use App\Models\WalletTopup;
+use App\Services\AdChestService;
+use App\Services\AdRewardService;
+use App\Services\AdViewRequiredException;
 use App\Services\MidtransService;
 use App\Services\WalletService;
 use App\Support\Responses\ApiResponse;
@@ -21,6 +25,8 @@ class WalletController extends Controller
     public function __construct(
         private readonly WalletService $wallet,
         private readonly MidtransService $midtrans,
+        private readonly AdRewardService $adRewards,
+        private readonly AdChestService $chests,
     ) {}
 
     public function show(Request $request): JsonResponse
@@ -30,7 +36,12 @@ class WalletController extends Controller
 
     public function claimBonus(Request $request): JsonResponse
     {
-        $transaction = $this->wallet->claimBonus($request->user());
+        try {
+            $transaction = $this->wallet->claimBonus($request->user());
+        } catch (AdViewRequiredException $e) {
+            // The app retries this for a few seconds while AdMob's callback is on its way.
+            return ApiResponse::error($e->getMessage(), ['code' => ['ad_view_required']], 409);
+        }
         if (! $transaction) {
             return ApiResponse::error('Bonus saldo belanja sudah diklaim.', [], 422);
         }
@@ -50,7 +61,46 @@ class WalletController extends Controller
             'max_balance' => (int) $this->wallet->maxBalance(),
             'bonus_max' => $this->wallet->bonusMax(),
             'bonus_available' => $this->wallet->bonusAvailable($user),
+            'bonus_requires_ad' => $this->adRewards->bonusRequiresAd(),
         ];
+    }
+
+    /**
+     * Debug builds show Google's sample ads, which never send an SSV callback;
+     * this stands in for it. Disabled unless ADMOB_ALLOW_UNVERIFIED_REWARDS is
+     * on, and always in production.
+     */
+    public function testAdView(Request $request): JsonResponse
+    {
+        abort_if(app()->isProduction() || ! config('services.admob.allow_unverified_rewards'), 404);
+
+        $purpose = $request->input('purpose') === AdReward::PURPOSE_CHEST ? AdReward::PURPOSE_CHEST : AdReward::PURPOSE_BONUS;
+        $this->adRewards->record($request->user(), 'test-'.Str::ulid(), 'test', $purpose);
+
+        return ApiResponse::success(null, 'Test ad view recorded.');
+    }
+
+    /** The home screen's reward chest; data is null while it is off. */
+    public function chest(Request $request): JsonResponse
+    {
+        return ApiResponse::success($this->chests->status($request->user()), 'Reward chest retrieved successfully.');
+    }
+
+    public function openChest(Request $request): JsonResponse
+    {
+        try {
+            $amount = $this->chests->open($request->user());
+        } catch (AdViewRequiredException $e) {
+            // AdMob's callback for the last view may still be on its way; the app retries.
+            return ApiResponse::error($e->getMessage(), ['code' => ['ad_view_required']], 409);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), [], 422);
+        }
+
+        return ApiResponse::success([
+            'claimed_amount' => $amount,
+            'chest' => $this->chests->status($request->user()),
+        ], 'Peti hadiah berhasil dibuka.');
     }
 
     public function transactions(Request $request): JsonResponse

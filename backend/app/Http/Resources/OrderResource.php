@@ -19,6 +19,7 @@ class OrderResource extends JsonResource
             'payment_method' => $this->whenLoaded('paymentMethod', fn () => $this->paymentMethod ? new PaymentMethodResource($this->paymentMethod) : null),
             'shipping_method' => $this->whenLoaded('shippingMethod', fn () => $this->shippingMethod ? new ShippingMethodResource($this->shippingMethod) : null),
             'items' => OrderItemResource::collection($this->whenLoaded('items')),
+            'items_count' => $this->whenCounted('items'),
             'subtotal' => (float) $this->subtotal,
             'discount_total' => (float) $this->discount_total,
             'shipping_fee' => (float) $this->shipping_fee,
@@ -41,6 +42,10 @@ class OrderResource extends JsonResource
             'accepted_at' => $this->accepted_at,
             'completed_at' => $this->completed_at,
             'cancelled_at' => $this->cancelled_at,
+            'can_cancel' => $this->buyerCanCancel(),
+            'cancel_on_hold' => $this->isCancelOnHold(),
+            // Relative (and frozen while on hold), so the app's countdown ignores the device clock.
+            'cancel_seconds_left' => $this->buyerCancelSecondsLeft(),
             'created_at' => $this->created_at,
         ];
     }

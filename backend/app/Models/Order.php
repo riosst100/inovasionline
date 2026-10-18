@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 class Order extends Model
 {
@@ -48,6 +49,8 @@ class Order extends Model
         'accepted_at',
         'completed_at',
         'cancelled_at',
+        'cancel_hold_started_at',
+        'cancel_declined_at',
     ];
 
     protected function casts(): array
@@ -70,6 +73,8 @@ class Order extends Model
             'accepted_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'cancel_hold_started_at' => 'datetime',
+            'cancel_declined_at' => 'datetime',
         ];
     }
 
@@ -125,5 +130,101 @@ class Order extends Model
     public function canTransitionTo(OrderStatus $next): bool
     {
         return in_array($next->value, self::TRANSITIONS[$this->status->value] ?? [], true);
+    }
+
+    /**
+     * Longest the buyer may keep the cancel confirmation open; an abandoned hold
+     * (app closed mid-dialog) counts as backing out.
+     */
+    public const BUYER_CANCEL_MAX_HOLD_SECONDS = 120;
+
+    /**
+     * Last moment the buyer may cancel a processing order: the admin-set window counted
+     * from when preparation started; while on hold, the end of the hold. Null when no
+     * deadline applies.
+     */
+    public function buyerCancelDeadline(): ?Carbon
+    {
+        if ($this->status !== OrderStatus::PROCESSING) {
+            return null;
+        }
+
+        if ($this->cancel_declined_at !== null) {
+            return $this->cancel_declined_at;
+        }
+
+        if ($this->cancel_hold_started_at !== null) {
+            return $this->cancel_hold_started_at->copy()->addSeconds(self::BUYER_CANCEL_MAX_HOLD_SECONDS);
+        }
+
+        return $this->cancelWindowEnd();
+    }
+
+    /** Seconds the countdown shows: frozen while on hold. Null when no deadline applies. */
+    public function buyerCancelSecondsLeft(): ?int
+    {
+        if ($this->buyerCancelDeadline() === null) {
+            return null;
+        }
+
+        if (! $this->buyerCanCancel()) {
+            return 0;
+        }
+
+        $from = $this->isCancelOnHold() ? $this->cancel_hold_started_at : now();
+
+        return max(0, $this->cancelWindowEnd()->getTimestamp() - $from->getTimestamp());
+    }
+
+    public function isCancelOnHold(): bool
+    {
+        return $this->status === OrderStatus::PROCESSING
+            && $this->cancel_declined_at === null
+            && $this->cancel_hold_started_at !== null
+            && now()->lessThan($this->cancel_hold_started_at->copy()->addSeconds(self::BUYER_CANCEL_MAX_HOLD_SECONDS));
+    }
+
+    public function buyerCanCancel(): bool
+    {
+        if (! $this->canTransitionTo(OrderStatus::CANCELLED)) {
+            return false;
+        }
+
+        $deadline = $this->buyerCancelDeadline();
+
+        return $deadline === null || now()->lessThan($deadline);
+    }
+
+    /** Freezes the countdown while the buyer reads the cancel confirmation. */
+    public function startCancelHold(): void
+    {
+        if ($this->status !== OrderStatus::PROCESSING || $this->cancel_hold_started_at !== null) {
+            return;
+        }
+
+        $this->update(['cancel_hold_started_at' => now()]);
+    }
+
+    /** The buyer backed out of cancelling: the order carries on and can no longer be cancelled. */
+    public function declineCancel(): void
+    {
+        if ($this->status !== OrderStatus::PROCESSING || $this->cancel_declined_at !== null) {
+            return;
+        }
+
+        $this->update(['cancel_declined_at' => now()]);
+    }
+
+    /** Preparation start + admin window. */
+    private function cancelWindowEnd(): Carbon
+    {
+        $startedAt = collect($this->status_history ?? [])
+            ->where('status', OrderStatus::PROCESSING->value)
+            ->pluck('at')
+            ->last();
+
+        $start = $startedAt ? Carbon::parse($startedAt) : ($this->paid_at ?? $this->created_at);
+
+        return Carbon::instance($start)->addSeconds(OrderSetting::current()->buyer_cancel_window_seconds);
     }
 }

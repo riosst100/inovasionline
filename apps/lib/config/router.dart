@@ -10,6 +10,7 @@ import '../features/categories/category_products_screen.dart';
 import '../features/checkout/checkout_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/flash_sale/flash_sale_screen.dart';
+import '../features/home/ad_chest.dart';
 import '../features/home/home_screen.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
@@ -109,9 +110,11 @@ final router = GoRouter(
           CheckoutScreen(selection: state.extra as CartSelection),
     ),
     GoRoute(path: '/wallet', builder: (context, state) => const WalletScreen()),
+    GoRoute(path: '/chest', builder: (context, state) => const AdChestScreen()),
     GoRoute(
       path: '/wallet/topup',
-      builder: (context, state) => const TopupScreen(),
+      builder: (context, state) =>
+          TopupScreen(fromCheckout: state.extra == topupFromCheckout),
     ),
     GoRoute(
       path: '/wallet/topups/:id/pay',

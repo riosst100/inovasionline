@@ -1,4 +1,7 @@
+import 'package:dio/dio.dart';
+
 import '../core/api/api_client.dart';
+import '../core/api/api_exception.dart';
 import '../models/wallet.dart';
 
 class WalletService {
@@ -18,6 +21,54 @@ class WalletService {
     final response = await _apiClient.dio.post('/wallet/bonus/claim');
     final data = response.data['data'] as Map<String, dynamic>;
     return (data['claimed_amount'] as num?)?.toInt() ?? 0;
+  }
+
+  /// [claimBonus] right after a rewarded ad: AdMob confirms the view to the
+  /// backend a few seconds after the ad closes, and until then the claim is
+  /// answered with 409, so keep retrying for a while.
+  Future<int> claimBonusAfterAd() async {
+    const attempts = 8;
+    for (var i = 1; ; i++) {
+      try {
+        return await claimBonus();
+      } on DioException catch (e) {
+        final error = e.error;
+        final pending = error is ApiException && error.statusCode == 409;
+        if (!pending || i == attempts) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 2500));
+      }
+    }
+  }
+
+  /// Debug builds only: Google's sample ads never call the backend, so this
+  /// records the view instead (the backend refuses it in production).
+  Future<void> recordTestAdView({String purpose = 'bonus'}) =>
+      _apiClient.dio.post('/wallet/bonus/test-ad-view', data: {'purpose': purpose});
+
+  /// Null while the reward chest is off.
+  Future<AdChestStatus?> chestStatus() async {
+    final response = await _apiClient.dio.get('/wallet/chest');
+    final data = response.data['data'];
+    return data is Map<String, dynamic> ? AdChestStatus.fromJson(data) : null;
+  }
+
+  /// Right after a chest's rewarded ad: opens it and returns the (random)
+  /// amount credited. Retries while the backend still waits for AdMob's
+  /// confirmation of the view.
+  Future<int> openChest() async {
+    const attempts = 8;
+    for (var i = 1; ; i++) {
+      try {
+        final response = await _apiClient.dio.post('/wallet/chest/open');
+        final data = response.data['data'] as Map<String, dynamic>;
+        return (data['claimed_amount'] as num?)?.toInt() ?? 0;
+      } on DioException catch (e) {
+        final error = e.error;
+        final pending = error is ApiException && error.statusCode == 409;
+        if (!pending || i == attempts) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 2500));
+      }
+    }
   }
 
   Future<List<WalletTransaction>> transactions({int perPage = 50}) async {

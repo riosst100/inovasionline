@@ -9,6 +9,7 @@ class WalletSummary {
     required this.maxBalance,
     this.bonusMax = 0,
     this.bonusAvailable = false,
+    this.bonusRequiresAd = false,
   });
 
   factory WalletSummary.fromJson(Map<String, dynamic> json) => WalletSummary(
@@ -18,6 +19,7 @@ class WalletSummary {
     maxBalance: json['max_balance'] as int? ?? 0,
     bonusMax: json['bonus_max'] as int? ?? 0,
     bonusAvailable: json['bonus_available'] as bool? ?? false,
+    bonusRequiresAd: json['bonus_requires_ad'] as bool? ?? false,
   );
 
   final double balance;
@@ -31,12 +33,48 @@ class WalletSummary {
   final int bonusMax;
   final bool bonusAvailable;
 
+  /// Admin requires a fully watched rewarded ad before the bonus can be claimed.
+  final bool bonusRequiresAd;
+
   /// Largest top-up that still fits under [maxBalance].
   int get topupRoom {
     if (maxBalance <= 0) return topupMax;
     final room = maxBalance - balance.floor();
     return room < topupMax ? (room < 0 ? 0 : room) : topupMax;
   }
+}
+
+/// The home screen's daily reward chests: each opens with one rewarded ad
+/// for a random saldo amount (up to [maxAmount]).
+class AdChestStatus {
+  AdChestStatus({
+    required this.openedToday,
+    required this.chestsPerDay,
+    required this.maxAmount,
+    required this.doneToday,
+    required this.soldOut,
+  });
+
+  factory AdChestStatus.fromJson(Map<String, dynamic> json) => AdChestStatus(
+    openedToday: json['opened_today'] as int? ?? 0,
+    chestsPerDay: json['chests_per_day'] as int? ?? 0,
+    maxAmount: json['max_amount'] as int? ?? 0,
+    doneToday: json['done_today'] as bool? ?? false,
+    soldOut: json['sold_out'] as bool? ?? false,
+  );
+
+  final int openedToday;
+  final int chestsPerDay;
+  final int maxAmount;
+
+  /// All of today's chests are opened; back tomorrow.
+  final bool doneToday;
+
+  /// Today's prize budget is used up; back tomorrow.
+  final bool soldOut;
+
+  int get remaining => (chestsPerDay - openedToday).clamp(0, chestsPerDay);
+  bool get canOpen => !doneToday && !soldOut && remaining > 0;
 }
 
 class WalletTransaction {
@@ -80,6 +118,7 @@ class WalletTransaction {
     'refund' => 'Pengembalian Dana',
     'adjustment' => 'Penyesuaian',
     'bonus' => 'Bonus Saldo',
+    'ad_chest' => 'Hadiah Peti',
     _ => type,
   };
 }

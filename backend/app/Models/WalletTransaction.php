@@ -15,6 +15,7 @@ class WalletTransaction extends Model
     public const TYPE_REFUND = 'refund';
     public const TYPE_ADJUSTMENT = 'adjustment';
     public const TYPE_BONUS = 'bonus';
+    public const TYPE_AD_CHEST = 'ad_chest';
 
     protected $fillable = [
         'user_id',
@@ -43,6 +44,11 @@ class WalletTransaction extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function topup(): BelongsTo
+    {
+        return $this->belongsTo(WalletTopup::class, 'wallet_topup_id');
     }
 
     public function adminUser(): BelongsTo

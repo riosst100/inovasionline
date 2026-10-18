@@ -38,11 +38,12 @@ Seluruh stack lokal berjalan di Docker: backend (PHP 8.3 CLI, PostgreSQL 16, Red
 
 ### Jalankan Stack (Windows → WSL, direkomendasikan):
 Kode diedit di Windows, lalu `backend/`, `frontend/`, `frontend-admin/` (+ `docker/`, `docker-compose.yml`) disinkronkan ke `~/projects/inovasionline` di WSL (`Ubuntu-24.04`) dan Docker dijalankan dari sana: lebih cepat dan hot reload jalan. `apps/` (Flutter) tidak ikut, tetap di-build dari Windows.
-```bash
-bash scripts/wsl-sync.sh up      # sync + docker compose up -d --build
-bash scripts/wsl-sync.sh watch   # biarkan jalan: sync otomatis tiap file disimpan
-bash scripts/wsl-sync.sh logs backend   # juga: ps, down, sync
+```powershell
+.\sync.ps1 up              # sync + docker compose up -d --build
+.\sync.ps1 watch           # biarkan jalan: sync otomatis tiap file disimpan
+.\sync.ps1 logs backend    # juga: ps, down, sync
 ```
+Dari Git Bash bisa juga `bash scripts/wsl-sync.sh <cmd>`. Jangan pakai `bash` dari PowerShell: itu bash WSL, bukan Git Bash.
 `.env` root & `backend/.env` hanya disalin sekali ke WSL; setelah itu ubah langsung di `~/projects/inovasionline` (WSL).
 
 ### Jalankan Stack (langsung dari folder ini):

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RollsTiers;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class WalletBonusSetting extends Model
 {
+    use RollsTiers;
+
     public const DEFAULT_TIERS = [
         ['from' => 1000, 'to' => 5000, 'weight' => 75],
         ['from' => 5500, 'to' => 9500, 'weight' => 20],
@@ -36,26 +39,12 @@ class WalletBonusSetting extends Model
         ]);
     }
 
-    /** @return list<array{from: int, to: int, weight: int}> usable tiers only */
-    public function usableTiers(): array
-    {
-        return collect($this->tiers ?? [])
-            ->map(fn ($t) => ['from' => (int) $t['from'], 'to' => (int) $t['to'], 'weight' => max(0, (int) $t['weight'])])
-            ->filter(fn ($t) => $t['weight'] > 0 && $t['to'] >= $t['from'] && $t['from'] > 0)
-            ->values()
-            ->all();
-    }
-
     public function toPayload(): array
     {
         return [
             'is_active' => (bool) $this->is_active,
             'step' => (int) $this->step,
-            'tiers' => array_map(fn ($t) => [
-                'from' => (int) $t['from'],
-                'to' => (int) $t['to'],
-                'weight' => (int) $t['weight'],
-            ], $this->tiers ?? []),
+            'tiers' => $this->tiersPayload(),
         ];
     }
 }

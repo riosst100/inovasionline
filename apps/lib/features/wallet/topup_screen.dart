@@ -9,11 +9,19 @@ import '../../core/api/api_exception.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/wallet.dart';
 import '../../providers/core_providers.dart';
+import 'reward_effects.dart';
+import 'topup_success_dialog.dart';
 import 'wallet_providers.dart';
+
+/// Route `extra` for a top-up opened from checkout: success goes back there
+/// instead of home.
+const topupFromCheckout = 'checkout';
 
 /// Picks an amount, creates a Midtrans top-up and opens its payment page.
 class TopupScreen extends ConsumerStatefulWidget {
-  const TopupScreen({super.key});
+  const TopupScreen({super.key, this.fromCheckout = false});
+
+  final bool fromCheckout;
 
   @override
   ConsumerState<TopupScreen> createState() => _TopupScreenState();
@@ -59,12 +67,31 @@ class _TopupScreenState extends ConsumerState<TopupScreen> {
 
   Future<void> _submit() async {
     setState(() => _submitting = true);
+    final WalletTopup topup;
+    final String url;
     try {
-      final topup = await ref.read(walletServiceProvider).createTopup(_amount);
-      final url = topup.paymentRedirectUrl;
-      if (url == null) throw Exception('Link pembayaran tidak tersedia.');
+      topup = await ref.read(walletServiceProvider).createTopup(_amount);
+      url = topup.paymentRedirectUrl ?? (throw Exception('Link pembayaran tidak tersedia.'));
+    } catch (e, st) {
+      debugPrint('createTopup failed: $e\n$st');
       if (!mounted) return;
+      setState(() => _submitting = false);
+      final message = e is DioException && e.error is ApiException
+          ? (e.error as ApiException).message
+          : 'Gagal membuat top up. Coba lagi.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
+    if (!mounted) return;
 
+    // Keep the home card on the old balance (the payment page refreshes the
+    // wallet) until the coin lands there.
+    final hold = ref.read(walletBalanceHoldProvider.notifier);
+    hold.state = ref.read(walletProvider).valueOrNull?.balance;
+    var landing = false;
+    try {
       final result = await context.push<WalletTopup?>(
         '/wallet/topups/${topup.id}/pay',
         extra: url,
@@ -72,13 +99,7 @@ class _TopupScreenState extends ConsumerState<TopupScreen> {
       if (!mounted) return;
 
       if (result?.isPaid == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Top up ${formatCurrency(result!.amount)} berhasil.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        context.pop();
+        landing = await _celebrate(result!, hold);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -89,17 +110,57 @@ class _TopupScreenState extends ConsumerState<TopupScreen> {
           ),
         );
       }
-    } catch (e) {
-      if (!mounted) return;
-      final message = e is DioException && e.error is ApiException
-          ? (e.error as ApiException).message
-          : 'Gagal membuat top up. Coba lagi.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-      );
     } finally {
+      if (!landing) hold.state = null;
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  /// Success dialog, then home with the coin flight (or back to checkout).
+  /// Returns whether the flight took over clearing [hold]. A glitch here must
+  /// not read as a failed top-up: the money is in, so fall back to a snackbar.
+  Future<bool> _celebrate(WalletTopup result, StateController<double?> hold) async {
+    try {
+      final coin = await showTopupSuccessDialog(
+        context,
+        amount: result.amount,
+        actionLabel: widget.fromCheckout ? 'Lanjut Bayar' : 'Lanjut Belanja',
+      );
+      if (!mounted) return false;
+      if (widget.fromCheckout || coin == null) {
+        context.pop();
+        return false;
+      }
+      _landOnHome(coin, hold);
+      return true;
+    } catch (e, st) {
+      debugPrint('Top-up success animation failed: $e\n$st');
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Top up ${formatCurrency(result.amount)} berhasil.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      context.pop();
+      return false;
+    }
+  }
+
+  /// Goes home and flies the coin into the saldo card, then lets the balance
+  /// count up. Runs on after this screen is gone, so it only touches [hold].
+  void _landOnHome(Offset coin, StateController<double?> hold) {
+    // Reveal a masked balance so the count-up is visible; the eye icon can hide it again.
+    if (ref.read(walletBalanceHiddenProvider)) {
+      ref.read(walletBalanceHiddenProvider.notifier).toggle();
+    }
+    // The coin hovers while the pushed screens pop off the home screen.
+    final flight = flyCoinToWalletBalance(context, coin, delay: const Duration(milliseconds: 450));
+    context.go('/');
+    flight.whenComplete(() {
+      HapticFeedback.lightImpact();
+      hold.state = null;
+    });
   }
 
   @override

@@ -6,6 +6,8 @@ import '../../models/product.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/product_grid.dart';
 import '../../widgets/skeleton.dart';
+import '../ads/ad_banner.dart';
+import '../ads/admob.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -125,6 +127,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
       ),
+      // Only with results on screen, not over the keyword suggestions.
+      bottomNavigationBar: _searched && _products.isNotEmpty
+          ? const AdBanner(placement: AdPlacement.productList)
+          : null,
       body: _loading
           ? const ProductGridSkeleton()
           : !_searched

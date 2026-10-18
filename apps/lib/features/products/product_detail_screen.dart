@@ -9,6 +9,8 @@ import '../../models/product.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/skeleton.dart';
+import '../ads/ad_banner.dart';
+import '../ads/admob.dart';
 import '../cart/cart_providers.dart';
 
 final productDetailProvider = FutureProvider.autoDispose
@@ -39,6 +41,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen>
       ]).animate(
         CurvedAnimation(parent: _cartBeatController, curve: Curves.easeOut),
       );
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(interstitialAdsProvider).onProductOpened();
+  }
 
   @override
   void dispose() {
@@ -225,6 +233,10 @@ class _ProductDetailBody extends StatelessWidget {
                 product.description ??
                     product.shortDescription ??
                     'Tidak ada deskripsi.',
+              ),
+              const AdBanner(
+                placement: AdPlacement.productDetail,
+                padding: EdgeInsets.only(top: 24),
               ),
               const SizedBox(height: 80),
             ],

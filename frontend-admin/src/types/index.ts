@@ -346,6 +346,20 @@ export interface WalletBonusSettings {
   tiers: WalletBonusTier[];
 }
 
+/** Iklan > Peti Hadiah: rewarded ads fill a chest that pays random saldo belanja. */
+export interface AdChestSettings {
+  is_active: boolean;
+  chests_per_day: number;
+  /** Saldo all chests may pay out per day (WIB); 0 = no cap. */
+  daily_budget: number;
+  step: number;
+  tiers: WalletBonusTier[];
+  /** Read-only: AdMob is on with a rewarded unit, without which the chest never shows. */
+  ads_ready?: boolean;
+  /** Read-only: saldo paid out by chests today. */
+  paid_today?: number;
+}
+
 export interface ServiceFeeSettings {
   is_active: boolean;
   label: string;
@@ -365,7 +379,7 @@ export interface WalletRow {
 
 export interface WalletTransactionRow {
   id: string;
-  type: 'topup' | 'payment' | 'refund' | 'adjustment' | 'bonus';
+  type: 'topup' | 'payment' | 'refund' | 'adjustment' | 'bonus' | 'ad_chest';
   /** Signed: + credit, - debit */
   amount: number;
   balance_after: number;
@@ -375,10 +389,73 @@ export interface WalletTransactionRow {
   created_at: string;
 }
 
+export type WalletTopupStatus = 'pending' | 'paid' | 'failed' | 'expired';
+
+export interface WalletTopupRow {
+  id: string;
+  topup_number: string;
+  amount: number;
+  status: WalletTopupStatus;
+  /** e.g. "Virtual Account BCA"; null until the customer picks a channel */
+  payment_method: string | null;
+  payment_expires_at: string | null;
+  paid_at: string | null;
+  created_at: string;
+  user: { id: string; name: string; email: string | null; phone: string | null } | null;
+}
+
+export interface WalletTopupDetail extends Omit<WalletTopupRow, 'user'> {
+  payment_type: string | null;
+  /** VA number, bill key, payment code, masked card, … as shown to the payer */
+  payment_fields: { label: string; value: string }[];
+  payment_redirect_url: string | null;
+  updated_at: string;
+  balance_after: number | null;
+  user: { id: string; name: string; email: string | null; phone: string | null; balance: number } | null;
+}
+
+export type WalletTopupSummary = Record<WalletTopupStatus, { count: number; total: number }>;
+
+export interface WalletReportTransaction {
+  id: string;
+  type: WalletTransactionRow['type'];
+  /** Signed: + pemasukan, - pengeluaran */
+  amount: number;
+  balance_after: number;
+  description: string;
+  payment_method: string | null;
+  topup: { id: string; topup_number: string } | null;
+  order: { id: string; order_number: string } | null;
+  admin: { id: string; name: string } | null;
+  user: { id: string; name: string; email: string | null; phone: string | null } | null;
+  created_at: string;
+}
+
+export interface WalletReport {
+  total_balance: number;
+  customers_with_balance: number;
+  period: {
+    opening_balance: number;
+    total_in: number;
+    total_out: number;
+    net: number;
+    closing_balance: number;
+  };
+  income_by_type: { type: WalletTransactionRow['type']; total: number }[];
+  expense_by_type: { type: WalletTransactionRow['type']; total: number }[];
+  income_by_method: { method: string; total: number; count: number }[];
+  transactions: WalletReportTransaction[];
+}
+
 export interface WalletDetail {
   user: { id: string; name: string; email: string | null; phone: string | null };
   balance: number;
   transactions: WalletTransactionRow[];
+}
+
+export interface OrderSettings {
+  /** How long a buyer may still cancel once the order is being prepared; 0 = not at all */
+  buyer_cancel_window_seconds: number;
 }
 
 export interface NavBadgeSettings {
@@ -389,6 +466,31 @@ export interface NavBadgeSettings {
   ends_at: string | null;
   /** Read-only: active and inside the schedule right now */
   is_visible?: boolean;
+}
+
+export interface AdmobSettings {
+  is_active: boolean;
+  android_banner_id: string | null;
+  ios_banner_id: string | null;
+  android_interstitial_id: string | null;
+  ios_interstitial_id: string | null;
+  android_rewarded_id: string | null;
+  ios_rewarded_id: string | null;
+  home_banner: boolean;
+  home_bottom_banner: boolean;
+  product_list_banner: boolean;
+  product_detail_banner: boolean;
+  interstitial_enabled: boolean;
+  /** Interstitial on every Nth product detail opened */
+  interstitial_every: number;
+  /** The one-time saldo bonus is claimable only after a fully watched rewarded ad */
+  bonus_requires_ad: boolean;
+  android_native_id: string | null;
+  ios_native_id: string | null;
+  /** Native ad after every Nth post in the Posts feed; 0 = off */
+  posts_native_every: number;
+  /** Read-only: paste into the rewarded ad unit's server-side verification setting */
+  ssv_callback_url?: string;
 }
 
 export interface ServiceCityOptions {

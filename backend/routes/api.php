@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Admin\CustomerController;
 use App\Http\Controllers\Api\Admin\DriverController;
 use App\Http\Controllers\Api\V1\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Api\V1\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\V1\Admin\DataTransferController as AdminDataTransferController;
 use App\Http\Controllers\Api\V1\Admin\DeliveryHolidayController as AdminDeliveryHolidayController;
 use App\Http\Controllers\Api\V1\Admin\DeliveryScheduleController as AdminDeliveryScheduleController;
@@ -22,8 +23,13 @@ use App\Http\Controllers\Api\V1\Admin\PhotographerApplicationController as Admin
 use App\Http\Controllers\Api\V1\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Api\V1\Admin\ServiceCityController as AdminServiceCityController;
 use App\Http\Controllers\Api\V1\Admin\NavBadgeController as AdminNavBadgeController;
+use App\Http\Controllers\Api\V1\Admin\OrderSettingController as AdminOrderSettingController;
+use App\Http\Controllers\Api\V1\Admin\AdChestController as AdminAdChestController;
+use App\Http\Controllers\Api\V1\Admin\AdmobController as AdminAdmobController;
 use App\Http\Controllers\Api\V1\Admin\WalletBonusController as AdminWalletBonusController;
 use App\Http\Controllers\Api\V1\Admin\WalletController as AdminWalletController;
+use App\Http\Controllers\Api\V1\Admin\WalletReportController as AdminWalletReportController;
+use App\Http\Controllers\Api\V1\Admin\WalletTopupController as AdminWalletTopupController;
 use App\Http\Controllers\Api\V1\Admin\ServiceFeeController as AdminServiceFeeController;
 use App\Http\Controllers\Api\V1\Admin\ShippingMethodController as AdminShippingMethodController;
 use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateController as AdminShippingRateTemplateController;
@@ -31,6 +37,7 @@ use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateRowController as Admin
 use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\UserVerificationController as AdminUserVerificationController;
 use App\Http\Controllers\Api\V1\Admin\WarehouseController as AdminWarehouseController;
+use App\Http\Controllers\Api\V1\AppPresenceController;
 use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BannerController;
@@ -44,6 +51,8 @@ use App\Http\Controllers\Api\V1\FaceProfileController;
 use App\Http\Controllers\Api\V1\FlashSaleSlotController;
 use App\Http\Controllers\Api\V1\MatchedPhotoController;
 use App\Http\Controllers\Api\V1\NavBadgeController;
+use App\Http\Controllers\Api\V1\AdmobConfigController;
+use App\Http\Controllers\Api\V1\AdmobSsvController;
 use App\Http\Controllers\Api\V1\WalletController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PaymentController;
@@ -134,6 +143,9 @@ Route::prefix('v1')->group(function () {
     Route::get('/delivery-schedules', [CheckoutOptionsController::class, 'deliverySchedules']);
     Route::get('/service-fee', [CheckoutOptionsController::class, 'serviceFee']);
     Route::get('/nav-badge', [NavBadgeController::class, 'show']);
+    Route::post('/app/heartbeat', [AppPresenceController::class, 'heartbeat'])->middleware('throttle:30,1');
+    Route::get('/admob-config', [AdmobConfigController::class, 'show']);
+    Route::get('/admob/ssv', AdmobSsvController::class)->name('admob.ssv')->middleware('throttle:120,1');
 
     Route::prefix('search')->group(function () {
         Route::get('/', [SearchController::class, 'index']);
@@ -198,6 +210,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/', [OrderController::class, 'index']);
         Route::get('/{order}', [OrderController::class, 'show']);
         Route::post('/{order}/cancel', [OrderController::class, 'cancel']);
+        Route::post('/{order}/cancel-hold', [OrderController::class, 'holdCancel']);
+        Route::post('/{order}/cancel-decline', [OrderController::class, 'declineCancel']);
         Route::post('/{order}/pay', [PaymentController::class, 'pay'])->middleware('feature.ban:purchase');
         Route::get('/{order}/payment-status', [PaymentController::class, 'status']);
     });
@@ -205,7 +219,12 @@ Route::prefix('v1')->group(function () {
     Route::prefix('wallet')->middleware(['auth:sanctum', 'not.blocked'])->group(function () {
         Route::get('/', [WalletController::class, 'show']);
         Route::get('/transactions', [WalletController::class, 'transactions']);
-        Route::post('/bonus/claim', [WalletController::class, 'claimBonus'])->middleware('throttle:5,1');
+        // Retried every couple of seconds while AdMob's reward callback is pending.
+        Route::post('/bonus/claim', [WalletController::class, 'claimBonus'])->middleware('throttle:20,1');
+        Route::post('/bonus/test-ad-view', [WalletController::class, 'testAdView'])->middleware('throttle:10,1');
+        // Opening is retried every couple of seconds while AdMob's reward callback is pending.
+        Route::get('/chest', [WalletController::class, 'chest'])->middleware('throttle:60,1');
+        Route::post('/chest/open', [WalletController::class, 'openChest'])->middleware('throttle:20,1');
         Route::post('/topups', [WalletController::class, 'topup'])->middleware('throttle:10,1');
         Route::get('/topups/{topup}/status', [WalletController::class, 'topupStatus']);
     });
@@ -287,6 +306,7 @@ Route::prefix('v1')->group(function () {
 
         Route::prefix('orders')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index']);
+            Route::get('/counts', [AdminOrderController::class, 'counts']);
             Route::get('/{order}', [AdminOrderController::class, 'show']);
         });
 
@@ -474,8 +494,23 @@ Route::prefix('admin')->group(function () {
             Route::post('/{user}/adjust', [AdminWalletController::class, 'adjust']);
         });
 
+        Route::get('wallet-topups', [AdminWalletTopupController::class, 'index']);
+        Route::get('wallet-topups/{topup}', [AdminWalletTopupController::class, 'show']);
+        Route::get('wallet-report', [AdminWalletReportController::class, 'index']);
+
+        Route::get('dashboard', [AdminDashboardController::class, 'index']);
+
         Route::get('nav-badge', [AdminNavBadgeController::class, 'show']);
         Route::put('nav-badge', [AdminNavBadgeController::class, 'update']);
+
+        Route::get('order-settings', [AdminOrderSettingController::class, 'show']);
+        Route::put('order-settings', [AdminOrderSettingController::class, 'update']);
+
+        Route::get('ad-chest', [AdminAdChestController::class, 'show']);
+        Route::put('ad-chest', [AdminAdChestController::class, 'update']);
+
+        Route::get('admob', [AdminAdmobController::class, 'show']);
+        Route::put('admob', [AdminAdmobController::class, 'update']);
 
         Route::prefix('flash-sales')->group(function () {
             Route::get('/', [AdminFlashSaleController::class, 'index']);
@@ -503,7 +538,9 @@ Route::prefix('admin')->group(function () {
 
         Route::prefix('orders')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index']);
+            Route::get('/counts', [AdminOrderController::class, 'counts']);
             Route::get('/{order}', [AdminOrderController::class, 'show']);
+            Route::patch('/{order}/status', [AdminOrderController::class, 'updateStatus']);
         });
 
         Route::prefix('flash-sale-slots')->group(function () {

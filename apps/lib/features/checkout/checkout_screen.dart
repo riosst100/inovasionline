@@ -9,6 +9,7 @@ import '../../models/payment_method.dart';
 import '../../models/shipping_method.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/address_picker.dart';
+import '../wallet/topup_screen.dart';
 import '../wallet/wallet_providers.dart';
 import 'checkout_providers.dart';
 
@@ -1618,7 +1619,7 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
           Navigator.of(context).pop(method);
         } else if (balance != null) {
           Navigator.of(context).pop();
-          context.push('/wallet/topup');
+          context.push('/wallet/topup', extra: topupFromCheckout);
         }
       },
     );

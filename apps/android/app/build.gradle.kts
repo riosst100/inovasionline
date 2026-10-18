@@ -14,6 +14,12 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// The Mobile Ads SDK crashes at startup without an App ID in the manifest, so fall
+// back to Google's sample ID (serves test ads only) when none is configured.
+val admobSampleAppId = "ca-app-pub-3940256099942544~3347511713"
+val admobProdAppId = (findProperty("admobAppIdAndroid") as String?)?.takeIf { it.isNotBlank() }
+    ?: admobSampleAppId.also { logger.warn("admobAppIdAndroid is not set; prod builds use the AdMob sample App ID.") }
+
 android {
     namespace = "com.inovasionline.app"
     compileSdk = flutter.compileSdkVersion
@@ -50,11 +56,13 @@ android {
             dimension = "env"
             applicationId = "com.inovasionline.app.dev"
             resValue("string", "app_name", "Inovasi Online (Dev)")
+            manifestPlaceholders["admobAppId"] = admobSampleAppId
         }
         create("prod") {
             dimension = "env"
             applicationId = "com.inovasionline.app"
             resValue("string", "app_name", "Inovasi Online")
+            manifestPlaceholders["admobAppId"] = admobProdAppId
         }
     }
 

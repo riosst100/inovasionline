@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
@@ -9,22 +10,76 @@ import '../../core/api/api_exception.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
+import '../ads/admob.dart';
+import '../wallet/reward_effects.dart';
 import '../wallet/wallet_providers.dart';
 
 const _giftRed = Color(0xFFEF4444);
 const _giftRedDark = Color(0xFFB91C1C);
-const _gold = Color(0xFFFDE047);
-const _goldDark = Color(0xFFF59E0B);
-const _brown = Color(0xFF713F12);
-
-/// Put on the balance figure in the saldo card: the collected coin flies there.
-final walletBalanceTargetKey = GlobalKey(debugLabel: 'walletBalanceTarget');
+const _gold = rewardGold;
+const _goldDark = rewardGoldDark;
+const _brown = rewardBrown;
 
 /// Popped by the gift dialog once the reward has turned into a coin.
 class _Collected {
   const _Collected(this.coinCenter);
 
   final Offset? coinCenter;
+}
+
+/// Plays the full-screen reveal for [claim] (the amount credited), with [box]
+/// drawing the container whose lid pops ([lidLift] 0..1). Once collected the
+/// coin flies into the saldo card and the wallet refreshes; a failed claim
+/// shows its message. Also used by the home screen's reward chest.
+Future<void> revealReward(
+  BuildContext context,
+  WidgetRef ref, {
+  required Future<int> Function() claim,
+  required Widget Function(double lidLift) box,
+}) async {
+  final result = await showGeneralDialog<Object?>(
+    context: context,
+    barrierDismissible: false,
+    barrierLabel: 'Hadiah',
+    barrierColor: Colors.black.withValues(alpha: 0.72),
+    transitionDuration: const Duration(milliseconds: 280),
+    pageBuilder: (_, _, _) => _GiftDialog(claim: claim, box: box),
+    transitionBuilder: (_, animation, _, child) => FadeTransition(
+      opacity: animation,
+      child: ScaleTransition(
+        scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+        child: child,
+      ),
+    ),
+  );
+
+  if (!context.mounted) return;
+
+  if (result is _Collected) {
+    // Reveal a masked balance so the count-up is visible; the eye icon can hide it again.
+    if (ref.read(walletBalanceHiddenProvider)) {
+      ref.read(walletBalanceHiddenProvider.notifier).toggle();
+    }
+    final from = result.coinCenter;
+    if (from != null) await flyCoinToWalletBalance(context, from);
+    if (!context.mounted) return;
+    HapticFeedback.lightImpact();
+    // Refreshing now makes the saldo card count up to the new balance as the
+    // coin lands (and the bonus banner collapse away).
+    invalidateWalletFromWidget(ref);
+    return;
+  }
+
+  invalidateWalletFromWidget(ref);
+
+  if (result != null) {
+    final message = result is DioException && result.error is ApiException
+        ? (result.error as ApiException).message
+        : 'Gagal membuka hadiah. Coba lagi.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
 }
 
 /// Home banner above the saldo card while the one-time bonus is unclaimed.
@@ -55,74 +110,83 @@ class _BonusGiftBannerState extends ConsumerState<BonusGiftBanner>
     if (_opening) return;
     setState(() => _opening = true);
     final service = ref.read(walletServiceProvider);
+    var claim = service.claimBonus;
 
-    final result = await showGeneralDialog<Object?>(
-      context: context,
-      barrierDismissible: false,
-      barrierLabel: 'Hadiah',
-      barrierColor: Colors.black.withValues(alpha: 0.72),
-      transitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (_, _, _) => _GiftDialog(claim: service.claimBonus),
-      transitionBuilder: (_, animation, _, child) => FadeTransition(
-        opacity: animation,
-        child: ScaleTransition(
-          scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-          child: child,
-        ),
-      ),
-    );
-
+    if (ref.read(walletProvider).valueOrNull?.bonusRequiresAd ?? false) {
+      final watched = await _watchAd();
+      if (!mounted) return;
+      if (!watched) {
+        setState(() => _opening = false);
+        return;
+      }
+      claim = service.claimBonusAfterAd;
+    }
     if (!mounted) return;
 
-    if (result is _Collected) {
-      // Reveal a masked balance so the count-up is visible; the eye icon can hide it again.
-      if (ref.read(walletBalanceHiddenProvider)) {
-        ref.read(walletBalanceHiddenProvider.notifier).toggle();
-      }
-      final from = result.coinCenter;
-      if (from != null) await _flyCoin(from);
-      if (!mounted) return;
-      HapticFeedback.lightImpact();
-      // Refreshing now makes the saldo card count up to the new balance as the
-      // coin lands (and this banner collapse away).
-      invalidateWalletFromWidget(ref);
-      setState(() => _opening = false);
-      return;
+    await revealReward(
+      context,
+      ref,
+      claim: claim,
+      box: (lidLift) => _GiftBox(lidLift: lidLift),
+    );
+    if (mounted) setState(() => _opening = false);
+  }
+
+  /// Explains the deal, then plays the rewarded ad. True once it was watched
+  /// to the end; the backend still waits for AdMob's own confirmation.
+  Future<bool> _watchAd() async {
+    final ads = ref.read(rewardedAdsProvider);
+    unawaited(ads.preload());
+
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const _AdConsentDialog(),
+    );
+    final userId = ref.read(authProvider).user?.id;
+    if (agreed != true || userId == null || !mounted) return false;
+
+    await _whileLoading(ads.preload());
+    final result = await ads.show(userId: userId);
+    if (!mounted) return false;
+
+    switch (result) {
+      case RewardedResult.earned:
+        if (useTestAds) {
+          await ref.read(walletServiceProvider).recordTestAdView().catchError((Object e) {
+            debugPrint('Test ad view not recorded (set ADMOB_ALLOW_UNVERIFIED_REWARDS=true on the backend): $e');
+          });
+        }
+        return true;
+      case RewardedResult.skipped:
+        _snack('Iklan belum selesai ditonton. Tonton sampai selesai untuk mendapatkan bonus saldo.');
+      case RewardedResult.unavailable:
+        _snack('Iklan belum tersedia. Coba lagi beberapa saat lagi.');
     }
+    return false;
+  }
 
-    invalidateWalletFromWidget(ref);
-    setState(() => _opening = false);
-
-    if (result != null) {
-      final message = result is DioException && result.error is ApiException
-          ? (result.error as ApiException).message
-          : 'Gagal membuka hadiah. Coba lagi.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-      );
+  Future<T> _whileLoading<T>(Future<T> future) async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+      ),
+    );
+    try {
+      return await future;
+    } finally {
+      navigator.pop();
     }
   }
 
-  /// Flies a gold coin (plus a few trailing ones) from [from] into the balance figure.
-  Future<void> _flyCoin(Offset from) async {
-    final target = walletBalanceTargetKey.currentContext?.findRenderObject() as RenderBox?;
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
-    if (target == null || !target.attached || overlay == null) return;
-    final to = target.localToGlobal(Offset(math.min(40, target.size.width / 2), target.size.height / 2));
-
-    final controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1050));
-    final entry = OverlayEntry(
-      builder: (_) => IgnorePointer(child: _CoinFlight(animation: controller, from: from, to: to)),
+  void _snack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
-    overlay.insert(entry);
-    try {
-      await controller.forward().orCancel;
-    } on TickerCanceled {
-      // Widget went away mid-flight; nothing to finish.
-    } finally {
-      entry.remove();
-      controller.dispose();
-    }
   }
 
   @override
@@ -272,15 +336,77 @@ class _BonusGiftBannerState extends ConsumerState<BonusGiftBanner>
       );
 }
 
+/// Shown on "Klaim" while admin requires an ad: the bonus is paid for a rewarded
+/// ad watched to the end. Pops true when the user agrees to watch.
+class _AdConsentDialog extends StatelessWidget {
+  const _AdConsentDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [_giftRed, _giftRedDark]),
+              ),
+              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 38),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Tonton Iklan untuk Bonus',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Untuk mendapatkan bonus saldo, kamu perlu menonton iklan sampai selesai. '
+              'Bonus saldo langsung masuk setelah iklan selesai.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13.5, height: 1.45, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _giftRed,
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text('Tonton Iklan', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Nanti Saja'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Full-screen reveal: the box shakes while the claim is in flight, then the
 /// lid pops, the reward rises out with confetti and the amount is announced.
 /// "Asyik" flips the reward into a gold coin and pops with [_Collected] (its
 /// screen position, so the coin can fly on into the balance). Pops with the
 /// error if the claim fails.
 class _GiftDialog extends StatefulWidget {
-  const _GiftDialog({required this.claim});
+  const _GiftDialog({required this.claim, required this.box});
 
   final Future<int> Function() claim;
+  final Widget Function(double lidLift) box;
 
   @override
   State<_GiftDialog> createState() => _GiftDialogState();
@@ -291,7 +417,7 @@ class _GiftDialogState extends State<_GiftDialog> with TickerProviderStateMixin 
   late final _open = AnimationController(vsync: this, duration: const Duration(milliseconds: 1900));
   late final _rays = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
   late final _morph = AnimationController(vsync: this, duration: const Duration(milliseconds: 750));
-  late final _particles = _Particle.burst(math.Random(), 46);
+  late final _particles = ConfettiParticle.burst(math.Random(), 46);
   final _coinKey = GlobalKey();
 
   int? _amount;
@@ -343,22 +469,6 @@ class _GiftDialogState extends State<_GiftDialog> with TickerProviderStateMixin 
   Animation<double> _interval(double begin, double end, [Curve curve = Curves.easeOut]) =>
       CurvedAnimation(parent: _open, curve: Interval(begin, end, curve: curve));
 
-  /// Flips around the Y axis: the voucher's front, then the coin's face.
-  Widget _ticketOrCoin() {
-    final m = Curves.easeInOut.transform(_morph.value);
-    final coinSide = m >= 0.5;
-    final angle = coinSide ? (m - 1) * math.pi : m * math.pi;
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()
-        ..setEntry(3, 2, 0.0015)
-        ..rotateY(angle),
-      child: coinSide
-          ? const SizedBox(width: 170, child: Center(child: GoldCoin(size: 92)))
-          : _RewardTicket(amount: _amount ?? 0),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final lid = _interval(0.0, 0.32, Curves.easeOutCubic);
@@ -395,7 +505,7 @@ class _GiftDialogState extends State<_GiftDialog> with TickerProviderStateMixin 
                         Positioned.fill(
                           child: Opacity(
                             opacity: glow.value * (0.4 + 0.6 * rest),
-                            child: CustomPaint(painter: _RaysPainter(rotation: _rays.value * 2 * math.pi)),
+                            child: CustomPaint(painter: RewardRaysPainter(rotation: _rays.value * 2 * math.pi)),
                           ),
                         ),
                         // Reward rising out of the box; it settles centred on the rays
@@ -406,7 +516,10 @@ class _GiftDialogState extends State<_GiftDialog> with TickerProviderStateMixin 
                             opacity: reward.value.clamp(0.0, 1.0),
                             child: Transform.scale(
                               scale: 0.3 + reward.value * 0.7,
-                              child: KeyedSubtree(key: _coinKey, child: _ticketOrCoin()),
+                              child: KeyedSubtree(
+                                key: _coinKey,
+                                child: ticketToCoin(_morph.value, RewardTicket(amount: _amount ?? 0)),
+                              ),
                             ),
                           ),
                         ),
@@ -421,7 +534,7 @@ class _GiftDialogState extends State<_GiftDialog> with TickerProviderStateMixin 
                             child: Transform.scale(
                               scale: boxScale,
                               alignment: Alignment.bottomCenter,
-                              child: _GiftBox(lidLift: lid.value),
+                              child: widget.box(lid.value),
                             ),
                           ),
                           ),
@@ -430,7 +543,7 @@ class _GiftDialogState extends State<_GiftDialog> with TickerProviderStateMixin 
                         Positioned.fill(
                           child: IgnorePointer(
                             child: CustomPaint(
-                              painter: _ConfettiPainter(_particles, confetti.value, origin: const Offset(0.5, 0.62)),
+                              painter: ConfettiPainter(_particles, confetti.value, origin: const Offset(0.5, 0.62)),
                             ),
                           ),
                         ),
@@ -515,146 +628,6 @@ class _Congrats extends StatelessWidget {
   }
 }
 
-/// Shiny gold "Rp" coin.
-class GoldCoin extends StatelessWidget {
-  const GoldCoin({super.key, required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          center: Alignment(-0.35, -0.4),
-          colors: [Color(0xFFFEF9C3), _gold, _goldDark, Color(0xFFB45309)],
-          stops: [0.0, 0.35, 0.8, 1.0],
-        ),
-        border: Border.all(color: const Color(0xFFFBBF24), width: size * 0.05),
-        boxShadow: [
-          BoxShadow(color: _goldDark.withValues(alpha: 0.55), blurRadius: size * 0.3, spreadRadius: size * 0.02),
-        ],
-      ),
-      child: Container(
-        margin: EdgeInsets.all(size * 0.1),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFB45309).withValues(alpha: 0.45), width: size * 0.025),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          'Rp',
-          style: TextStyle(
-            fontSize: size * 0.32,
-            fontWeight: FontWeight.w900,
-            color: _brown,
-            shadows: [Shadow(color: Colors.white.withValues(alpha: 0.6), offset: Offset(0, size * 0.015))],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The collected coin arcing from the dialog into the balance, shrinking as it
-/// goes, with a few smaller coins trailing behind.
-class _CoinFlight extends StatelessWidget {
-  const _CoinFlight({required this.animation, required this.from, required this.to});
-
-  final Animation<double> animation;
-  final Offset from;
-  final Offset to;
-
-  static const _trail = 4;
-  static const _lag = 0.07;
-
-  Offset _at(double t) {
-    final control = Offset(math.max(from.dx, to.dx) + 70, (from.dy + to.dy) / 2 - 30);
-    final u = 1 - t;
-    return from * (u * u) + control * (2 * u * t) + to * (t * t);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (_, _) {
-        final coins = <Widget>[];
-        // Trailing coins first so the main one is drawn on top.
-        for (var i = _trail; i >= 0; i--) {
-          final span = 1 - _trail * _lag;
-          final raw = ((animation.value - i * _lag) / span).clamp(0.0, 1.0);
-          if (i > 0 && (raw <= 0 || raw >= 1)) continue;
-          final t = Curves.easeInOutCubic.transform(raw);
-          final size = i == 0 ? 92 + (24 - 92) * t : 34 + (16 - 34) * t;
-          final p = _at(t);
-          coins.add(Positioned(
-            left: p.dx - size / 2,
-            top: p.dy - size / 2,
-            child: Opacity(
-              opacity: i == 0 ? (raw > 0.92 ? (1 - raw) / 0.08 : 1.0) : 0.75,
-              child: GoldCoin(size: size),
-            ),
-          ));
-        }
-        return Stack(children: coins);
-      },
-    );
-  }
-}
-
-/// Gold voucher that flies out of the box.
-class _RewardTicket extends StatelessWidget {
-  const _RewardTicket({required this.amount});
-
-  final int amount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 170,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFEF08A), _goldDark],
-        ),
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: [
-          BoxShadow(color: _goldDark.withValues(alpha: 0.6), blurRadius: 24, spreadRadius: 2),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.account_balance_wallet_rounded, size: 15, color: _brown),
-              SizedBox(width: 5),
-              Text(
-                'SALDO BELANJA',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: _brown, letterSpacing: 0.8),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          FittedBox(
-            child: Text(
-              formatCurrency(amount.toDouble()),
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: _brown),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// A red gift box with a gold ribbon. [lidLift] 0..1 pops the lid off.
 /// [scale] shrinks it for the banner (base size is 140 wide).
@@ -755,101 +728,3 @@ class _GiftBox extends StatelessWidget {
       );
 }
 
-class _RaysPainter extends CustomPainter {
-  _RaysPainter({required this.rotation});
-
-  final double rotation;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height * 0.42);
-    final radius = size.width * 0.75;
-
-    canvas.drawCircle(
-      center,
-      radius * 0.45,
-      Paint()
-        ..shader = RadialGradient(colors: [_gold.withValues(alpha: 0.55), _gold.withValues(alpha: 0)])
-            .createShader(Rect.fromCircle(center: center, radius: radius * 0.45)),
-    );
-
-    final paint = Paint()
-      ..shader = RadialGradient(colors: [_gold.withValues(alpha: 0.35), _gold.withValues(alpha: 0)])
-          .createShader(Rect.fromCircle(center: center, radius: radius));
-    const count = 12;
-    for (var i = 0; i < count; i++) {
-      final a = rotation + i * 2 * math.pi / count;
-      final path = Path()
-        ..moveTo(center.dx, center.dy)
-        ..lineTo(center.dx + radius * math.cos(a - 0.11), center.dy + radius * math.sin(a - 0.11))
-        ..lineTo(center.dx + radius * math.cos(a + 0.11), center.dy + radius * math.sin(a + 0.11))
-        ..close();
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RaysPainter oldDelegate) => oldDelegate.rotation != rotation;
-}
-
-class _Particle {
-  _Particle(this.angle, this.speed, this.size, this.color, this.spin, this.round);
-
-  static const _colors = [_gold, Color(0xFFF472B6), Color(0xFF38BDF8), Color(0xFF4ADE80), Colors.white, _giftRed];
-
-  /// Upward fan of pieces.
-  static List<_Particle> burst(math.Random random, int count) => List.generate(count, (_) {
-        return _Particle(
-          -math.pi / 2 + (random.nextDouble() - 0.5) * 2.2,
-          180 + random.nextDouble() * 220,
-          4 + random.nextDouble() * 5,
-          _colors[random.nextInt(_colors.length)],
-          (random.nextDouble() - 0.5) * 14,
-          random.nextBool(),
-        );
-      });
-
-  final double angle;
-  final double speed;
-  final double size;
-  final Color color;
-  final double spin;
-  final bool round;
-}
-
-class _ConfettiPainter extends CustomPainter {
-  _ConfettiPainter(this.particles, this.progress, {required this.origin});
-
-  final List<_Particle> particles;
-  final double progress;
-
-  /// Fractional position of the burst inside the canvas.
-  final Offset origin;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (progress <= 0 || progress >= 1) return;
-    final start = Offset(size.width * origin.dx, size.height * origin.dy);
-    final t = progress * 1.6; // seconds of flight
-    const gravity = 420.0;
-    final paint = Paint();
-
-    for (final p in particles) {
-      final x = start.dx + math.cos(p.angle) * p.speed * t;
-      final y = start.dy + math.sin(p.angle) * p.speed * t + 0.5 * gravity * t * t;
-      paint.color = p.color.withValues(alpha: (1 - progress).clamp(0.0, 1.0));
-      canvas.save();
-      canvas.translate(x, y);
-      canvas.rotate(p.spin * t);
-      if (p.round) {
-        canvas.drawCircle(Offset.zero, p.size / 2, paint);
-      } else {
-        canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 1.8), paint);
-      }
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ConfettiPainter oldDelegate) => oldDelegate.progress != progress;
-}

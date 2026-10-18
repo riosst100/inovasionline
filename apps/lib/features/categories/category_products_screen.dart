@@ -6,6 +6,8 @@ import '../../models/product.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/product_grid.dart';
 import '../../widgets/skeleton.dart';
+import '../ads/ad_banner.dart';
+import '../ads/admob.dart';
 import '../cart/cart_providers.dart';
 
 class CategoryProductsScreen extends ConsumerStatefulWidget {
@@ -93,6 +95,7 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
           ),
         ],
       ),
+      bottomNavigationBar: const AdBanner(placement: AdPlacement.productList),
       body: _loading
           ? const ProductGridSkeleton()
           : RefreshIndicator(

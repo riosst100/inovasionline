@@ -59,6 +59,12 @@ return [
         'max_balance' => (int) env('WALLET_MAX_BALANCE', 2000000),
     ],
 
+    'admob' => [
+        // Lets debug builds (Google's sample ad units, which never send SSV
+        // callbacks) claim rewards themselves. Ignored in production.
+        'allow_unverified_rewards' => (bool) env('ADMOB_ALLOW_UNVERIFIED_REWARDS', false),
+    ],
+
     'support' => [
         // Link opened by the "Hubungi Admin" button on the blocked-account screen.
         'contact_url' => env('SUPPORT_CONTACT_URL'),

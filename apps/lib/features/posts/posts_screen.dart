@@ -9,6 +9,8 @@ import '../../core/utils/formatters.dart';
 import '../../models/post.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/skeleton.dart';
+import '../ads/admob.dart';
+import '../ads/native_feed_ad.dart';
 import 'create_post_screen.dart';
 import 'post_comments_sheet.dart';
 import 'post_providers.dart';
@@ -155,7 +157,12 @@ class _PostsScreenState extends ConsumerState<PostsScreen> {
                       child: Center(child: CircularProgressIndicator()),
                     );
                   }
-                  return _PostCard(post: feedState.posts[postIndex]);
+                  final post = _PostCard(post: feedState.posts[postIndex]);
+                  final adEvery = ref.watch(admobProvider).value?.postsNativeEvery ?? 0;
+                  if (adEvery <= 0 || (postIndex + 1) % adEvery != 0) return post;
+                  return Column(
+                    children: [post, const Divider(height: 1), const NativeFeedAd()],
+                  );
                 },
               ),
       ),

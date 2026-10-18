@@ -61,6 +61,7 @@ dependencies:
   android_intent_plus: ^5.2.0
   geolocator: ^14.1.1
   location: ^10.0.2
+  google_mobile_ads: ^9.1.0
 
 dev_dependencies:
   flutter_test:

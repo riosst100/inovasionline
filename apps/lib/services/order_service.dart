@@ -20,4 +20,16 @@ class OrderService {
     final response = await _apiClient.dio.post('/orders/$orderId/cancel');
     return Order.fromJson(response.data['data'] as Map<String, dynamic>);
   }
+
+  /// Pauses the cancel countdown while the buyer reads the confirmation.
+  Future<Order> holdCancel(String orderId) async {
+    final response = await _apiClient.dio.post('/orders/$orderId/cancel-hold');
+    return Order.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  /// The buyer backed out: the order carries on and can no longer be cancelled.
+  Future<Order> declineCancel(String orderId) async {
+    final response = await _apiClient.dio.post('/orders/$orderId/cancel-decline');
+    return Order.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
 }

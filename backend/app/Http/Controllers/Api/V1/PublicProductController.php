@@ -92,6 +92,10 @@ class PublicProductController extends Controller
             throw new NotFoundHttpException;
         }
 
+        // Feeds "most viewed" on the admin dashboard; bypasses Eloquent so
+        // updated_at is left alone.
+        $product->newQuery()->toBase()->where('id', $product->id)->increment('view_count');
+
         $product->load([
             'images',
             'category',

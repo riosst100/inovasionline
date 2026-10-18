@@ -95,7 +95,7 @@ class WalletService
             return 0;
         }
 
-        return (int) collect($setting->usableTiers())->max('to');
+        return $setting->maxAmount();
     }
 
     public function bonusAvailable(User $user): bool
@@ -107,29 +107,15 @@ class WalletService
     public function rollBonusAmount(): int
     {
         $setting = WalletBonusSetting::current();
-        $tiers = $setting->usableTiers();
-        $total = array_sum(array_column($tiers, 'weight'));
-        if (! $setting->is_active || $total <= 0) {
-            return 0;
-        }
 
-        $roll = random_int(1, $total);
-        foreach ($tiers as $tier) {
-            $roll -= $tier['weight'];
-            if ($roll <= 0) {
-                break;
-            }
-        }
-
-        // A multiple of the step inside the tier (falling back to its lower bound if none fits).
-        $step = max(1, (int) $setting->step);
-        $first = (int) ceil($tier['from'] / $step);
-        $last = (int) floor($tier['to'] / $step);
-
-        return $first <= $last ? random_int($first, $last) * $step : $tier['from'];
+        return $setting->is_active ? $setting->rollAmount() : 0;
     }
 
-    /** Credits the one-time bonus. Returns null when it is disabled or already claimed. */
+    /**
+     * Credits the one-time bonus. Returns null when it is disabled or already claimed.
+     *
+     * @throws AdViewRequiredException when admin requires a watched ad and none is verified yet
+     */
     public function claimBonus(User $user): ?WalletTransaction
     {
         $amount = $this->rollBonusAmount();
@@ -143,10 +129,21 @@ class WalletService
                 return null;
             }
 
+            $ads = app(AdRewardService::class);
+            if ($ads->bonusRequiresAd()) {
+                $ads->consumeView($locked);
+            }
+
             $locked->forceFill(['wallet_bonus_claimed_at' => now()])->save();
 
             return $this->apply($user->id, WalletTransaction::TYPE_BONUS, $amount, 'Bonus saldo belanja', []);
         });
+    }
+
+    /** Pays an opened reward chest (see AdChestService). */
+    public function creditAdChest(User $user, int $amount): WalletTransaction
+    {
+        return $this->apply($user->id, WalletTransaction::TYPE_AD_CHEST, $amount, 'Hadiah peti iklan', []);
     }
 
     public function maxBalance(): float

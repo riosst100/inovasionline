@@ -20,6 +20,15 @@ final walletTransactionsProvider =
       return ref.watch(walletServiceProvider).transactions();
     });
 
+/// The home reward chest; null while signed out or while admin has it off.
+final adChestProvider = FutureProvider<AdChestStatus?>((ref) async {
+  final authenticated = ref.watch(
+    authProvider.select((s) => s.status == AuthStatus.authenticated),
+  );
+  if (!authenticated) return null;
+  return ref.watch(walletServiceProvider).chestStatus();
+});
+
 /// Refreshes every balance view at once.
 void invalidateWallet(Ref ref) {
   ref.invalidate(walletProvider);
@@ -52,3 +61,7 @@ class WalletBalanceHiddenNotifier extends StateNotifier<bool> {
     _storage.write(key: _key, value: state ? '1' : '0').catchError((_) {});
   }
 }
+
+/// While set, the home saldo card shows this instead of the live balance, so a
+/// top-up's coin can land before the figure counts up to the new amount.
+final walletBalanceHoldProvider = StateProvider<double?>((ref) => null);

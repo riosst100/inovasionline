@@ -55,6 +55,32 @@ class OrderCancelNotifier extends StateNotifier<OrderCancelState> {
       return false;
     }
   }
+
+  /// Freezes the cancel countdown before showing the confirmation; false when the window already closed.
+  Future<bool> hold(String orderId) async {
+    state = const OrderCancelState(cancelling: true);
+    try {
+      await _ref.read(orderServiceProvider).holdCancel(orderId);
+      _ref.invalidate(orderDetailProvider(orderId)); // the screen behind the dialog shows the frozen countdown
+      state = const OrderCancelState();
+      return true;
+    } catch (e) {
+      _ref.invalidate(orderDetailProvider(orderId)); // refresh, so the stale button goes away
+      state = OrderCancelState(error: _errorMessage(e, 'Gagal membatalkan pesanan.'));
+      return false;
+    }
+  }
+
+  /// Buyer backed out: the order carries on and the cancel button goes away for good.
+  Future<void> decline(String orderId) async {
+    try {
+      await _ref.read(orderServiceProvider).declineCancel(orderId);
+    } catch (_) {
+      // An unreleased hold expires on the server and counts as declining anyway.
+    }
+    _ref.invalidate(orderDetailProvider(orderId));
+    _ref.invalidate(myOrdersProvider);
+  }
 }
 
 final orderCancelProvider =

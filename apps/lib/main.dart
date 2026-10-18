@@ -7,16 +7,20 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'config/env.dart';
 import 'config/router.dart';
 import 'config/theme.dart';
 import 'features/shell/blocked_account_gate.dart';
 import 'features/shell/permission_gate.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
+import 'providers/core_providers.dart';
+import 'services/app_presence.dart';
 import 'services/push_notification_handler.dart';
 
 Future<void> bootstrap({required String envFile, required bool isDev}) async {
   WidgetsFlutterBinding.ensureInitialized();
+  Env.isDev = isDev;
   // Independent of each other, so run side by side: the native splash stays
   // up until all of this is done.
   await Future.wait([
@@ -33,6 +37,9 @@ Future<void> bootstrap({required String envFile, required bool isDev}) async {
   // Starts restoring the session (currentUser API call) right away, so it
   // runs during the splash and intro instead of after them.
   container.read(authProvider);
+
+  // Install / online / checkout counts for the admin dashboard.
+  unawaited(AppPresence(container.read(apiClientProvider), router).start());
 
   // Firebase + push are not needed for the first frames, so they are set up
   // behind the intro; whatever uses FirebaseMessaging awaits firebaseReady.

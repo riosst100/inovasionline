@@ -17,8 +17,13 @@ import '../../providers/delivery_address_provider.dart';
 import '../../widgets/banner_carousel.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/skeleton.dart';
+import '../ads/ad_banner.dart';
+import '../ads/admob.dart';
 import '../cart/cart_providers.dart';
+import '../orders/order_providers.dart';
+import '../wallet/reward_effects.dart';
 import '../wallet/wallet_providers.dart';
+import 'ad_chest.dart';
 import 'bonus_gift.dart';
 import 'delivery_address_sheet.dart';
 import 'home_providers.dart';
@@ -119,6 +124,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final popularProducts = ref.watch(popularProductsProvider);
     final cartState = ref.watch(cartProvider);
     final cartItemCount = cartState.cart?.itemCount ?? 0;
+    final hasActiveOrder = (ref.watch(activeOrdersProvider).valueOrNull ?? const []).isNotEmpty;
 
     final topPadding = MediaQuery.of(context).padding.top;
     final headerOpacity = ((_offset - (_locationHeight - 20)) / 40).clamp(0.0, 1.0);
@@ -148,12 +154,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   silent(ref.refresh(bestSellersProvider.future)),
                   silent(ref.refresh(popularProductsProvider.future)),
                   silent(ref.refresh(walletProvider.future).then((_) {})),
+                  silent(ref.refresh(adChestProvider.future).then((_) {})),
                 ]);
               },
               child: ListView(
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
-                padding: const EdgeInsets.only(bottom: 90),
+                // Room for the floating active-order card only while it shows.
+                padding: EdgeInsets.only(bottom: hasActiveOrder ? 90 : 16),
                 children: [
                   // Top Header Backdrop (Brand green gradient + Petal pattern)
                   _HomeTopBackdrop(
@@ -184,6 +192,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                   // Hadiah saldo belanja (one-time bonus), then Saldo E-Wallet
                   const BonusGiftBanner(),
+                  // Promo: gratis ongkir untuk pembayaran pakai saldo belanja
+                  const _WalletFreeShippingPromo(),
+                  const SizedBox(height: 8),
                   const _WalletSection(),
 
                   const SizedBox(height: 8),
@@ -219,7 +230,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     error: (_, _) => const SizedBox.shrink(),
                   ),
 
-                  const SizedBox(height: 28),
+                  // Keeps the usual 28px gap when there is no ad.
+                  const AdBanner(
+                    placement: AdPlacement.home,
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    emptyHeight: 28,
+                  ),
 
                   // 7. Inspirasi Untukmu / Curated Product Feed with Tabs
                   _InspirasiUntukmuSection(
@@ -228,6 +244,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bestSellers: bestSellers.value ?? [],
                     popularProducts: popularProducts.value ?? [],
                     flashSaleProducts: flashSale.value?.slots.expand((s) => s.products).toList() ?? [],
+                  ),
+
+                  const AdBanner(
+                    placement: AdPlacement.homeBottom,
+                    padding: EdgeInsets.only(top: 16),
                   ),
                 ],
               ),
@@ -925,17 +946,17 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: _gradient.last.withValues(alpha: 0.28),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+              color: _gradient.last.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           child: Material(
             color: Colors.transparent,
             child: Ink(
@@ -949,13 +970,15 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
               child: Stack(
                 children: [
                   // Decorative bubbles
-                  Positioned(right: -30, top: -40, child: _bubble(120, 0.10)),
-                  Positioned(right: 70, bottom: -46, child: _bubble(90, 0.08)),
-                  Positioned(left: -20, bottom: -30, child: _bubble(60, 0.06)),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
-                    child: authenticated ? _signedIn(wallet) : _signedOut(),
-                  ),
+                  Positioned(right: -30, top: -50, child: _bubble(110, 0.10)),
+                  Positioned(right: 80, bottom: -50, child: _bubble(80, 0.07)),
+                  Positioned(left: -20, bottom: -34, child: _bubble(56, 0.06)),
+                  authenticated
+                      ? _signedIn(wallet)
+                      : Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                          child: _signedOut(),
+                        ),
                 ],
               ),
             ),
@@ -977,14 +1000,14 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
       );
 
   static Widget _iconBadge(IconData icon) => Container(
-        width: 44,
-        height: 44,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white.withValues(alpha: 0.2),
           border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
         ),
-        child: Icon(icon, color: Colors.white, size: 22),
+        child: Icon(icon, color: Colors.white, size: 18),
       );
 
   Widget _signedIn(AsyncValue<WalletSummary?> wallet) {
@@ -993,53 +1016,58 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
     final Widget balance;
     if (wallet.isLoading && !wallet.hasValue) {
       balance = Container(
-        width: 110,
-        height: 20,
+        width: 100,
+        height: 18,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.25),
           borderRadius: BorderRadius.circular(6),
         ),
       );
     } else {
-      balance = _CountUpBalance(amount: summary?.balance, hidden: hidden);
+      balance = _CountUpBalance(
+        amount: ref.watch(walletBalanceHoldProvider) ?? summary?.balance,
+        hidden: hidden,
+      );
     }
 
     final balanceRow = Row(
       children: [
-        _iconBadge(Icons.account_balance_wallet_rounded),
-        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Saldo Belanja',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.85),
+              // Label with the mask toggle beside it, so the figure gets the full width.
+              InkWell(
+                onTap: () => ref.read(walletBalanceHiddenProvider.notifier).toggle(),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.account_balance_wallet_rounded, size: 13, color: Colors.white.withValues(alpha: 0.85)),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Saldo Belanja',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        hidden ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 3),
-              Row(
-                children: [
-                  Flexible(child: KeyedSubtree(key: walletBalanceTargetKey, child: balance)),
-                  const SizedBox(width: 4),
-                  InkResponse(
-                    onTap: () => ref.read(walletBalanceHiddenProvider.notifier).toggle(),
-                    radius: 18,
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        hidden ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        size: 17,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              const SizedBox(height: 2),
+              KeyedSubtree(key: walletBalanceTargetKey, child: balance),
             ],
           ),
         ),
@@ -1047,9 +1075,10 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
         _WalletAction(
           icon: Icons.add_rounded,
           label: 'Top Up',
+          primary: true,
           onTap: () => context.push('/wallet/topup'),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
         _WalletAction(
           icon: Icons.receipt_long_rounded,
           label: 'Riwayat',
@@ -1058,7 +1087,33 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
       ],
     );
 
-    return balanceRow;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          balanceRow,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 11, color: Colors.white.withValues(alpha: 0.7)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Saldo tidak dapat dicairkan atau ditransfer ke rekening bank',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 9.5, color: Colors.white.withValues(alpha: 0.7)),
+                ),
+              ),
+            ],
+          ),
+          // Its own row, last: a game, not a money action like Top Up / Riwayat.
+          const AdChestWalletStrip(),
+        ],
+      ),
+    );
   }
 
   Widget _signedOut() {
@@ -1172,7 +1227,7 @@ class _CountUpBalanceState extends State<_CountUpBalance> with SingleTickerProvi
               shown == null ? '—' : (widget.hidden ? 'Rp ••••••' : formatCurrency(shown.roundToDouble())),
               maxLines: 1,
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 21,
                 fontWeight: FontWeight.w800,
                 color: Color.lerp(Colors.white, const Color(0xFFFDE047), pulse),
                 letterSpacing: -0.3,
@@ -1189,11 +1244,14 @@ class _CountUpBalanceState extends State<_CountUpBalance> with SingleTickerProvi
 }
 
 class _WalletAction extends StatelessWidget {
-  const _WalletAction({required this.icon, required this.label, required this.onTap});
+  const _WalletAction({required this.icon, required this.label, required this.onTap, this.primary = false});
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
+  /// Solid white (Top Up); the rest stay translucent.
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
@@ -1201,7 +1259,7 @@ class _WalletAction extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1209,16 +1267,19 @@ class _WalletAction extends StatelessWidget {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                color: primary ? Colors.white : Colors.white.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+                border: primary ? null : Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                boxShadow: primary
+                    ? [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 6, offset: const Offset(0, 2))]
+                    : null,
               ),
-              child: Icon(icon, size: 19, color: Colors.white),
+              child: Icon(icon, size: 19, color: primary ? const Color(0xFF0284C7) : Colors.white),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+              style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Colors.white),
             ),
           ],
         ),
@@ -1374,6 +1435,50 @@ class _PromoGercepSectionState extends State<_PromoGercepSection> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ==========================================
+// PROMO GRATIS ONGKIR (Bayar pakai Saldo Belanja)
+// ==========================================
+class _WalletFreeShippingPromo extends StatelessWidget {
+  const _WalletFreeShippingPromo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFBBF7D0)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.local_shipping_rounded, color: Color(0xFF16A34A), size: 13),
+            SizedBox(width: 6),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Gratis Ongkir ',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
+                    ),
+                    TextSpan(text: 'untuk pembayaran pakai Saldo Belanja'),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, color: Color(0xFF334155)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
