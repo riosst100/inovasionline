@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\Enums\OrderStatus;
 use App\Support\Enums\PaymentStatus;
+use App\Support\Enums\ShippingMethodType;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -119,17 +120,27 @@ class Order extends Model
      */
     private const TRANSITIONS = [
         // pending -> processing happens automatically once an online payment settles.
-        'pending' => ['accepted', 'processing', 'cancelled'],
-        'accepted' => ['processing', 'cancelled'],
+        'pending' => ['processing', 'cancelled'],
         'processing' => ['ready', 'cancelled'],
-        'ready' => ['completed'],
+        'ready' => ['on_delivery'],
+        'on_delivery' => ['completed'],
         'completed' => [],
         'cancelled' => [],
     ];
 
     public function canTransitionTo(OrderStatus $next): bool
     {
+        // Store pickup has no courier leg: the buyer collects it, so ready goes straight to completed.
+        if ($this->status === OrderStatus::READY && $this->isStorePickup()) {
+            return $next === OrderStatus::COMPLETED;
+        }
+
         return in_array($next->value, self::TRANSITIONS[$this->status->value] ?? [], true);
+    }
+
+    public function isStorePickup(): bool
+    {
+        return $this->delivery_method === ShippingMethodType::STORE_PICKUP->value;
     }
 
     /**

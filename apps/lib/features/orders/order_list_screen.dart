@@ -126,10 +126,10 @@ class _StatusBadge extends StatelessWidget {
   final String status;
 
   static const _labels = {
-    'pending': 'Menunggu',
-    'accepted': 'Diterima',
+    'pending': 'Menunggu Pembayaran',
     'processing': 'Disiapkan',
     'ready': 'Siap',
+    'on_delivery': 'Diantar',
     'completed': 'Selesai',
     'cancelled': 'Dibatalkan',
   };

@@ -10,7 +10,7 @@ class OrderService {
   Future<PaginatedResult<Order>> list({int page = 1, OrderStatus? status, String search = ''}) async {
     final res = await _api.dio.get(
       '/admin/orders',
-      queryParameters: {'page': page, 'per_page': 20, 'status': ?status?.name, if (search.isNotEmpty) 'search': search},
+      queryParameters: {'page': page, 'per_page': 20, 'status': ?status?.value, if (search.isNotEmpty) 'search': search},
     );
     return PaginatedResult.fromEnvelope(res.data as Map<String, dynamic>, Order.fromJson);
   }
@@ -30,7 +30,7 @@ class OrderService {
   Future<Order> updateStatus(String id, OrderStatus status, {String? adminNotes}) async {
     final res = await _api.dio.patch(
       '/admin/orders/$id/status',
-      data: {'status': status.name, 'admin_notes': ?adminNotes},
+      data: {'status': status.value, 'admin_notes': ?adminNotes},
     );
     return Order.fromJson(res.data['data'] as Map<String, dynamic>);
   }

@@ -17,11 +17,11 @@ class OrderDetailScreen extends ConsumerWidget {
   /// For status history entries; the current status uses [Order.statusLabel].
   static const _statusLabels = {
     'pending': 'Pesanan dibuat',
-    'accepted': 'Diterima',
     'processing': 'Pesanan sedang disiapkan',
-    'ready': 'Siap Dikirim/Diambil',
-    'completed': 'Selesai',
-    'cancelled': 'Dibatalkan',
+    'ready': 'Pesanan sudah disiapkan',
+    'on_delivery': 'Pesanan sedang diantar',
+    'completed': 'Pesanan Selesai',
+    'cancelled': 'Pesanan dibatalkan',
   };
 
   Future<void> _confirmCancel(BuildContext context, WidgetRef ref, Order order) async {

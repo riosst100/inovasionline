@@ -6,9 +6,9 @@ import '../../widgets/common.dart';
 
 Color orderStatusColor(OrderStatus status) => switch (status) {
   OrderStatus.pending => AppColors.warning,
-  OrderStatus.accepted => AppColors.info,
   OrderStatus.processing => AppColors.accent,
   OrderStatus.ready => AppColors.primary,
+  OrderStatus.onDelivery => AppColors.info,
   OrderStatus.completed => AppColors.success,
   OrderStatus.cancelled => AppColors.destructive,
 };

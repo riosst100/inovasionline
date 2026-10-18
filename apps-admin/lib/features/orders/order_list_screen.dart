@@ -158,7 +158,7 @@ class _StatusTabBar extends StatelessWidget {
                   Text(status?.label ?? 'Semua'),
                   const SizedBox(width: 6),
                   _CountPill(
-                    count: counts?[status?.name ?? 'all'],
+                    count: counts?[status?.value ?? 'all'],
                     color: status == null ? AppColors.primary : orderStatusColor(status),
                     selected: controller.index == index,
                   ),

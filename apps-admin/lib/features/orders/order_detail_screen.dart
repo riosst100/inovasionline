@@ -84,7 +84,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                     )
                   : const Center(child: CircularProgressIndicator()))
             : RefreshIndicator(onRefresh: _load, child: _body(order)),
-        bottomNavigationBar: order == null || order.status.next.isEmpty ? null : _actions(order),
+        bottomNavigationBar: order == null || order.nextStatuses.isEmpty ? null : _actions(order),
       ),
     );
   }
@@ -228,8 +228,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   }
 
   Widget _actions(Order order) {
-    final forward = order.status.next.where((s) => s != OrderStatus.cancelled).toList();
-    final canCancel = order.status.next.contains(OrderStatus.cancelled);
+    final forward = order.nextStatuses.where((s) => s != OrderStatus.cancelled).toList();
+    final canCancel = order.nextStatuses.contains(OrderStatus.cancelled);
 
     return SafeArea(
       child: Container(

@@ -2,32 +2,35 @@ import '../core/utils/formatters.dart';
 
 /// Mirrors App\Support\Enums\OrderStatus; [next] mirrors Order::TRANSITIONS.
 enum OrderStatus {
-  pending('Menunggu'),
-  accepted('Diterima'),
-  processing('Disiapkan'),
-  ready('Siap Kirim/Ambil'),
-  completed('Selesai'),
-  cancelled('Dibatalkan');
+  pending('pending', 'Belum Bayar'),
+  processing('processing', 'Perlu Diproses'),
+  ready('ready', 'Perlu Dikirim'),
+  onDelivery('on_delivery', 'Sedang Dikirim'),
+  completed('completed', 'Selesai'),
+  cancelled('cancelled', 'Dibatalkan');
 
-  const OrderStatus(this.label);
+  const OrderStatus(this.value, this.label);
 
+  /// Wire value sent to and received from the API.
+  final String value;
   final String label;
 
-  static OrderStatus parse(String? value) => values.firstWhere((s) => s.name == value, orElse: () => pending);
+  static OrderStatus parse(String? value) => values.firstWhere((s) => s.value == value, orElse: () => pending);
 
-  List<OrderStatus> get next => switch (this) {
-    pending => [accepted, processing, cancelled],
-    accepted => [processing, cancelled],
+  /// Store pickup has no courier leg, so a ready pickup order is completed directly.
+  List<OrderStatus> next({bool storePickup = false}) => switch (this) {
+    pending => [processing, cancelled],
     processing => [ready, cancelled],
-    ready => [completed],
+    ready => storePickup ? [completed] : [onDelivery],
+    onDelivery => [completed],
     completed || cancelled => const [],
   };
 
   /// Verb shown on the button that moves an order into this status.
   String get actionLabel => switch (this) {
-    accepted => 'Terima Pesanan',
     processing => 'Mulai Siapkan',
     ready => 'Tandai Siap',
+    onDelivery => 'Antar Pesanan',
     completed => 'Selesaikan',
     cancelled => 'Batalkan',
     pending => label,
@@ -167,6 +170,8 @@ class Order {
   final List<StatusHistoryEntry> history;
   final DateTime? paidAt;
   final DateTime createdAt;
+
+  List<OrderStatus> get nextStatuses => status.next(storePickup: deliveryMethod == 'store_pickup');
 
   String get paymentStatusLabel => switch (paymentStatus) {
     'paid' => 'Lunas',

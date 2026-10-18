@@ -26,6 +26,14 @@ class AdminOrderStatusTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'ready');
 
+        $this->patchJson("/api/admin/orders/{$order->id}/status", ['status' => 'completed'])->assertStatus(422);
+
+        $this->patchJson("/api/admin/orders/{$order->id}/status", ['status' => 'on_delivery'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'on_delivery');
+
+        $this->patchJson("/api/admin/orders/{$order->id}/status", ['status' => 'cancelled'])->assertStatus(422);
+
         $this->patchJson("/api/admin/orders/{$order->id}/status", ['status' => 'completed', 'admin_notes' => 'Diterima tetangga'])
             ->assertOk()
             ->assertJsonPath('data.status', 'completed')
@@ -33,8 +41,20 @@ class AdminOrderStatusTest extends TestCase
 
         $order->refresh();
         $this->assertNotNull($order->completed_at);
-        $this->assertSame(['processing', 'ready', 'completed'], array_column($order->status_history, 'status'));
+        $this->assertSame(['processing', 'ready', 'on_delivery', 'completed'], array_column($order->status_history, 'status'));
         $this->assertSame('admin:'.$admin->id, last($order->status_history)['by']);
+    }
+
+    public function test_store_pickup_order_skips_delivery(): void
+    {
+        Sanctum::actingAs($this->admin(), ['admin']);
+        $order = $this->order(User::factory()->create(), OrderStatus::READY, PaymentStatus::PAID);
+        $order->update(['delivery_method' => 'store_pickup']);
+
+        $this->patchJson("/api/admin/orders/{$order->id}/status", ['status' => 'on_delivery'])->assertStatus(422);
+        $this->patchJson("/api/admin/orders/{$order->id}/status", ['status' => 'completed'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'completed');
     }
 
     public function test_invalid_transition_is_refused(): void

@@ -54,7 +54,7 @@ class DashboardStats {
 
     return DashboardStats(
       activeOrders: _int(orders['active']),
-      ordersByStatus: {for (final s in OrderStatus.values) s: _int(byStatus[s.name])},
+      ordersByStatus: {for (final s in OrderStatus.values) s: _int(byStatus[s.value])},
       ordersToday: _int(orders['today']),
       revenueToday: parseNum(orders['revenue_today']),
       usersOnline: _int(users['online']),

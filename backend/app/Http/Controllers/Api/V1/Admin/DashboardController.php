@@ -19,9 +19,9 @@ class DashboardController extends Controller
 {
     private const ACTIVE_ORDER_STATUSES = [
         OrderStatus::PENDING,
-        OrderStatus::ACCEPTED,
         OrderStatus::PROCESSING,
         OrderStatus::READY,
+        OrderStatus::ON_DELIVERY,
     ];
 
     private const TOP_LIMIT = 5;

@@ -475,14 +475,22 @@ export default function DriversPage() {
                             <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                               order.status === 'completed'
                                 ? 'bg-emerald-100 text-emerald-800'
-                                : order.status === 'processing'
+                                : order.status === 'on_delivery'
                                 ? 'bg-amber-100 text-amber-800'
                                 : 'bg-blue-100 text-blue-800'
                             }`}>
                               {order.status === 'completed'
-                                ? 'Selesai Diantar'
+                                ? 'Selesai'
+                                : order.status === 'on_delivery'
+                                ? 'Sedang Dikirim'
                                 : order.status === 'processing'
-                                ? 'Sedang Diantar'
+                                ? 'Perlu Diproses'
+                                : order.status === 'ready'
+                                ? 'Perlu Dikirim'
+                                : order.status === 'cancelled'
+                                ? 'Dibatalkan'
+                                : order.status === 'pending'
+                                ? 'Belum Bayar'
                                 : order.status}
                             </span>
                             <span className="font-bold text-xs text-slate-900">

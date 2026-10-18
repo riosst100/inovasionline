@@ -34,20 +34,27 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
         builder: (context, state, shell) => MainShell(navigationShell: shell),
+        navigatorContainerBuilder: (context, shell, children) =>
+            BranchPager(navigationShell: shell, children: children),
         // Order must match the destinations in MainShell.
         branches: [
           StatefulShellBranch(
             routes: [GoRoute(path: '/dashboard', builder: (_, _) => const DashboardScreen())],
           ),
           StatefulShellBranch(
+            // Built up front so it is already loaded when swiped in from the dashboard.
+            preload: true,
             routes: [GoRoute(path: '/orders', builder: (_, _) => const OrderListScreen())],
           ),
           StatefulShellBranch(
+            // Produk and Kategori are swiped between, so both are built up front (see orders).
+            preload: true,
             routes: [GoRoute(path: '/products', builder: (_, _) => const ProductListScreen())],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [GoRoute(path: '/categories', builder: (_, _) => const CategoryListScreen())],
           ),
           StatefulShellBranch(

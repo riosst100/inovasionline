@@ -21,9 +21,9 @@ use RuntimeException;
 class OrderController extends Controller
 {
     private const STATUS_MESSAGES = [
-        'accepted' => 'Pesanan Anda telah diterima penjual.',
         'processing' => 'Pesanan Anda sedang disiapkan.',
-        'ready' => 'Pesanan Anda siap dikirim/diambil.',
+        'ready' => 'Pesanan Anda sudah disiapkan.',
+        'on_delivery' => 'Pesanan Anda sedang diantar ke alamat kamu.',
         'completed' => 'Pesanan Anda telah selesai. Terima kasih!',
         'cancelled' => 'Pesanan Anda dibatalkan oleh penjual.',
     ];
@@ -122,7 +122,6 @@ class OrderController extends Controller
                     ['status' => $next->value, 'at' => now()->toIso8601String(), 'by' => $by],
                 ],
                 ...match ($next) {
-                    OrderStatus::ACCEPTED => ['accepted_at' => now()],
                     OrderStatus::COMPLETED => ['completed_at' => now()],
                     default => [],
                 },

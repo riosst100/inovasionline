@@ -171,21 +171,25 @@ class Order {
 
   bool get isPending => status == 'pending';
 
+  bool get isStorePickup => deliveryMethod == 'store_pickup';
+
   /// New orders start as processing; only unpaid online payments sit in pending.
   String get statusLabel => switch (status) {
-        'pending' => needsOnlinePayment ? 'Menunggu Pembayaran' : 'Menunggu Konfirmasi',
-        'accepted' => 'Pesanan Diterima',
+        'pending' => 'Menunggu Pembayaran',
         'processing' => cancelOnHold ? 'Ditahan, menunggu konfirmasi batal' : 'Pesanan sedang disiapkan',
-        'ready' => 'Siap Dikirim/Diambil',
-        'completed' => 'Selesai',
-        'cancelled' => 'Dibatalkan',
+        'ready' => isStorePickup
+            ? 'Pesanan sudah disiapkan. Silakan ambil di toko'
+            : 'Pesanan sudah disiapkan. Menunggu diantar kurir',
+        'on_delivery' => 'Pesanan sedang diantar ke alamat kamu',
+        'completed' => 'Pesanan Selesai',
+        'cancelled' => 'Pesanan dibatalkan',
         _ => status,
       };
 
   /// Before preparation the buyer may always cancel; once processing, only until
   /// [cancelDeadline] (admin-configured window, see Order::buyerCanCancel on the backend).
   bool get canCancel {
-    final allowed = serverCanCancel ?? (status == 'pending' || status == 'accepted' || status == 'processing');
+    final allowed = serverCanCancel ?? (status == 'pending' || status == 'processing');
     final deadline = cancelDeadline;
     return allowed && (cancelOnHold || deadline == null || DateTime.now().isBefore(deadline));
   }
