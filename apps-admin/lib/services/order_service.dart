@@ -34,4 +34,20 @@ class OrderService {
     );
     return Order.fromJson(res.data['data'] as Map<String, dynamic>);
   }
+
+  /// Saves the parcel split: each map is order item id -> quantity in that parcel.
+  Future<Order> updatePackages(String id, List<Map<String, int>> packages) async {
+    final res = await _api.dio.put(
+      '/admin/orders/$id/packages',
+      data: {
+        'packages': [
+          for (final package in packages)
+            [
+              for (final MapEntry(:key, :value) in package.entries) {'order_item_id': key, 'quantity': value},
+            ],
+        ],
+      },
+    );
+    return Order.fromJson(res.data['data'] as Map<String, dynamic>);
+  }
 }

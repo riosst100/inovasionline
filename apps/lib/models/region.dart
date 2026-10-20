@@ -8,4 +8,12 @@ class Region {
 
   final String code;
   final String name;
+
+  // By code, so a region loaded elsewhere (e.g. a saved address) matches the
+  // same entry in a freshly fetched dropdown list.
+  @override
+  bool operator ==(Object other) => other is Region && other.code == code;
+
+  @override
+  int get hashCode => code.hashCode;
 }

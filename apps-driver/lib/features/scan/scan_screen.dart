@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/api_exception.dart';
+import '../../core/permissions.dart';
 import '../../models/parcel.dart';
 import '../../providers/providers.dart';
 import 'confirm_screen.dart';
@@ -38,6 +39,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     _busy = true;
     setState(() => _message = 'Memeriksa pesanan...');
 
+    // Location is checked on every scan, not only when the scanner opens.
+    if (!await ensureLocationReady(context)) {
+      if (mounted) _fail('Scan butuh izin lokasi dan GPS aktif.');
+      return;
+    }
+    if (!mounted) return;
+
     try {
       final parcel = await ref.read(deliveryServiceProvider).scan(code);
       if (!mounted) return;
@@ -54,7 +62,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
       setState(() => _message = null);
       final ok = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(builder: (_) => ConfirmScreen(parcel: parcel, code: code)),
+        MaterialPageRoute(
+          builder: (_) => ConfirmScreen(parcel: parcel, code: code),
+        ),
       );
       if (!mounted) return;
 
@@ -97,9 +107,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(expected == null ? 'Scan QR paket' : 'Scan ${expected.orderNumber}'),
-        actions: [
-          IconButton(icon: const Icon(Icons.flash_on), onPressed: _controller.toggleTorch),
-        ],
+        actions: [IconButton(icon: const Icon(Icons.flash_on), onPressed: _controller.toggleTorch)],
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -127,11 +135,17 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(10)),
-                      child: Text(_message!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+                      child: Text(
+                        _message!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     )
                   else
                     Text(
-                      _confirmed == 0 ? 'Arahkan kamera ke QR pada paket' : '$_confirmed paket dikonfirmasi. Scan paket berikutnya.',
+                      _confirmed == 0
+                          ? 'Arahkan kamera ke QR pada paket'
+                          : '$_confirmed paket dikonfirmasi. Scan paket berikutnya.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white),
                     ),

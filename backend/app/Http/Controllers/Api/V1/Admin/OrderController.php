@@ -139,6 +139,57 @@ class OrderController extends Controller
         return ApiResponse::success(new OrderResource($order), 'Status pesanan berhasil diperbarui.');
     }
 
+    /**
+     * Splits the order into parcels while it is being prepared. Every unit of every item must be
+     * in exactly one parcel; a single parcel is stored as the default (null).
+     */
+    public function updatePackages(Request $request, Order $order): JsonResponse
+    {
+        $data = $request->validate([
+            'packages' => ['required', 'array', 'min:1', 'max:'.Order::MAX_PACKAGES],
+            'packages.*' => ['required', 'array', 'min:1'],
+            'packages.*.*.order_item_id' => ['required', 'string'],
+            'packages.*.*.quantity' => ['required', 'integer', 'min:1'],
+        ]);
+
+        if ($order->status !== OrderStatus::PROCESSING) {
+            return ApiResponse::error('Paket hanya dapat diatur saat pesanan sedang diproses.', [], 422);
+        }
+
+        $ordered = $order->items()->pluck('quantity', 'id')->map(fn ($qty) => (int) $qty);
+        $packed = [];
+        $packages = [];
+
+        foreach ($data['packages'] as $package) {
+            // Merge repeated lines of the same item within one parcel.
+            $lines = [];
+            foreach ($package as $line) {
+                $id = $line['order_item_id'];
+                if (! $ordered->has($id)) {
+                    return ApiResponse::error('Produk tidak termasuk dalam pesanan ini.', [], 422);
+                }
+                $lines[$id] = ($lines[$id] ?? 0) + (int) $line['quantity'];
+                $packed[$id] = ($packed[$id] ?? 0) + (int) $line['quantity'];
+            }
+
+            $packages[] = collect($lines)
+                ->map(fn (int $qty, string $id) => ['order_item_id' => $id, 'quantity' => $qty])
+                ->values()->all();
+        }
+
+        foreach ($ordered as $id => $qty) {
+            if (($packed[$id] ?? 0) !== $qty) {
+                return ApiResponse::error('Jumlah produk di semua paket harus sama dengan jumlah pesanan.', [], 422);
+            }
+        }
+
+        $order->update(['packages' => count($packages) > 1 ? $packages : null]);
+
+        $order->load(['user', 'items', 'paymentMethod', 'shippingMethod']);
+
+        return ApiResponse::success(new OrderResource($order), 'Paket pesanan berhasil disimpan.');
+    }
+
     private function notifyBuyer(Order $order, OrderStatus $status): void
     {
         $user = $order->user;

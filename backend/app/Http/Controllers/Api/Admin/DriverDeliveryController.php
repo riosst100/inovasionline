@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Endpoints for the driver app. A driver carries several parcels at once, so every parcel is
- * identified by its QR code: scanning it picks the order, then a photo confirms the step.
+ * identified by its QR code: scanning it picks the order, then a photo confirms the step. An order
+ * split into several parcels has one QR per parcel; any of them resolves the order.
  */
 class DriverDeliveryController extends Controller
 {
@@ -197,6 +198,8 @@ class DriverDeliveryController extends Controller
             'recipient_name' => $address['recipient_name'] ?? null,
             'address' => $address['address_line'] ?? $address['full_address'] ?? null,
             'items_count' => (int) $order->items_count,
+            // Parcels the order ships in; the driver must carry all of them.
+            'packages_count' => $order->packagesCount(),
             'grand_total' => (float) $order->grand_total,
             // Cash the driver must collect at the door; 0 when already paid.
             'cod_amount' => $owedInCash ? (float) $order->grand_total : 0.0,

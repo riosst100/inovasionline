@@ -15,6 +15,7 @@ import '../services/wallet_service.dart';
 import '../services/post_service.dart';
 import '../services/region_service.dart';
 import '../services/search_service.dart';
+import '../services/user_address_service.dart';
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
 
@@ -45,7 +46,11 @@ final regionServiceProvider = Provider<RegionService>(
   (ref) => RegionService(ref.watch(apiClientProvider)),
 );
 
-final chatServiceProvider = Provider<ChatService>(
+final userAddressServiceProvider = Provider<UserAddressService>(
+  (ref) => UserAddressService(ref.watch(apiClientProvider)),
+);
+
+final chatServiceProvider =Provider<ChatService>(
   (ref) => ChatService(ref.watch(apiClientProvider)),
 );
 

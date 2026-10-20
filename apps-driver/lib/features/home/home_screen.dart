@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../core/api_exception.dart';
 import '../../core/formatters.dart';
+import '../../core/permissions.dart';
 import '../../models/parcel.dart';
 import '../../providers/providers.dart';
 import '../scan/scan_screen.dart';
@@ -14,13 +15,12 @@ import '../scan/scan_screen.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  void _scan(BuildContext context, WidgetRef ref, {Parcel? expected}) {
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => ScanScreen(expected: expected)))
-        .then((_) {
-          ref.invalidate(parcelsProvider(false));
-          ref.invalidate(parcelsProvider(true));
-        });
+  Future<void> _scan(BuildContext context, WidgetRef ref, {Parcel? expected}) async {
+    if (!await ensureLocationReady(context) || !context.mounted) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ScanScreen(expected: expected))).then((_) {
+      ref.invalidate(parcelsProvider(false));
+      ref.invalidate(parcelsProvider(true));
+    });
   }
 
   @override
@@ -39,7 +39,12 @@ class HomeScreen extends ConsumerWidget {
               onPressed: () => ref.read(authProvider.notifier).logout(),
             ),
           ],
-          bottom: const TabBar(tabs: [Tab(text: 'Dalam perjalanan'), Tab(text: 'Selesai')]),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Dalam perjalanan'),
+              Tab(text: 'Selesai'),
+            ],
+          ),
         ),
         body: TabBarView(
           children: [
@@ -75,7 +80,9 @@ class _ParcelList extends ConsumerWidget {
         data: (items) => items.isEmpty
             ? _Message(
                 icon: Icons.inventory_2_outlined,
-                text: done ? 'Belum ada pesanan yang selesai.' : 'Tidak ada paket di tangan.\nScan QR paket untuk mulai mengantar.',
+                text: done
+                    ? 'Belum ada pesanan yang selesai.'
+                    : 'Tidak ada paket di tangan.\nScan QR paket untuk mulai mengantar.',
               )
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -106,7 +113,11 @@ class _Message extends StatelessWidget {
             children: [
               Icon(icon, size: 48, color: AppColors.mutedForeground),
               const SizedBox(height: 12),
-              Text(text, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.mutedForeground)),
+              Text(
+                text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.mutedForeground),
+              ),
             ],
           ),
         ),

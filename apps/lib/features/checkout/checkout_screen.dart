@@ -8,12 +8,14 @@ import '../../models/cart.dart';
 import '../../models/delivery_schedule.dart';
 import '../../models/payment_method.dart';
 import '../../models/shipping_method.dart';
-import '../../providers/auth_provider.dart';
+import '../../models/user_address.dart';
 import '../../providers/core_providers.dart';
+import '../../providers/user_address_provider.dart';
 import '../../widgets/address_picker.dart';
 import '../wallet/topup_screen.dart';
 import '../wallet/wallet_providers.dart';
 import 'checkout_providers.dart';
+import 'user_address_sheets.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key, required this.selection});
@@ -30,6 +32,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _addressDetailController = TextEditingController();
   final _notesController = TextEditingController();
 
+  /// The saved address the fields above came from.
+  String? _addressId;
   AddressSelection _address = const AddressSelection();
   PaymentMethod? _paymentMethod;
   ShippingMethod? _shippingMethod;
@@ -38,11 +42,37 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    final user = ref.read(authProvider).user;
-    if (user != null) {
-      _recipientNameController.text = user.name;
-      _recipientPhoneController.text = user.phone ?? '';
+    _selectRecentAddress();
+  }
+
+  /// Picks the most recently added or used saved address, so a returning
+  /// user does not have to choose it again.
+  Future<void> _selectRecentAddress() async {
+    try {
+      final addresses = await ref.read(userAddressesProvider.future);
+      if (!mounted || _addressId != null || addresses.isEmpty) return;
+      _applyAddress(addresses.first);
+    } catch (_) {
+      // The user can still pick or add an address by hand.
     }
+  }
+
+  void _applyAddress(UserAddress? address) {
+    final region = address?.region ?? const AddressSelection();
+    final districtChanged = region.district?.code != _address.district?.code;
+    final villageChanged = region.village?.code != _address.village?.code;
+
+    setState(() {
+      _addressId = address?.id;
+      _recipientNameController.text = address?.recipientName ?? '';
+      _recipientPhoneController.text = address?.recipientPhone ?? '';
+      _addressDetailController.text = address?.detail ?? '';
+      _address = region;
+      if (districtChanged || villageChanged) {
+        _shippingMethod = null;
+        _deliverySlot = null;
+      }
+    });
   }
 
   @override
@@ -94,36 +124,38 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       !_scheduleMissing &&
       _addressStepDone;
 
+  /// Lets the user pick one of their saved addresses, or add one straight
+  /// away when they have none yet.
   Future<void> _editAddress() async {
-    final result = await showModalBottomSheet<_AddressFormResult>(
+    final addresses = await ref
+        .read(userAddressesProvider.future)
+        .catchError((_) => <UserAddress>[]);
+    if (!mounted) return;
+
+    if (addresses.isEmpty) {
+      final added = await showUserAddressForm(context);
+      if (added != null && mounted) _applyAddress(added);
+      return;
+    }
+
+    final picked = await showModalBottomSheet<UserAddress>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _AddressFormSheet(
-        initialName: _recipientNameController.text,
-        initialPhone: _recipientPhoneController.text,
-        initialDetail: _addressDetailController.text,
-        initialAddress: _address,
-      ),
+      builder: (context) => UserAddressListSheet(selectedId: _addressId),
     );
-    if (result == null) return;
+    if (!mounted) return;
+    if (picked != null) {
+      _applyAddress(picked);
+      return;
+    }
 
-    final districtChanged =
-        result.address.district?.code != _address.district?.code;
-    final villageChanged =
-        result.address.village?.code != _address.village?.code;
-
-    setState(() {
-      _recipientNameController.text = result.name;
-      _recipientPhoneController.text = result.phone;
-      _addressDetailController.text = result.detail;
-      _address = result.address;
-      if (districtChanged || villageChanged) {
-        _shippingMethod = null;
-        _deliverySlot = null;
-      }
-    });
+    // Nothing picked, but the current address may have been edited or
+    // deleted in the sheet.
+    final latest = ref.read(userAddressesProvider).valueOrNull;
+    if (_addressId == null || latest == null) return;
+    _applyAddress(latest.where((a) => a.id == _addressId).firstOrNull);
   }
 
   Future<void> _pickPaymentMethod() async {
@@ -144,9 +176,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         selected: _paymentMethod,
         total: _total,
         walletBalance: walletBalance,
+        // Verify at selection time so "Buat Pesanan" never detours into the camera.
+        verifyFace: _ensureFaceVerified,
       ),
     );
-    if (selected != null) setState(() => _paymentMethod = selected);
+    if (selected != null && mounted) setState(() => _paymentMethod = selected);
   }
 
   Future<void> _pickShippingMethod() async {
@@ -248,6 +282,23 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return false;
     }
     if (!mounted) return false;
+    final start = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.face_retouching_natural_rounded, size: 40, color: Color(0xFFEA580C)),
+        title: const Text('Verifikasi Wajah'),
+        content: const Text(
+          'Untuk memakai metode pembayaran ini, Anda perlu verifikasi wajah satu kali.\n\n'
+          'Siapkan ruangan yang terang dan lepas masker atau kacamata hitam.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Batal')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Mulai')),
+        ],
+      ),
+    );
+    if (start != true || !mounted) return false;
     final passed = await context.push<bool>('/face-verification');
     if (passed != true) {
       if (mounted) _showSnack('Verifikasi wajah diperlukan untuk metode pembayaran ini.');
@@ -262,8 +313,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    if (_paymentMethod!.needsFaceVerification && !await _ensureFaceVerified()) return;
-
     final success = await ref
         .read(checkoutProvider.notifier)
         .submit(
@@ -277,6 +326,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           districtCode: _address.district!.code,
           villageCode: _address.village!.code,
           addressDetail: _addressDetailController.text.trim(),
+          addressId: _addressId,
           customerNotes: _notesController.text.trim().isEmpty
               ? null
               : _notesController.text.trim(),
@@ -1712,226 +1762,27 @@ class _SummaryLine extends StatelessWidget {
 }
 
 // ==========================================
-// MODAL BOTTOM SHEETS
-// ==========================================
-class _AddressFormResult {
-  const _AddressFormResult({
-    required this.name,
-    required this.phone,
-    required this.detail,
-    required this.address,
-  });
-
-  final String name;
-  final String phone;
-  final String detail;
-  final AddressSelection address;
-}
-
-class _AddressFormSheet extends StatefulWidget {
-  const _AddressFormSheet({
-    required this.initialName,
-    required this.initialPhone,
-    required this.initialDetail,
-    required this.initialAddress,
-  });
-
-  final String initialName;
-  final String initialPhone;
-  final String initialDetail;
-  final AddressSelection initialAddress;
-
-  @override
-  State<_AddressFormSheet> createState() => _AddressFormSheetState();
-}
-
-class _AddressFormSheetState extends State<_AddressFormSheet> {
-  late final _nameController = TextEditingController(text: widget.initialName);
-  late final _phoneController = TextEditingController(
-    text: widget.initialPhone,
-  );
-  late final _detailController = TextEditingController(
-    text: widget.initialDetail,
-  );
-  AddressSelection _address = const AddressSelection();
-
-  bool get _valid =>
-      _address.isComplete &&
-      _nameController.text.trim().isNotEmpty &&
-      _phoneController.text.trim().isNotEmpty &&
-      _detailController.text.trim().isNotEmpty;
-
-  @override
-  void initState() {
-    super.initState();
-    _address = widget.initialAddress;
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _detailController.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (!_valid) return;
-    Navigator.of(context).pop(
-      _AddressFormResult(
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        detail: _detailController.text.trim(),
-        address: _address,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return Column(
-            children: [
-              // Drag Handle
-              Container(
-                margin: const EdgeInsets.only(top: 10, bottom: 6),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Alamat Pengiriman',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: Color(0xFF64748B),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                  children: [
-                    TextField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nama Penerima',
-                        prefixIcon: Icon(
-                          Icons.person_outline_rounded,
-                          size: 20,
-                        ),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Nomor Telepon Penerima',
-                        prefixIcon: Icon(Icons.phone_outlined, size: 20),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 18),
-                    AddressPicker(
-                      initial: _address,
-                      onChanged: (selection) =>
-                          setState(() => _address = selection),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _detailController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Detail Alamat (Nama Jalan, No. Rumah, RT/RW, Patokan)',
-                        alignLabelWithHint: true,
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ],
-                ),
-              ),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _valid ? _save : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D9488),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text(
-                        'Simpan Alamat Pengiriman',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ==========================================
 // PAYMENT METHOD PICKER SHEET
 // ==========================================
 class _PaymentMethodPickerSheet extends StatelessWidget {
   const _PaymentMethodPickerSheet({
     required this.methods,
     required this.total,
+    required this.verifyFace,
     this.selected,
     this.walletBalance,
   });
 
   final List<PaymentMethod> methods;
   final PaymentMethod? selected;
+
+  /// Runs the one-time face check; COD/Paylater only become selected once it passes.
+  final Future<bool> Function() verifyFace;
+
+  Future<void> _choose(BuildContext context, PaymentMethod method) async {
+    if (method.needsFaceVerification && !await verifyFace()) return;
+    if (context.mounted) Navigator.of(context).pop(method);
+  }
 
   /// Order total the balance has to cover; null balance = not loaded yet.
   final double total;
@@ -1994,7 +1845,7 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
             );
           return;
         }
-        Navigator.of(context).pop(method);
+        _choose(context, method);
       },
     );
   }
@@ -2123,7 +1974,7 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                                       ? 'Transfer'
                                       : null),
                             selected: selected?.id == method.id,
-                            onTap: () => Navigator.of(context).pop(method),
+                            onTap: () => _choose(context, method),
                           ),
                     ],
                   ],

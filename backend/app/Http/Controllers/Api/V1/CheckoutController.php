@@ -31,6 +31,10 @@ class CheckoutController extends Controller
             return ApiResponse::error($e->getMessage(), [], 422);
         }
 
+        if ($addressId = $request->validated('address_id')) {
+            $request->user()->addresses()->whereKey($addressId)->update(['last_used_at' => now()]);
+        }
+
         return ApiResponse::success(new OrderResource($order), 'Order placed successfully.', [], 201);
     }
 }

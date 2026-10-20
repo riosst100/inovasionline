@@ -1,7 +1,10 @@
 # Sync kode Windows -> WSL lalu jalankan Docker di sana. Wrapper PowerShell untuk scripts/wsl-sync.sh.
 # `bash` di PowerShell adalah bash WSL (tanpa wsl/cygpath), jadi script dijalankan lewat Git Bash.
 #   .\sync.ps1                # sync sekali
-#   .\sync.ps1 watch          # sync otomatis tiap file disimpan (Ctrl+C untuk stop)
+#   .\sync.ps1 watch          # sync otomatis tiap file disimpan (Ctrl+C untuk stop);
+#                             # jalan sendiri saat folder dibuka di VS Code (.vscode/tasks.json)
+# Tiap sync juga menerapkan perubahan ke container: migrate, composer install, restart queue
+# (scripts/wsl-post-sync.sh).
 #   .\sync.ps1 up             # sync + docker compose up -d --build
 #   .\sync.ps1 logs admin     # juga: ps, down
 param(

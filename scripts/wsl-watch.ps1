@@ -10,9 +10,10 @@ $srcWsl = ((wsl -d $Distro -- wslpath -a $root.Replace([string][char]92, '/')) |
 if (-not $srcWsl -or -not $srcWsl.StartsWith('/mnt/')) { throw "wslpath gagal: '$srcWsl'" }
 $skip = '[\\/](\.git|node_modules|\.next|vendor|apps|download|scripts|logs|framework)([\\/]|$)|[\\/]storage[\\/]app([\\/]|$)|[\\/]\.env$'
 
-# Keep in sync with sync_once in wsl-sync.sh.
+# Keep in sync with sync_once in wsl-sync.sh. wsl-post-sync.sh applies the
+# changes to the running containers (migrate, composer install, queue restart).
 function Sync-Now {
-  $cmd = "mkdir -p $Dest && rsync -a --delete --exclude='node_modules/' --exclude='.next/' --exclude='backend/vendor/' --exclude='backend/.env' --exclude='backend/storage/logs/' --exclude='backend/storage/framework/' --exclude='backend/storage/app/' --exclude='backend/public/storage' --exclude='backend/bootstrap/cache/*.php' --include='/backend/' --include='/frontend/' --include='/frontend-admin/' --include='/docker/' --include='/docker-compose.yml' --include='/.env.example' --include='/deploy-local.sh' --exclude='/*' '$srcWsl/' $Dest/"
+  $cmd = "mkdir -p $Dest && rsync -a -i --delete --exclude='node_modules/' --exclude='.next/' --exclude='backend/vendor/' --exclude='backend/.env' --exclude='backend/storage/logs/' --exclude='backend/storage/framework/' --exclude='backend/storage/app/' --exclude='backend/public/storage' --exclude='backend/bootstrap/cache/*.php' --include='/backend/' --include='/frontend/' --include='/frontend-admin/' --include='/docker/' --include='/docker-compose.yml' --include='/.env.example' --include='/deploy-local.sh' --exclude='/*' '$srcWsl/' $Dest/ | bash '$srcWsl/scripts/wsl-post-sync.sh' $Dest"
   wsl -d $Distro -- bash -lc $cmd
   Write-Host ("[{0}] synced" -f (Get-Date -Format HH:mm:ss))
 }

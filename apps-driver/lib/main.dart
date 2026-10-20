@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'config/theme.dart';
+import 'core/permissions.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'providers/providers.dart';
@@ -22,8 +23,20 @@ Future<void> bootstrap({required String envFile}) async {
 
 Future<void> main() => bootstrap(envFile: '.env');
 
-class DriverApp extends StatelessWidget {
+class DriverApp extends StatefulWidget {
   const DriverApp({super.key});
+
+  @override
+  State<DriverApp> createState() => _DriverAppState();
+}
+
+class _DriverAppState extends State<DriverApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Right after the splash (first frame): camera + location prompts up front, not mid-scan.
+    WidgetsBinding.instance.addPostFrameCallback((_) => requestStartupPermissions());
+  }
 
   @override
   Widget build(BuildContext context) {

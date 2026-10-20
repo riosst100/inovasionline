@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../core/api_exception.dart';
 import '../../core/formatters.dart';
+import '../../core/permissions.dart';
 import '../../models/parcel.dart';
 import '../../providers/providers.dart';
 
@@ -37,6 +38,8 @@ class _ConfirmScreenState extends ConsumerState<ConfirmScreen> {
   Future<void> _submit() async {
     final photo = _photo;
     if (photo == null) return;
+    // Pickup and handover both need GPS on.
+    if (!await ensureLocationReady(context) || !mounted) return;
     setState(() => _submitting = true);
 
     final service = ref.read(deliveryServiceProvider);
@@ -47,9 +50,8 @@ class _ConfirmScreenState extends ConsumerState<ConfirmScreen> {
         await service.deliver(widget.parcel, code: widget.code, photoPath: photo.path);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isShip ? 'Ditandai sedang diantar.' : 'Ditandai selesai diterima.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_isShip ? 'Ditandai sedang diantar.' : 'Ditandai selesai diterima.')));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -80,11 +82,36 @@ class _ConfirmScreenState extends ConsumerState<ConfirmScreen> {
                   if (parcel.customerPhone != null) _Row('Telepon', parcel.customerPhone!),
                   if (parcel.address != null) _Row('Alamat', parcel.address!),
                   _Row('Barang', '${parcel.itemsCount} item'),
+                  _Row('Paket', '${parcel.packagesCount} paket'),
                   if (parcel.customerNotes?.isNotEmpty ?? false) _Row('Catatan', parcel.customerNotes!),
                 ],
               ),
             ),
           ),
+          if (parcel.packagesCount > 1) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.inventory_2_outlined, color: AppColors.warning),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _isShip
+                          ? 'Pesanan ini terdiri dari ${parcel.packagesCount} paket. Pastikan semua paket dibawa.'
+                          : 'Serahkan semua ${parcel.packagesCount} paket ke penerima.',
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.warning),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (parcel.codAmount > 0 && !_isShip) ...[
             const SizedBox(height: 12),
             Container(
@@ -145,7 +172,11 @@ class _ConfirmScreenState extends ConsumerState<ConfirmScreen> {
           FilledButton(
             onPressed: photo == null || _submitting ? null : _submit,
             child: _submitting
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
                 : Text(_isShip ? 'Konfirmasi dikirim' : 'Konfirmasi diterima'),
           ),
         ],
@@ -167,8 +198,13 @@ class _Row extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 76, child: Text(label, style: const TextStyle(color: AppColors.mutedForeground))),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
+          SizedBox(
+            width: 76,
+            child: Text(label, style: const TextStyle(color: AppColors.mutedForeground)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );

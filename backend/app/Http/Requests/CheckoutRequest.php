@@ -28,6 +28,9 @@ class CheckoutRequest extends FormRequest
             'district_code' => ['required', 'string', 'exists:indonesia_districts,code'],
             'village_code' => ['required', 'string', 'exists:indonesia_villages,code'],
             'address_detail' => ['required', 'string', 'max:500'],
+            // The saved address the fields above came from, if any; it is
+            // offered first next time.
+            'address_id' => ['nullable', 'string'],
             'customer_notes' => ['nullable', 'string', 'max:1000'],
         ];
     }

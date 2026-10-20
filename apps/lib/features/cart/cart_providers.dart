@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_exception.dart';
 import '../../models/cart.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 
 String _errorMessage(Object error, String fallback) {
@@ -64,6 +65,8 @@ class CartNotifier extends StateNotifier<CartState> {
     }
   }
 
+  void clear() => state = const CartState();
+
   Future<void> removeItem(String cartItemId) async {
     try {
       final cart = await _ref.read(cartServiceProvider).removeItem(cartItemId);
@@ -74,4 +77,20 @@ class CartNotifier extends StateNotifier<CartState> {
   }
 }
 
-final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) => CartNotifier(ref));
+/// Loads on login and clears on logout, so the cart badges are filled before
+/// the cart screen is ever opened.
+final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
+  final notifier = CartNotifier(ref);
+  ref.listen<AuthStatus>(
+    authProvider.select((s) => s.status),
+    (_, status) {
+      if (status == AuthStatus.authenticated) {
+        Future.microtask(notifier.load);
+      } else if (status == AuthStatus.unauthenticated) {
+        notifier.clear();
+      }
+    },
+    fireImmediately: true,
+  );
+  return notifier;
+});

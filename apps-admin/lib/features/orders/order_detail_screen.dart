@@ -11,6 +11,7 @@ import '../../models/order.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/common.dart';
 import 'order_style.dart';
+import 'packing_screen.dart';
 
 class OrderDetailScreen extends ConsumerStatefulWidget {
   const OrderDetailScreen({super.key, required this.orderId});
@@ -122,21 +123,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             if (order.paidAt != null) _Row('Dibayar', formatDateTime(order.paidAt!)),
           ],
         ),
-        if (order.qrCode != null && order.deliveryMethod != 'store_pickup' && order.status.next().isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _Section(
-            title: 'QR Paket',
-            children: [
-              Center(child: QrImageView(data: order.qrCode!, size: 180, backgroundColor: Colors.white)),
-              const SizedBox(height: 4),
-              const Text(
-                'Driver scan QR ini saat mengambil dan menyerahkan paket.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.mutedForeground, fontSize: 12),
-              ),
-            ],
-          ),
-        ],
+        ?_packagesSection(order),
         const SizedBox(height: 12),
         _Section(
           title: 'Pengiriman',
@@ -244,6 +231,86 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Future<void> _editPackages() async {
+    final updated = await Navigator.of(
+      context,
+    ).push<Order>(MaterialPageRoute(builder: (_) => PackingScreen(order: _order!)));
+    if (updated != null && mounted) setState(() => _order = _changed = updated);
+  }
+
+  /// Parcels with their contents and, while a driver still has to scan them, one QR each.
+  Widget? _packagesSection(Order order) {
+    final showQr = order.deliveryMethod != 'store_pickup' && order.status.next().isNotEmpty;
+    final packages = order.packages;
+    // Older API without parcels: fall back to the single order QR.
+    if (packages.isEmpty) {
+      if (!showQr || order.qrCode == null) return null;
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: _Section(
+          title: 'QR Paket',
+          children: [
+            Center(child: QrImageView(data: order.qrCode!, size: 180, backgroundColor: Colors.white)),
+          ],
+        ),
+      );
+    }
+    if (!showQr && !order.canEditPackages && packages.length == 1) return null;
+
+    final items = {for (final item in order.items) item.id: item};
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: _Section(
+        title: 'Paket (${packages.length})',
+        children: [
+          for (final package in packages) ...[
+            if (package.number > 1) const Divider(height: 24),
+            Text(
+              packages.length > 1 ? 'Paket ${package.number} dari ${packages.length}' : 'Paket 1',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            for (final MapEntry(:key, :value) in package.items.entries)
+              Text(
+                '$value × ${items[key]?.productName ?? '-'}'
+                '${items[key]?.variantName != null ? ' (${items[key]!.variantName})' : ''}',
+                style: const TextStyle(fontSize: 13),
+              ),
+            if (showQr && package.qrCode != null) ...[
+              const SizedBox(height: 8),
+              Center(child: QrImageView(data: package.qrCode!, size: 160, backgroundColor: Colors.white)),
+              Center(
+                child: Text(
+                  '${order.orderNumber} · ${package.number}/${packages.length}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ],
+          if (showQr) ...[
+            const SizedBox(height: 8),
+            Text(
+              packages.length > 1
+                  ? 'Tempel QR di paket yang sesuai. Driver scan salah satu QR dan wajib membawa semua ${packages.length} paket.'
+                  : 'Driver scan QR ini saat mengambil dan menyerahkan paket.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.mutedForeground, fontSize: 12),
+            ),
+          ],
+          if (order.canEditPackages) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _updating ? null : _editPackages,
+              icon: const Icon(Icons.call_split, size: 18),
+              label: Text(packages.length > 1 ? 'Ubah Pembagian Paket' : 'Split Paket'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

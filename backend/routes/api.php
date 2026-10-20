@@ -68,6 +68,7 @@ use App\Http\Controllers\Api\V1\PostController;
 use App\Http\Controllers\Api\V1\PublicProductController;
 use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\SearchController;
+use App\Http\Controllers\Api\V1\UserAddressController;
 use App\Http\Controllers\Api\V1\UserVerificationController;
 use App\Http\Middleware\EnsureDriver;
 use Illuminate\Support\Facades\Route;
@@ -98,6 +99,10 @@ Route::prefix('v1')->group(function () {
             Route::put('/user/address', [AuthController::class, 'updateAddress']);
             Route::post('/user/address/from-location', [AuthController::class, 'setAddressFromLocation'])
                 ->middleware('throttle:6,1');
+            Route::get('/user/addresses', [UserAddressController::class, 'index']);
+            Route::post('/user/addresses', [UserAddressController::class, 'store']);
+            Route::put('/user/addresses/{address}', [UserAddressController::class, 'update']);
+            Route::delete('/user/addresses/{address}', [UserAddressController::class, 'destroy']);
         });
     });
 
@@ -562,6 +567,7 @@ Route::prefix('admin')->group(function () {
             Route::get('/counts', [AdminOrderController::class, 'counts']);
             Route::get('/{order}', [AdminOrderController::class, 'show']);
             Route::patch('/{order}/status', [AdminOrderController::class, 'updateStatus']);
+            Route::put('/{order}/packages', [AdminOrderController::class, 'updatePackages']);
         });
 
         Route::prefix('flash-sale-slots')->group(function () {

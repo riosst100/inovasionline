@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,8 +15,9 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _email = TextEditingController();
-  final _password = TextEditingController();
+  // TODO: remove — debug-only prefill with seeded driver for quick testing.
+  final _email = TextEditingController(text: kDebugMode ? 'budi.driver@inovasionline.com' : '');
+  final _password = TextEditingController(text: kDebugMode ? 'password' : '');
   bool _obscure = true;
   bool _submitting = false;
   String? _error;

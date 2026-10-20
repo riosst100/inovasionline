@@ -207,8 +207,10 @@ class _RegionDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The list loads after the value is known; until then show it empty, as a
+    // value missing from the items is an error.
     return DropdownButtonFormField<Region>(
-      initialValue: value,
+      initialValue: items.contains(value) ? value : null,
       isExpanded: true,
       decoration: InputDecoration(labelText: label),
       items: items

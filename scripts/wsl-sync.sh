@@ -18,9 +18,10 @@ case "$SRC_WSL" in /mnt/?*) ;; *) echo "wslpath gagal: '$SRC_WSL'" >&2; exit 1 ;
 
 wsh() { wsl -d "$DISTRO" -- bash -lc "$1"; }
 
-# Keep in sync with Sync-Now in wsl-watch.ps1.
+# Keep in sync with Sync-Now in wsl-watch.ps1. wsl-post-sync.sh applies the
+# changes to the running containers (migrate, composer install, queue restart).
 sync_once() {
-  wsh "mkdir -p $DEST && rsync -a --delete \
+  wsh "mkdir -p $DEST && rsync -a -i --delete \
     --exclude='node_modules/' --exclude='.next/' \
     --exclude='backend/vendor/' --exclude='backend/.env' \
     --exclude='backend/storage/logs/' --exclude='backend/storage/framework/' \
@@ -29,7 +30,7 @@ sync_once() {
     --include='/backend/' --include='/frontend/' --include='/frontend-admin/' \
     --include='/docker/' --include='/docker-compose.yml' --include='/.env.example' \
     --include='/deploy-local.sh' --exclude='/*' \
-    '$SRC_WSL/' $DEST/"
+    '$SRC_WSL/' $DEST/ | bash '$SRC_WSL/scripts/wsl-post-sync.sh' $DEST"
 }
 
 # .env files are only seeded once; after that the WSL copies are left alone.

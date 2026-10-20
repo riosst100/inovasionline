@@ -39,6 +39,7 @@ enum OrderStatus {
 
 class OrderItem {
   OrderItem({
+    required this.id,
     required this.productName,
     required this.quantity,
     required this.unitPrice,
@@ -50,6 +51,7 @@ class OrderItem {
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
+    id: json['id'].toString(),
     productName: json['product_name'] as String? ?? '-',
     variantName: json['variant_name'] as String?,
     sku: json['product_sku'] as String?,
@@ -60,6 +62,7 @@ class OrderItem {
     notes: json['notes'] as String?,
   );
 
+  final String id;
   final String productName;
   final String? variantName;
   final String? sku;
@@ -68,6 +71,26 @@ class OrderItem {
   final double unitPrice;
   final double lineTotal;
   final String? notes;
+}
+
+/// One parcel of an order: quantity per order item id, plus the QR stuck on it.
+class OrderPackage {
+  OrderPackage({required this.number, required this.items, this.qrCode});
+
+  factory OrderPackage.fromJson(Map<String, dynamic> json) => OrderPackage(
+    number: (json['number'] as num?)?.toInt() ?? 1,
+    qrCode: json['qr_code'] as String?,
+    items: {
+      for (final line in (json['items'] as List? ?? []).cast<Map<String, dynamic>>())
+        line['order_item_id'].toString(): (line['quantity'] as num?)?.toInt() ?? 0,
+    },
+  );
+
+  final int number;
+  final String? qrCode;
+
+  /// Order item id -> quantity in this parcel.
+  final Map<String, int> items;
 }
 
 class StatusHistoryEntry {
@@ -118,6 +141,7 @@ class Order {
     this.history = const [],
     this.paidAt,
     this.qrCode,
+    this.packages = const [],
   });
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
@@ -146,6 +170,9 @@ class Order {
         .toList(),
     paidAt: DateTime.tryParse(json['paid_at']?.toString() ?? ''),
     qrCode: json['qr_code'] as String?,
+    packages: (json['packages'] as List? ?? [])
+        .map((e) => OrderPackage.fromJson(e as Map<String, dynamic>))
+        .toList(),
     createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
   );
 
@@ -174,9 +201,17 @@ class Order {
 
   /// Value of the parcel label QR the driver app scans.
   final String? qrCode;
+
+  /// Parcels the order ships in, each with its own QR; one parcel unless the admin split it.
+  final List<OrderPackage> packages;
   final DateTime createdAt;
 
   List<OrderStatus> get nextStatuses => status.next(storePickup: deliveryMethod == 'store_pickup');
+
+  /// Parcels can be rearranged only while the order is being prepared, and only when there
+  /// is more than one unit to split.
+  bool get canEditPackages =>
+      status == OrderStatus.processing && items.fold<int>(0, (sum, item) => sum + item.quantity) > 1;
 
   String get paymentStatusLabel => switch (paymentStatus) {
     'paid' => 'Lunas',

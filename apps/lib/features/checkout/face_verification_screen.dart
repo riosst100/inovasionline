@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -29,7 +30,7 @@ enum _Step {
   final String instruction;
 }
 
-enum _Phase { loading, intro, running, uploading, failed, denied }
+enum _Phase { loading, running, uploading, failed, denied }
 
 /// One-time face check (shared by COD and Paylater). Pops `true` once the recording is uploaded.
 class FaceVerificationScreen extends ConsumerStatefulWidget {
@@ -40,11 +41,27 @@ class FaceVerificationScreen extends ConsumerStatefulWidget {
 }
 
 class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen> with SingleTickerProviderStateMixin {
-  static const _colorHold = Duration(milliseconds: 3200);
+  static const _flashStep = Duration(milliseconds: 800);
+  // Solid full-screen colours that light the face during the colour check, shown in a random order.
+  static const _flashPalette = [
+    Color(0xFFFF1744),
+    Color(0xFF00E676),
+    Color(0xFF2979FF),
+    Color(0xFFFFEA00),
+    Color(0xFFD500F9),
+    Color(0xFFFFFFFF),
+  ];
+  static const _flashCount = 4;
+  static final _colorHold = _flashStep * _flashCount;
   static const _turnAngle = 20.0;
   static const _nodSwing = 16.0;
 
-  late final AnimationController _spin = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+  // Drives the little face that acts out the current instruction.
+  late final AnimationController _demo = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
+    ..repeat();
+  List<Color> _flashColors = const [];
+  int _flashIndex = 0;
+  Timer? _flashTimer;
   final FaceDetector _detector = FaceDetector(
     options: FaceDetectorOptions(enableClassification: true, performanceMode: FaceDetectorMode.fast, minFaceSize: 0.2),
   );
@@ -78,7 +95,8 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
 
   @override
   void dispose() {
-    _spin.dispose();
+    _demo.dispose();
+    _flashTimer?.cancel();
     _detector.close();
     final camera = _camera;
     if (camera != null) {
@@ -105,14 +123,21 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
       );
       await controller.initialize();
       await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
+      // CameraX binds Preview + ImageCapture + ImageAnalysis up front; adding VideoCapture makes four
+      // use cases, which switches on stream sharing and the preview comes out rotated and stretched.
+      // We never take photos, and this call unbinds ImageCapture (it is rebound only on takePicture).
+      if (Platform.isAndroid) {
+        try {
+          await controller.setJpegImageQuality(90);
+        } catch (_) {}
+      }
       if (!mounted) {
         await controller.dispose();
         return;
       }
-      setState(() {
-        _camera = controller;
-        _phase = _Phase.intro;
-      });
+      _camera = controller;
+      // The checkout popup already explained the check, so start right away.
+      await _start();
     } on CameraException catch (e) {
       if (!mounted) return;
       final denied = e.code.contains('AccessDenied') || e.code.contains('Permission');
@@ -152,7 +177,27 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
     _blinkSawClosed = false;
     _colorSeen = Duration.zero;
     _lastFrameAt = null;
+    _stopFlash();
   }
+
+  void _startFlash() {
+    _flashColors = (List.of(_flashPalette)..shuffle()).take(_flashCount).toList();
+    _flashIndex = 0;
+    _flashTimer?.cancel();
+    _flashTimer = Timer.periodic(_flashStep, (_) {
+      if (mounted) setState(() => _flashIndex = (_flashIndex + 1) % _flashColors.length);
+    });
+  }
+
+  void _stopFlash() {
+    _flashTimer?.cancel();
+    _flashTimer = null;
+    _flashColors = const [];
+  }
+
+  /// The solid colour filling the screen right now, or null outside the colour check.
+  Color? get _flashColor =>
+      _phase == _Phase.running && _step == _Step.color && _flashColors.isNotEmpty ? _flashColors[_flashIndex] : null;
 
   void _advance() {
     final finished = _step;
@@ -164,17 +209,20 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
 
     final next = _Step.values.indexOf(finished) + 1;
     if (next >= _Step.values.length) {
+      _stopFlash();
       _finish();
       return;
     }
     setState(() {
       _step = _Step.values[next];
       _hint = null;
+      if (_step == _Step.color) _startFlash();
     });
   }
 
   Future<void> _fail(String message) async {
     if (!mounted || _phase == _Phase.failed) return;
+    _stopFlash();
     final camera = _camera;
     if (camera != null && camera.value.isRecordingVideo) {
       try {
@@ -217,17 +265,48 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
       } on FileSystemException {
         // Temp file; the OS cleans it up eventually.
       }
+      if (!mounted) return;
+      await _showSuccess();
       if (mounted) context.pop(true);
     } catch (e) {
       if (!mounted) return;
       final message = e is DioException && e.error is ApiException
           ? (e.error as ApiException).message
           : 'Gagal mengunggah rekaman. Periksa koneksi Anda.';
+      // The server rejected this recording, so "Coba Lagi" records a new one instead of resending it.
+      if (e is DioException && e.response != null) _videoPath = null;
       setState(() {
         _phase = _Phase.failed;
         _error = message;
       });
     }
+  }
+
+  Future<void> _showSuccess() {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          icon: const Icon(Icons.verified_rounded, size: 48, color: Color(0xFF16A34A)),
+          title: const Text('Verifikasi Berhasil'),
+          content: const Text(
+            'Wajah Anda berhasil diverifikasi. Anda tidak perlu verifikasi lagi untuk pesanan berikutnya.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Lanjutkan Checkout'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ---------------------------------------------------------- detection
@@ -374,31 +453,41 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
     if (camera == null || !camera.value.isInitialized) {
       return _initCamera();
     }
-    setState(() => _phase = _Phase.intro);
+    await _start();
   }
 
   @override
   Widget build(BuildContext context) {
+    final flash = _flashColor;
     return PopScope(
       canPop: _phase != _Phase.uploading,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0B1020),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: _phase == _Phase.uploading ? null : () => context.pop(false),
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+        body: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          color: flash ?? const Color(0xFF0B1020),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    onPressed: _phase == _Phase.uploading ? null : () => context.pop(false),
+                    icon: Icon(Icons.close_rounded, color: _foreground),
+                  ),
                 ),
-              ),
-              Expanded(child: _body()),
-            ],
+                Expanded(child: _body()),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  /// Text colour that stays readable on the current background (dark, or a light flash colour).
+  Color get _foreground {
+    final flash = _flashColor;
+    return flash != null && flash.computeLuminance() > 0.4 ? const Color(0xFF0B1020) : Colors.white;
   }
 
   Widget _body() {
@@ -442,7 +531,9 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
     // Small while aligning, then grows so the face can fill it.
     final diameter = (running && _step != _Step.align) || _phase == _Phase.uploading ? width * 0.88 : width * 0.58;
     final preview = camera.value.previewSize!;
-    final colorful = _phase == _Phase.running && _step == _Step.color;
+    final fg = _foreground;
+    final ringColor = _phase == _Phase.uploading ? const Color(0xFF34D399) : fg.withValues(alpha: 0.85);
+    final demo = _phase == _Phase.running ? _step : null;
 
     return Column(
       children: [
@@ -451,12 +542,11 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(
             switch (_phase) {
-              _Phase.intro => 'Verifikasi Wajah',
               _Phase.uploading => 'Menyimpan verifikasi...',
               _ => _step.instruction,
             },
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, height: 1.2),
+            style: TextStyle(color: fg, fontSize: 24, fontWeight: FontWeight.w800, height: 1.2),
           ),
         ),
         const SizedBox(height: 8),
@@ -464,8 +554,26 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
           height: 22,
           child: Text(
             _phase == _Phase.running ? (_hint ?? '') : '',
-            style: const TextStyle(color: Color(0xFFFCD34D), fontSize: 14, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: _flashColor == null ? const Color(0xFFFCD34D) : fg,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
+        ),
+        const SizedBox(height: 12),
+        // Small face acting out the instruction; keeps its height so the preview does not jump.
+        SizedBox(
+          height: 72,
+          child: _StepDemo.supports(demo)
+              ? AnimatedBuilder(
+                  animation: _demo,
+                  builder: (context, _) => CustomPaint(
+                    size: const Size(72, 72),
+                    painter: _StepDemo(step: demo!, t: _demo.value, color: fg),
+                  ),
+                )
+              : null,
         ),
         Expanded(
           child: Center(
@@ -474,23 +582,18 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
               curve: Curves.easeInOutCubic,
               width: diameter,
               height: diameter,
-              child: AnimatedBuilder(
-                animation: _spin,
-                builder: (context, child) => CustomPaint(
-                  painter: _RingPainter(progress: _spin.value, colorful: colorful, done: _phase == _Phase.uploading),
-                  child: child,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: ClipOval(
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      child: SizedBox(
-                        width: math.min(preview.width, preview.height),
-                        height: math.max(preview.width, preview.height),
-                        child: CameraPreview(camera),
-                      ),
-                    ),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: ringColor, width: 6),
+              ),
+              child: ClipOval(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: math.min(preview.width, preview.height),
+                    height: math.max(preview.width, preview.height),
+                    child: CameraPreview(camera),
                   ),
                 ),
               ),
@@ -499,42 +602,15 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
         ),
         if (_phase == _Phase.uploading)
           const Padding(padding: EdgeInsets.only(bottom: 32), child: CircularProgressIndicator(color: Colors.white))
-        else if (_phase == _Phase.intro)
-          _intro()
         else
           _progress(),
       ],
     );
   }
 
-  Widget _intro() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: Column(
-        children: [
-          const Text(
-            'Untuk keamanan pembayaran di tempat, kami perlu memastikan Anda adalah pemilik akun. '
-            'Verifikasi hanya dilakukan satu kali dan direkam untuk pengecekan.\n\n'
-            'Siapkan ruangan yang terang dan lepas masker atau kacamata hitam.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _start,
-              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-              child: const Text('Mulai Verifikasi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _progress() {
     final steps = _Step.values.where((s) => s.key != null).toList();
+    final fg = _foreground;
     return Padding(
       padding: const EdgeInsets.only(bottom: 32),
       child: Row(
@@ -551,8 +627,8 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
                 color: _done.contains(s.key)
                     ? const Color(0xFF34D399)
                     : s == _step
-                        ? Colors.white
-                        : Colors.white24,
+                        ? fg
+                        : fg.withValues(alpha: 0.24),
               ),
             ),
         ],
@@ -561,46 +637,103 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
   }
 }
 
-/// Ring around the preview: plain while verifying, a rotating rainbow during the colour check.
-class _RingPainter extends CustomPainter {
-  _RingPainter({required this.progress, required this.colorful, required this.done});
 
-  final double progress;
-  final bool colorful;
-  final bool done;
+/// A simple line-drawn face that acts out the current instruction, looping with [t] in 0..1.
+class _StepDemo extends CustomPainter {
+  _StepDemo({required this.step, required this.t, required this.color});
 
-  static const _rainbow = [
-    Color(0xFFFF3B30),
-    Color(0xFFFF9500),
-    Color(0xFFFFE600),
-    Color(0xFF34C759),
-    Color(0xFF00C7FF),
-    Color(0xFF5856FF),
-    Color(0xFFFF2D92),
-    Color(0xFFFF3B30),
-  ];
+  final _Step step;
+  final double t;
+  final Color color;
+
+  static bool supports(_Step? step) =>
+      step != null && step != _Step.align && step != _Step.color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const stroke = 8.0;
-    final rect = Rect.fromLTWH(stroke / 2, stroke / 2, size.width - stroke, size.height - stroke);
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round;
+    // 0 → 1 → 0 over one loop, eased at both ends.
+    final swing = 0.5 - 0.5 * math.cos(2 * math.pi * t);
+    final center = size.center(Offset.zero);
+    var r = size.shortestSide * 0.36;
+    var dx = 0.0;
+    var dy = 0.0;
+    var eyesClosed = false;
 
-    if (colorful) {
-      paint.shader = SweepGradient(
-        colors: _rainbow,
-        transform: GradientRotation(progress * 2 * math.pi),
-      ).createShader(rect);
-    } else {
-      paint.color = done ? const Color(0xFF34D399) : Colors.white.withValues(alpha: 0.85);
+    switch (step) {
+      case _Step.closer:
+        r *= 0.8 + 0.3 * swing;
+      case _Step.turnFirst:
+        dx = r * 0.45 * swing;
+      case _Step.turnSecond:
+        dx = -r * 0.45 * swing;
+      case _Step.nod:
+        dy = r * 0.32 * math.sin(2 * math.pi * t);
+      case _Step.blink:
+        eyesClosed = t > 0.45 && t < 0.6;
+      case _Step.align:
+      case _Step.color:
+        break;
     }
-    canvas.drawOval(rect, paint);
+
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    final fill = Paint()..color = color;
+
+    final head = Rect.fromCenter(center: center, width: r * 1.7, height: r * 2.1);
+    canvas.drawOval(head, stroke);
+
+    // Features slide inside the head outline, which reads as the head turning or tilting.
+    canvas.save();
+    canvas.clipPath(Path()..addOval(head));
+    final f = center + Offset(dx, dy);
+    for (final side in [-1.0, 1.0]) {
+      final eye = f + Offset(side * r * 0.35, -r * 0.2);
+      if (eyesClosed) {
+        canvas.drawLine(eye - Offset(r * 0.13, 0), eye + Offset(r * 0.13, 0), stroke);
+      } else {
+        canvas.drawCircle(eye, r * 0.1, fill);
+      }
+    }
+    canvas.drawLine(f + Offset(0, -r * 0.02), f + Offset(0, r * 0.22), stroke);
+    canvas.drawArc(Rect.fromCenter(center: f + Offset(0, r * 0.42), width: r * 0.6, height: r * 0.3), 0.15 * math.pi,
+        0.7 * math.pi, false, stroke);
+    canvas.restore();
+
+    // Arrows spell out the direction.
+    final arrowX = r * 1.35;
+    void chevron(Offset tip, double dirX, double dirY) {
+      final back = Offset(-dirX, -dirY) * (r * 0.28);
+      final side = Offset(-dirY, dirX) * (r * 0.22);
+      canvas.drawPath(
+        Path()
+          ..moveTo((tip + back + side).dx, (tip + back + side).dy)
+          ..lineTo(tip.dx, tip.dy)
+          ..lineTo((tip + back - side).dx, (tip + back - side).dy),
+        stroke,
+      );
+    }
+
+    switch (step) {
+      case _Step.turnFirst:
+        chevron(center + Offset(arrowX + r * 0.15 * swing, 0), 1, 0);
+      case _Step.turnSecond:
+        chevron(center + Offset(-arrowX - r * 0.15 * swing, 0), -1, 0);
+      case _Step.nod:
+        chevron(center + Offset(arrowX, -r * 0.45), 0, -1);
+        chevron(center + Offset(arrowX, r * 0.45), 0, 1);
+      case _Step.closer:
+        chevron(center + Offset(arrowX + r * 0.1 * swing, 0), 1, 0);
+        chevron(center + Offset(-arrowX - r * 0.1 * swing, 0), -1, 0);
+      case _Step.blink:
+      case _Step.align:
+      case _Step.color:
+        break;
+    }
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) =>
-      old.progress != progress || old.colorful != colorful || old.done != done;
+  bool shouldRepaint(_StepDemo old) => old.t != t || old.step != step || old.color != color;
 }

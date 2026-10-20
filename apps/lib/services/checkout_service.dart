@@ -69,6 +69,7 @@ class CheckoutService {
     required String districtCode,
     required String villageCode,
     required String addressDetail,
+    String? addressId,
     String? customerNotes,
     String? deliveryScheduleId,
     String? deliveryDate,
@@ -86,6 +87,7 @@ class CheckoutService {
       'district_code': districtCode,
       'village_code': villageCode,
       'address_detail': addressDetail,
+      'address_id': ?addressId,
       'customer_notes': customerNotes,
     });
     return Order.fromJson(response.data['data'] as Map<String, dynamic>);
@@ -99,11 +101,12 @@ class CheckoutService {
 
   /// Uploads the liveness recording; the server stores it for later review.
   Future<void> submitFaceVerification({required String videoPath, required List<String> steps}) async {
+    // multiCompatible sends `steps[]`; the default repeats a bare `steps`, which PHP collapses to one string.
     final form = FormData.fromMap({
       'video': await MultipartFile.fromFile(videoPath, filename: 'face-verification.mp4'),
       'steps': steps,
       'device': defaultTargetPlatform.name,
-    });
+    }, ListFormat.multiCompatible);
     await _apiClient.dio.post(
       '/checkout/face-verification',
       data: form,

@@ -52,6 +52,7 @@ class Order extends Model
         'shipped_proof_path',
         'shipped_at',
         'delivered_proof_path',
+        'packages',
         'cancelled_at',
         'cancel_hold_started_at',
         'cancel_declined_at',
@@ -72,6 +73,7 @@ class Order extends Model
             'delivery_date' => 'date',
             'delivery_slot' => 'array',
             'status_history' => 'array',
+            'packages' => 'array',
             'payment_expires_at' => 'datetime',
             'paid_at' => 'datetime',
             'accepted_at' => 'datetime',
@@ -142,6 +144,30 @@ class Order extends Model
         return in_array($next->value, self::TRANSITIONS[$this->status->value] ?? [], true);
     }
 
+    /** Most parcels one order may be split into. */
+    public const MAX_PACKAGES = 20;
+
+    /**
+     * The parcels the order ships in, each a list of {order_item_id, quantity}. Without a split
+     * by the admin this is a single parcel holding every item.
+     *
+     * @return list<list<array{order_item_id: string, quantity: int}>>
+     */
+    public function packingList(): array
+    {
+        return $this->packages ?: [
+            $this->items->map(fn (OrderItem $item) => [
+                'order_item_id' => $item->id,
+                'quantity' => (int) $item->quantity,
+            ])->values()->all(),
+        ];
+    }
+
+    public function packagesCount(): int
+    {
+        return max(1, count($this->packages ?? []));
+    }
+
     /**
      * Value printed as the parcel's QR code: "IO:<order number>:<signature>". The signature is an
      * HMAC of the order id, so a code cannot be forged from a guessed order number.
@@ -151,21 +177,43 @@ class Order extends Model
         return 'IO:'.$this->order_number.':'.$this->qrSignature();
     }
 
+    /** QR of one parcel (1-based): "IO:<order number>:<package>:<signature>". */
+    public function packageQrCode(int $package): string
+    {
+        return 'IO:'.$this->order_number.':'.$package.':'.$this->qrSignature($package);
+    }
+
+    /** Resolves an order QR or any of its parcel QRs. */
     public static function findByQrCode(string $code): ?self
     {
         $parts = explode(':', trim($code));
-        if (count($parts) !== 3 || $parts[0] !== 'IO') {
+        if (! in_array(count($parts), [3, 4], true) || $parts[0] !== 'IO') {
             return null;
         }
 
         $order = static::where('order_number', $parts[1])->first();
+        if (! $order) {
+            return null;
+        }
 
-        return $order && hash_equals($order->qrSignature(), $parts[2]) ? $order : null;
+        if (count($parts) === 3) {
+            return hash_equals($order->qrSignature(), $parts[2]) ? $order : null;
+        }
+
+        // A label from before a re-split may name a parcel that no longer exists.
+        $package = ctype_digit($parts[2]) ? (int) $parts[2] : 0;
+        if ($package < 1 || $package > $order->packagesCount()) {
+            return null;
+        }
+
+        return hash_equals($order->qrSignature($package), $parts[3]) ? $order : null;
     }
 
-    private function qrSignature(): string
+    private function qrSignature(?int $package = null): string
     {
-        return substr(hash_hmac('sha256', (string) $this->id, (string) config('app.key')), 0, 10);
+        $subject = $package === null ? (string) $this->id : $this->id.':'.$package;
+
+        return substr(hash_hmac('sha256', $subject, (string) config('app.key')), 0, 10);
     }
 
     public function isStorePickup(): bool

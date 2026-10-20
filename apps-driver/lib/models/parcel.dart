@@ -14,6 +14,7 @@ class Parcel {
     this.recipientName,
     this.address,
     this.itemsCount = 0,
+    this.packagesCount = 1,
     this.grandTotal = 0,
     this.codAmount = 0,
     this.customerNotes,
@@ -34,6 +35,7 @@ class Parcel {
     recipientName: json['recipient_name'] as String?,
     address: json['address'] as String?,
     itemsCount: (json['items_count'] as num?)?.toInt() ?? 0,
+    packagesCount: (json['packages_count'] as num?)?.toInt() ?? 1,
     grandTotal: parseNum(json['grand_total']),
     codAmount: parseNum(json['cod_amount']),
     customerNotes: json['customer_notes'] as String?,
@@ -49,6 +51,9 @@ class Parcel {
   final String? recipientName;
   final String? address;
   final int itemsCount;
+
+  /// Boxes the order ships in, each with its own QR; all of them travel together.
+  final int packagesCount;
   final double grandTotal;
 
   /// Cash to collect at the door; 0 when already paid.
