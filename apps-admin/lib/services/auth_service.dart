@@ -22,6 +22,18 @@ class AuthService {
     return AdminUser.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmation,
+  }) async {
+    await _api.dio.put('/admin/auth/password', data: {
+      'current_password': currentPassword,
+      'password': newPassword,
+      'password_confirmation': confirmation,
+    });
+  }
+
   Future<void> logout() async {
     try {
       await _api.dio.post('/admin/auth/logout');

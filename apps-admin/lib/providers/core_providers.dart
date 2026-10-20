@@ -6,6 +6,7 @@ import '../models/category.dart';
 import '../models/dashboard.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
+import '../services/cod_verification_service.dart';
 import '../services/dashboard_service.dart';
 import '../services/order_service.dart';
 
@@ -34,4 +35,8 @@ final categoriesProvider = FutureProvider.autoDispose<List<Category>>(
 
 final warehousesProvider = FutureProvider.autoDispose<List<Warehouse>>(
   (ref) => ref.watch(catalogServiceProvider).warehouses(),
+);
+
+final codVerificationServiceProvider = Provider<CodVerificationService>(
+  (ref) => CodVerificationService(ref.watch(apiClientProvider)),
 );

@@ -4,7 +4,10 @@ use App\Http\Controllers\Api\Admin\AdminAuthController;
 use App\Http\Controllers\Api\Admin\AdminStaffController;
 use App\Http\Controllers\Api\Admin\CustomerController;
 use App\Http\Controllers\Api\Admin\DriverController;
+use App\Http\Controllers\Api\Admin\DriverDeliveryController;
 use App\Http\Controllers\Api\V1\Admin\BannerController as AdminBannerController;
+use App\Http\Controllers\Api\V1\Admin\CodVerificationController as AdminCodVerificationController;
+use App\Http\Controllers\Api\V1\CodVerificationController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\V1\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\V1\Admin\DataTransferController as AdminDataTransferController;
@@ -66,6 +69,7 @@ use App\Http\Controllers\Api\V1\PublicProductController;
 use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\SearchController;
 use App\Http\Controllers\Api\V1\UserVerificationController;
+use App\Http\Middleware\EnsureDriver;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -204,6 +208,11 @@ Route::prefix('v1')->group(function () {
 
     Route::prefix('checkout')->middleware(['auth:sanctum', 'not.blocked', 'feature.ban:purchase'])->group(function () {
         Route::post('/', [CheckoutController::class, 'store']);
+        // One-time face check shared by COD and Paylater; /cod-verification is the older alias.
+        Route::get('/face-verification', [CodVerificationController::class, 'show']);
+        Route::post('/face-verification', [CodVerificationController::class, 'store'])->middleware('throttle:10,1');
+        Route::get('/cod-verification', [CodVerificationController::class, 'show']);
+        Route::post('/cod-verification', [CodVerificationController::class, 'store'])->middleware('throttle:10,1');
     });
 
     Route::prefix('orders')->middleware(['auth:sanctum', 'not.blocked'])->group(function () {
@@ -358,6 +367,7 @@ Route::prefix('admin')->group(function () {
         Route::prefix('auth')->group(function () {
             Route::get('/me', [AdminAuthController::class, 'me']);
             Route::post('/logout', [AdminAuthController::class, 'logout']);
+            Route::put('/password', [AdminAuthController::class, 'changePassword']);
             Route::get('/sessions', [AdminAuthController::class, 'sessions']);
             Route::delete('/sessions', [AdminAuthController::class, 'revokeOtherSessions']);
             Route::delete('/sessions/{id}', [AdminAuthController::class, 'revokeSession']);
@@ -381,6 +391,14 @@ Route::prefix('admin')->group(function () {
             Route::patch('/{driver}/status', [DriverController::class, 'setStatus']);
             Route::delete('/{driver}', [DriverController::class, 'destroy']);
             Route::get('/{driver}/orders', [DriverController::class, 'orders']);
+        });
+
+        // Driver app: scan a parcel's QR, then confirm pickup (shipped) or handover (delivered) with a photo.
+        Route::prefix('driver')->middleware(EnsureDriver::class)->group(function () {
+            Route::get('/orders', [DriverDeliveryController::class, 'index']);
+            Route::post('/scan', [DriverDeliveryController::class, 'scan']);
+            Route::post('/orders/{order}/ship', [DriverDeliveryController::class, 'ship']);
+            Route::post('/orders/{order}/deliver', [DriverDeliveryController::class, 'deliver']);
         });
 
         // Role & Permissions Management
@@ -497,6 +515,9 @@ Route::prefix('admin')->group(function () {
         Route::get('wallet-topups', [AdminWalletTopupController::class, 'index']);
         Route::get('wallet-topups/{topup}', [AdminWalletTopupController::class, 'show']);
         Route::get('wallet-report', [AdminWalletReportController::class, 'index']);
+
+        Route::get('cod-verifications', [AdminCodVerificationController::class, 'index']);
+        Route::post('cod-verifications/{codVerification}/revoke', [AdminCodVerificationController::class, 'revoke']);
 
         Route::get('dashboard', [AdminDashboardController::class, 'index']);
 

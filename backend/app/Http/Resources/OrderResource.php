@@ -42,6 +42,10 @@ class OrderResource extends JsonResource
             'accepted_at' => $this->accepted_at,
             'completed_at' => $this->completed_at,
             'cancelled_at' => $this->cancelled_at,
+            'qr_code' => $this->qrCode(),
+            'shipped_at' => $this->shipped_at,
+            'shipped_proof_url' => $this->shipped_proof_path ? asset('storage/'.$this->shipped_proof_path) : null,
+            'delivered_proof_url' => $this->delivered_proof_path ? asset('storage/'.$this->delivered_proof_path) : null,
             'can_cancel' => $this->buyerCanCancel(),
             'cancel_on_hold' => $this->isCancelOnHold(),
             // Relative (and frozen while on hold), so the app's countdown ignores the device clock.

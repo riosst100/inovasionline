@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/theme.dart';
@@ -49,6 +50,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final notes = await showModalBottomSheet<_StatusChange>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (_) => _StatusChangeSheet(order: order, next: next),
     );
     if (notes == null || !mounted) return;
@@ -83,7 +85,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                       child: ErrorView(message: errorMessage(_error!), onRetry: _load),
                     )
                   : const Center(child: CircularProgressIndicator()))
-            : RefreshIndicator(onRefresh: _load, child: _body(order)),
+            : SafeArea(
+                top: false,
+                child: RefreshIndicator(onRefresh: _load, child: _body(order)),
+              ),
         bottomNavigationBar: order == null || order.nextStatuses.isEmpty ? null : _actions(order),
       ),
     );
@@ -117,6 +122,21 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             if (order.paidAt != null) _Row('Dibayar', formatDateTime(order.paidAt!)),
           ],
         ),
+        if (order.qrCode != null && order.deliveryMethod != 'store_pickup' && order.status.next().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _Section(
+            title: 'QR Paket',
+            children: [
+              Center(child: QrImageView(data: order.qrCode!, size: 180, backgroundColor: Colors.white)),
+              const SizedBox(height: 4),
+              const Text(
+                'Driver scan QR ini saat mengambil dan menyerahkan paket.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.mutedForeground, fontSize: 12),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 12),
         _Section(
           title: 'Pengiriman',

@@ -33,6 +33,7 @@ import {
   Coins,
   ArrowUpCircle,
   FileBarChart,
+  ScanFace,
   ArrowDownUp,
   Bike,
   CalendarClock,
@@ -160,6 +161,7 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
             { name: 'Laporan', href: '/dashboard/wallet-report', icon: FileBarChart },
           ],
         },
+        { name: 'Verifikasi COD', href: '/dashboard/cod-verifications', icon: ScanFace },
         { name: 'User', href: '/dashboard/users', icon: UserCog, badge: 'Internal' },
         {
           name: 'Hak Akses & Role',

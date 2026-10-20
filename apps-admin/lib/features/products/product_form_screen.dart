@@ -165,6 +165,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   Future<void> _imageAction(ProductImage image) async {
     final action = await showModalBottomSheet<String>(
       context: context,
+      useSafeArea: true,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

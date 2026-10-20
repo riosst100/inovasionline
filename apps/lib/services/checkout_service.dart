@@ -1,3 +1,6 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
 import '../core/api/api_client.dart';
 import '../models/delivery_schedule.dart';
 import '../models/order.dart';
@@ -86,5 +89,25 @@ class CheckoutService {
       'customer_notes': customerNotes,
     });
     return Order.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  /// Whether this account already passed the one-time face check (COD and Paylater).
+  Future<bool> faceVerified() async {
+    final response = await _apiClient.dio.get('/checkout/face-verification');
+    return (response.data['data'] as Map)['verified'] == true;
+  }
+
+  /// Uploads the liveness recording; the server stores it for later review.
+  Future<void> submitFaceVerification({required String videoPath, required List<String> steps}) async {
+    final form = FormData.fromMap({
+      'video': await MultipartFile.fromFile(videoPath, filename: 'face-verification.mp4'),
+      'steps': steps,
+      'device': defaultTargetPlatform.name,
+    });
+    await _apiClient.dio.post(
+      '/checkout/face-verification',
+      data: form,
+      options: Options(sendTimeout: const Duration(minutes: 2), receiveTimeout: const Duration(minutes: 2)),
+    );
   }
 }

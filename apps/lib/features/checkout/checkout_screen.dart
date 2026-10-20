@@ -2,12 +2,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../core/utils/formatters.dart';
 import '../../models/cart.dart';
 import '../../models/delivery_schedule.dart';
 import '../../models/payment_method.dart';
 import '../../models/shipping_method.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/core_providers.dart';
 import '../../widgets/address_picker.dart';
 import '../wallet/topup_screen.dart';
 import '../wallet/wallet_providers.dart';
@@ -63,7 +65,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (cfg == null || cfg['is_active'] != true) return 0;
     final value = (cfg['value'] as num?)?.toDouble() ?? 0;
     if (value <= 0) return 0;
-    var fee = cfg['type'] == 'percent' ? widget.selection.subtotal * value / 100 : value;
+    var fee = cfg['type'] == 'percent'
+        ? widget.selection.subtotal * value / 100
+        : value;
     final min = (cfg['min_fee'] as num?)?.toDouble();
     final max = (cfg['max_fee'] as num?)?.toDouble();
     if (min != null && fee < min) fee = min;
@@ -72,13 +76,23 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   String get _serviceFeeLabel =>
-      ref.watch(checkoutServiceFeeConfigProvider).valueOrNull?['label'] as String? ?? 'Biaya Layanan';
+      ref.watch(checkoutServiceFeeConfigProvider).valueOrNull?['label']
+          as String? ??
+      'Biaya Layanan';
 
-  double get _total => widget.selection.subtotal + (_shippingMethod?.displayFee ?? 0) + _serviceFee;
+  double get _total =>
+      widget.selection.subtotal +
+      (_shippingMethod?.displayFee ?? 0) +
+      _serviceFee;
 
-  bool get _scheduleMissing => _shippingMethod?.requiresSchedule == true && _deliverySlot == null;
+  bool get _scheduleMissing =>
+      _shippingMethod?.requiresSchedule == true && _deliverySlot == null;
 
-  bool get _canSubmit => _paymentMethod != null && _shippingMethod != null && !_scheduleMissing && _addressStepDone;
+  bool get _canSubmit =>
+      _paymentMethod != null &&
+      _shippingMethod != null &&
+      !_scheduleMissing &&
+      _addressStepDone;
 
   Future<void> _editAddress() async {
     final result = await showModalBottomSheet<_AddressFormResult>(
@@ -95,8 +109,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
     if (result == null) return;
 
-    final districtChanged = result.address.district?.code != _address.district?.code;
-    final villageChanged = result.address.village?.code != _address.village?.code;
+    final districtChanged =
+        result.address.district?.code != _address.district?.code;
+    final villageChanged =
+        result.address.village?.code != _address.village?.code;
 
     setState(() {
       _recipientNameController.text = result.name;
@@ -114,7 +130,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final methods = await ref.read(checkoutPaymentMethodsProvider.future);
     // Fresh balance: it may have changed (top-up, refund) since the screen opened.
     ref.invalidate(walletProvider);
-    final walletBalance = await ref.read(walletProvider.future).then((w) => w?.balance, onError: (_) => null);
+    final walletBalance = await ref
+        .read(walletProvider.future)
+        .then((w) => w?.balance, onError: (_) => null);
     if (!mounted) return;
     final selected = await showModalBottomSheet<PaymentMethod>(
       context: context,
@@ -138,24 +156,30 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    final methods = await ref.read(checkoutShippingMethodsProvider((
-      districtCode: district.code,
-      villageCode: _address.village?.code,
-    )).future);
+    final methods = await ref.read(
+      checkoutShippingMethodsProvider((
+        districtCode: district.code,
+        villageCode: _address.village?.code,
+      )).future,
+    );
     if (!mounted) return;
     final selected = await showModalBottomSheet<ShippingMethod>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _ShippingMethodPickerSheet(methods: methods, selected: _shippingMethod),
+      builder: (context) => _ShippingMethodPickerSheet(
+        methods: methods,
+        selected: _shippingMethod,
+      ),
     );
     if (selected == null || !mounted) return;
     setState(() {
       if (selected.id != _shippingMethod?.id) _deliverySlot = null;
       _shippingMethod = selected;
     });
-    if (selected.requiresSchedule && _deliverySlot == null) await _pickDeliverySlot();
+    if (selected.requiresSchedule && _deliverySlot == null)
+      await _pickDeliverySlot();
   }
 
   Future<void> _pickDeliverySlot() async {
@@ -165,7 +189,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     ref.invalidate(checkoutDeliverySchedulesProvider(method.id));
     final List<DeliveryDay> days;
     try {
-      days = await ref.read(checkoutDeliverySchedulesProvider(method.id).future);
+      days = await ref.read(
+        checkoutDeliverySchedulesProvider(method.id).future,
+      );
     } catch (_) {
       if (mounted) _showSnack('Gagal memuat jadwal pengiriman.');
       return;
@@ -176,7 +202,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _DeliverySlotPickerSheet(days: days, selected: _deliverySlot),
+      builder: (context) =>
+          _DeliverySlotPickerSheet(days: days, selected: _deliverySlot),
     );
     if (selected != null) setState(() => _deliverySlot = selected);
   }
@@ -184,7 +211,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        ),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -208,13 +238,35 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
+  /// COD and Paylater need the one-time face check; once passed, the server remembers it.
+  Future<bool> _ensureFaceVerified() async {
+    final service = ref.read(checkoutServiceProvider);
+    try {
+      if (await service.faceVerified()) return true;
+    } catch (_) {
+      _showSnack('Gagal memeriksa status verifikasi wajah. Coba lagi.');
+      return false;
+    }
+    if (!mounted) return false;
+    final passed = await context.push<bool>('/face-verification');
+    if (passed != true) {
+      if (mounted) _showSnack('Verifikasi wajah diperlukan untuk metode pembayaran ini.');
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _submit() async {
     if (!_canSubmit) {
       _handleDisabledSubmitTap();
       return;
     }
 
-    final success = await ref.read(checkoutProvider.notifier).submit(
+    if (_paymentMethod!.needsFaceVerification && !await _ensureFaceVerified()) return;
+
+    final success = await ref
+        .read(checkoutProvider.notifier)
+        .submit(
           cartItemIds: widget.selection.items.map((item) => item.id).toList(),
           paymentMethodId: _paymentMethod!.id,
           shippingMethodId: _shippingMethod!.id,
@@ -225,9 +277,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           districtCode: _address.district!.code,
           villageCode: _address.village!.code,
           addressDetail: _addressDetailController.text.trim(),
-          customerNotes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-          deliveryScheduleId: _shippingMethod!.requiresSchedule ? _deliverySlot?.slot.scheduleId : null,
-          deliveryDate: _shippingMethod!.requiresSchedule ? _deliverySlot?.slot.date : null,
+          customerNotes: _notesController.text.trim().isEmpty
+              ? null
+              : _notesController.text.trim(),
+          deliveryScheduleId: _shippingMethod!.requiresSchedule
+              ? _deliverySlot?.slot.scheduleId
+              : null,
+          deliveryDate: _shippingMethod!.requiresSchedule
+              ? _deliverySlot?.slot.date
+              : null,
         );
 
     if (!mounted) return;
@@ -238,7 +296,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         context.go('/orders/${order.id}');
         _showSnack('Pesanan berhasil dibuat!');
         if (order.needsOnlinePayment && order.paymentRedirectUrl != null) {
-          context.push('/orders/${order.id}/pay', extra: order.paymentRedirectUrl);
+          context.push(
+            '/orders/${order.id}/pay',
+            extra: order.paymentRedirectUrl,
+          );
         }
       }
     } else {
@@ -269,7 +330,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         scrolledUnderElevation: 1,
         titleSpacing: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Color(0xFF1E293B)),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: Color(0xFF1E293B),
+          ),
           onPressed: () => context.pop(),
         ),
         title: const Column(
@@ -287,7 +352,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             SizedBox(height: 1),
             Text(
               'Periksa rincian & selesaikan pembayaran',
-              style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 11,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -307,7 +376,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 SizedBox(width: 4),
                 Text(
                   '100% Aman',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF15803D),
+                  ),
                 ),
               ],
             ),
@@ -365,29 +438,37 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF94A3B8)),
+                        Icon(
+                          Icons.lock_outline_rounded,
+                          size: 16,
+                          color: Color(0xFF94A3B8),
+                        ),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Lengkapi alamat terlebih dahulu untuk memilih kurir & ongkir.',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   )
                 : _shippingMethod != null
-                    ? _SelectedShippingTile(
-                        method: _shippingMethod!,
-                        deliverySlot: _deliverySlot,
-                        onPickSlot: _pickDeliverySlot,
-                      )
-                    : _EmptyStepPrompt(
-                        icon: Icons.delivery_dining_outlined,
-                        title: 'Pilih Metode Kurir & Pengiriman',
-                        subtitle: 'Pilih pengiriman instan atau pengiriman terjadwal.',
-                        onTap: _pickShippingMethod,
-                      ),
+                ? _SelectedShippingTile(
+                    method: _shippingMethod!,
+                    deliverySlot: _deliverySlot,
+                    onPickSlot: _pickDeliverySlot,
+                  )
+                : _EmptyStepPrompt(
+                    icon: Icons.delivery_dining_outlined,
+                    title: 'Pilih Metode Kurir & Pengiriman',
+                    subtitle:
+                        'Pilih pengiriman instan atau pengiriman terjadwal.',
+                    onTap: _pickShippingMethod,
+                  ),
           ),
           const SizedBox(height: 14),
 
@@ -459,7 +540,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     children: [
                       const Text(
                         'Total Pembayaran',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -480,29 +565,42 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   child: SizedBox(
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _canSubmit && !checkoutState.submitting ? _submit : null,
+                      onPressed: _canSubmit && !checkoutState.submitting
+                          ? _submit
+                          : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0D9488),
                         disabledBackgroundColor: const Color(0xFFCBD5E1),
                         foregroundColor: Colors.white,
-                        disabledForegroundColor: Colors.white.withValues(alpha: 0.9),
+                        disabledForegroundColor: Colors.white.withValues(
+                          alpha: 0.9,
+                        ),
                         elevation: _canSubmit ? 2 : 0,
-                        shadowColor: const Color(0xFF0D9488).withValues(alpha: 0.35),
+                        shadowColor: const Color(0xFF0D9488)
+                            .withValues(alpha: 0.35),
                         padding: const EdgeInsets.symmetric(horizontal: 26),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       child: checkoutState.submitting
                           ? const SizedBox(
                               height: 18,
                               width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   'Buat Pesanan',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
                                 ),
                                 SizedBox(width: 6),
                                 Icon(Icons.arrow_forward_rounded, size: 18),
@@ -563,7 +661,11 @@ class _ItemsCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Center(
-                    child: Icon(Icons.shopping_bag_outlined, size: 18, color: Color(0xFF0D9488)),
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      size: 18,
+                      color: Color(0xFF0D9488),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -573,11 +675,18 @@ class _ItemsCard extends StatelessWidget {
                     children: [
                       const Text(
                         'Produk Dipesan',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                       Text(
                         '${selection.items.length} Barang dipesan',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                        ),
                       ),
                     ],
                   ),
@@ -619,11 +728,19 @@ class _ItemsCard extends StatelessWidget {
               children: [
                 Text(
                   'Subtotal (${selection.items.length} Produk)',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
                 Text(
                   formatCurrency(selection.subtotal),
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
               ],
             ),
@@ -651,7 +768,8 @@ class _CheckoutItemRow extends StatelessWidget {
             width: 48,
             height: 48,
             color: const Color(0xFFF1F5F9),
-            child: item.productImageUrl != null && item.productImageUrl!.isNotEmpty
+            child:
+                item.productImageUrl != null && item.productImageUrl!.isNotEmpty
                 ? CachedNetworkImage(
                     imageUrl: item.productImageUrl!,
                     fit: BoxFit.cover,
@@ -659,12 +777,23 @@ class _CheckoutItemRow extends StatelessWidget {
                       child: SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0D9488)),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF0D9488),
+                        ),
                       ),
                     ),
-                    errorWidget: (_, _, _) => const Icon(Icons.image_outlined, color: Color(0xFF94A3B8), size: 24),
+                    errorWidget: (_, _, _) => const Icon(
+                      Icons.image_outlined,
+                      color: Color(0xFF94A3B8),
+                      size: 24,
+                    ),
                   )
-                : const Icon(Icons.shopping_basket_outlined, color: Color(0xFF94A3B8), size: 24),
+                : const Icon(
+                    Icons.shopping_basket_outlined,
+                    color: Color(0xFF94A3B8),
+                    size: 24,
+                  ),
           ),
         ),
         const SizedBox(width: 12),
@@ -676,16 +805,24 @@ class _CheckoutItemRow extends StatelessWidget {
             children: [
               Text(
                 item.productName,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Row(
                 children: [
-                  if (item.variantName != null && item.variantName!.isNotEmpty) ...[
+                  if (item.variantName != null &&
+                      item.variantName!.isNotEmpty) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1.5,
+                      ),
                       margin: const EdgeInsets.only(right: 6),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF1F5F9),
@@ -693,13 +830,21 @@ class _CheckoutItemRow extends StatelessWidget {
                       ),
                       child: Text(
                         item.variantName!,
-                        style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
                   Text(
                     '${item.quantity} x ${formatCurrency(item.unitPrice)}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -710,7 +855,11 @@ class _CheckoutItemRow extends StatelessWidget {
         // Line Total
         Text(
           formatCurrency(item.lineTotal),
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+          ),
         ),
       ],
     );
@@ -751,7 +900,9 @@ class _StepCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: done ? iconColor.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+          color: done
+              ? iconColor.withValues(alpha: 0.3)
+              : const Color(0xFFE2E8F0),
           width: done ? 1.4 : 1,
         ),
         boxShadow: [
@@ -774,11 +925,17 @@ class _StepCard extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: done ? iconColor.withValues(alpha: 0.12) : const Color(0xFFF1F5F9),
+                    color: done
+                        ? iconColor.withValues(alpha: 0.12)
+                        : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
-                    child: Icon(icon, size: 18, color: done ? iconColor : const Color(0xFF64748B)),
+                    child: Icon(
+                      icon,
+                      size: 18,
+                      color: done ? iconColor : const Color(0xFF64748B),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -787,7 +944,11 @@ class _StepCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                       if (done) ...[
                         const SizedBox(width: 6),
@@ -797,7 +958,11 @@ class _StepCard extends StatelessWidget {
                             color: Color(0xFF10B981),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.check, size: 10, color: Colors.white),
+                          child: const Icon(
+                            Icons.check,
+                            size: 10,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ],
@@ -808,7 +973,10 @@ class _StepCard extends StatelessWidget {
                     onTap: onTap,
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -836,10 +1004,7 @@ class _StepCard extends StatelessWidget {
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
 
           // Step Body
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
     );
@@ -870,7 +1035,10 @@ class _EmptyStepPrompt extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
+          border: Border.all(
+            color: const Color(0xFFE2E8F0),
+            style: BorderStyle.solid,
+          ),
         ),
         child: Row(
           children: [
@@ -890,17 +1058,28 @@ class _EmptyStepPrompt extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
+              color: Color(0xFF94A3B8),
+            ),
           ],
         ),
       ),
@@ -937,30 +1116,57 @@ class _AddressSummary extends StatelessWidget {
               ),
               child: const Text(
                 'Penerima',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0284C7),
+                ),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               name,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
+              ),
             ),
-            const Text(' · ', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+            const Text(
+              ' · ',
+              style: TextStyle(
+                color: Color(0xFF94A3B8),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             Text(
               phone,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF475569),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 8),
         Text(
           detail,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B), height: 1.35),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E293B),
+            height: 1.35,
+          ),
         ),
         const SizedBox(height: 3),
         Text(
           regionLine,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF64748B),
+            height: 1.3,
+          ),
         ),
       ],
     );
@@ -969,7 +1175,11 @@ class _AddressSummary extends StatelessWidget {
 
 // Selected Shipping Method view
 class _SelectedShippingTile extends StatelessWidget {
-  const _SelectedShippingTile({required this.method, this.deliverySlot, this.onPickSlot});
+  const _SelectedShippingTile({
+    required this.method,
+    this.deliverySlot,
+    this.onPickSlot,
+  });
 
   final ShippingMethod method;
   final SelectedDeliverySlot? deliverySlot;
@@ -1006,14 +1216,20 @@ class _SelectedShippingTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: slot == null ? const Color(0xFFFCA5A5) : const Color(0xFFBBF7D0)),
+          border: Border.all(
+            color: slot == null
+                ? const Color(0xFFFCA5A5)
+                : const Color(0xFFBBF7D0),
+          ),
         ),
         child: Row(
           children: [
             Icon(
               Icons.event_available_rounded,
               size: 16,
-              color: slot == null ? const Color(0xFFDC2626) : const Color(0xFF15803D),
+              color: slot == null
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFF15803D),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1022,13 +1238,19 @@ class _SelectedShippingTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: slot == null ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                  color: slot == null
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF0F172A),
                 ),
               ),
             ),
             Text(
               slot == null ? 'Pilih' : 'Ubah',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0D9488)),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0D9488),
+              ),
             ),
           ],
         ),
@@ -1038,70 +1260,96 @@ class _SelectedShippingTile extends StatelessWidget {
 
   Widget _buildMethodRow() {
     return Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              method.requiresSchedule ? Icons.event_available_rounded : Icons.bolt_rounded,
-              size: 20,
-              color: const Color(0xFF16A34A),
-            ),
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFFDCFCE7),
+            borderRadius: BorderRadius.circular(10),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        method.name,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+          child: Icon(
+            method.requiresSchedule
+                ? Icons.event_available_rounded
+                : Icons.bolt_rounded,
+            size: 20,
+            color: const Color(0xFF16A34A),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      method.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16A34A),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      method.requiresSchedule ? 'Terjadwal' : 'Cepat',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF16A34A),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        method.requiresSchedule ? 'Terjadwal' : 'Cepat',
-                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              if (method.estimatedDeliveryTime != null &&
+                  method.estimatedDeliveryTime!.isNotEmpty)
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.access_time_rounded,
+                      size: 12,
+                      color: Color(0xFF15803D),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      method.estimatedDeliveryTime!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF15803D),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                if (method.estimatedDeliveryTime != null && method.estimatedDeliveryTime!.isNotEmpty)
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF15803D)),
-                      const SizedBox(width: 4),
-                      Text(
-                        method.estimatedDeliveryTime!,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+            ],
           ),
-          Text(
-            method.displayFee == 0 ? 'GRATIS' : formatCurrency(method.displayFee),
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
+        ),
+        Text(
+          method.displayFee == 0 ? 'GRATIS' : formatCurrency(method.displayFee),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF15803D),
           ),
-        ],
-      );
+        ),
+      ],
+    );
   }
 }
 
@@ -1117,7 +1365,7 @@ class _SelectedPaymentTile extends StatelessWidget {
     Color iconColor = const Color(0xFF7C3AED);
     Color bgIcon = const Color(0xFFEDE9FE);
 
-    if (method.type == 'cod') {
+    if (method.isCod) {
       iconData = Icons.payments_rounded;
       iconColor = const Color(0xFFEA580C);
       bgIcon = const Color(0xFFFFEDD5);
@@ -1154,14 +1402,22 @@ class _SelectedPaymentTile extends StatelessWidget {
               children: [
                 Text(
                   method.name,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   method.type == 'bank_transfer' && method.bankName != null
                       ? 'Bank: ${method.bankName}'
-                      : (method.description ?? 'Metode pembayaran terverifikasi'),
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      : (method.description ??
+                            'Metode pembayaran terverifikasi'),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
               ],
             ),
@@ -1174,7 +1430,11 @@ class _SelectedPaymentTile extends StatelessWidget {
             ),
             child: const Text(
               'Terpilih',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -1221,7 +1481,11 @@ class _CustomerNotesCard extends StatelessWidget {
               SizedBox(width: 8),
               Text(
                 'Catatan untuk Kurir (opsional)',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: Color(0xFF0F172A),
+                ),
               ),
             ],
           ),
@@ -1232,7 +1496,10 @@ class _CustomerNotesCard extends StatelessWidget {
             style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
             decoration: InputDecoration(
               hintText: 'Contoh: Titip di satpam, pagar warna hitam, dll...',
-              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              hintStyle: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
+              ),
               fillColor: const Color(0xFFF8FAFC),
               filled: true,
               contentPadding: const EdgeInsets.all(12),
@@ -1246,7 +1513,10 @@ class _CustomerNotesCard extends StatelessWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF0D9488), width: 1.5),
+                borderSide: const BorderSide(
+                  color: Color(0xFF0D9488),
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -1256,29 +1526,37 @@ class _CustomerNotesCard extends StatelessWidget {
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: [
-              'Titip di satpam',
-              'Hubungi sebelum sampai',
-              'Taruh depan pintu',
-              'Jangan tekan bel',
-            ].map((text) {
-              return InkWell(
-                onTap: () => onPresetSelected(text),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+            children:
+                [
+                  'Titip di satpam',
+                  'Hubungi sebelum sampai',
+                  'Taruh depan pintu',
+                  'Jangan tekan bel',
+                ].map((text) {
+                  return InkWell(
+                    onTap: () => onPresetSelected(text),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Text(
-                    '+ $text',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                  ),
-                ),
-              );
-            }).toList(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Text(
+                        '+ $text',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
           ),
         ],
       ),
@@ -1326,27 +1604,44 @@ class _OrderSummaryCard extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.receipt_long_rounded, size: 20, color: Color(0xFF0D9488)),
+              Icon(
+                Icons.receipt_long_rounded,
+                size: 20,
+                color: Color(0xFF0D9488),
+              ),
               SizedBox(width: 8),
               Text(
                 'Rincian Pembayaran',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: Color(0xFF0F172A),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _SummaryLine(label: 'Total Harga Produk', value: formatCurrency(subtotal)),
+          _SummaryLine(
+            label: 'Total Harga Produk',
+            value: formatCurrency(subtotal),
+          ),
           const SizedBox(height: 8),
           _SummaryLine(
             label: 'Biaya Pengiriman',
-            value: shippingFee != null ? (shippingFee == 0 ? 'GRATIS' : formatCurrency(shippingFee!)) : 'Pilih kurir',
-            valueColor: shippingFee != null ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+            value: shippingFee != null
+                ? (shippingFee == 0 ? 'GRATIS' : formatCurrency(shippingFee!))
+                : 'Pilih kurir',
+            valueColor: shippingFee != null
+                ? const Color(0xFF0F172A)
+                : const Color(0xFF94A3B8),
           ),
           const SizedBox(height: 8),
           _SummaryLine(
             label: serviceFeeLabel,
             value: serviceFee > 0 ? formatCurrency(serviceFee) : 'GRATIS',
-            valueColor: serviceFee > 0 ? const Color(0xFF0F172A) : const Color(0xFF16A34A),
+            valueColor: serviceFee > 0
+                ? const Color(0xFF0F172A)
+                : const Color(0xFF16A34A),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -1357,11 +1652,19 @@ class _OrderSummaryCard extends StatelessWidget {
             children: [
               const Text(
                 'Total Tagihan',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
               ),
               Text(
                 formatCurrency(total),
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0D9488)),
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0D9488),
+                ),
               ),
             ],
           ),
@@ -1387,8 +1690,22 @@ class _SummaryLine extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: valueColor)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF64748B),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+          ),
+        ),
       ],
     );
   }
@@ -1430,8 +1747,12 @@ class _AddressFormSheet extends StatefulWidget {
 
 class _AddressFormSheetState extends State<_AddressFormSheet> {
   late final _nameController = TextEditingController(text: widget.initialName);
-  late final _phoneController = TextEditingController(text: widget.initialPhone);
-  late final _detailController = TextEditingController(text: widget.initialDetail);
+  late final _phoneController = TextEditingController(
+    text: widget.initialPhone,
+  );
+  late final _detailController = TextEditingController(
+    text: widget.initialDetail,
+  );
   AddressSelection _address = const AddressSelection();
 
   bool get _valid =>
@@ -1476,7 +1797,9 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
           topRight: Radius.circular(24),
         ),
       ),
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.9,
         minChildSize: 0.5,
@@ -1502,11 +1825,18 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
                     const Expanded(
                       child: Text(
                         'Alamat Pengiriman',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: Color(0xFF0F172A),
+                        ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
@@ -1522,7 +1852,10 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
                       controller: _nameController,
                       decoration: const InputDecoration(
                         labelText: 'Nama Penerima',
-                        prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                        prefixIcon: Icon(
+                          Icons.person_outline_rounded,
+                          size: 20,
+                        ),
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
@@ -1539,7 +1872,8 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
                     const SizedBox(height: 18),
                     AddressPicker(
                       initial: _address,
-                      onChanged: (selection) => setState(() => _address = selection),
+                      onChanged: (selection) =>
+                          setState(() => _address = selection),
                     ),
                     const SizedBox(height: 14),
                     TextField(
@@ -1565,9 +1899,14 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
                       onPressed: _valid ? _save : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0D9488),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                      child: const Text('Simpan Alamat Pengiriman', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Simpan Alamat Pengiriman',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ),
@@ -1610,8 +1949,8 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
       subtitle: balance == null
           ? 'Memuat saldo…'
           : enough
-              ? 'Saldo ${formatCurrency(balance)}'
-              : 'Saldo ${formatCurrency(balance)} · kurang ${formatCurrency(total - balance)}, ketuk untuk top up',
+          ? 'Saldo ${formatCurrency(balance)}'
+          : 'Saldo ${formatCurrency(balance)} · kurang ${formatCurrency(total - balance)}, ketuk untuk top up',
       badge: enough ? 'Instan' : 'Top Up',
       selected: selected?.id == method.id,
       onTap: () {
@@ -1621,6 +1960,41 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
           Navigator.of(context).pop();
           context.push('/wallet/topup', extra: topupFromCheckout);
         }
+      },
+    );
+  }
+
+  /// Paylater: locked (with the reason) until the buyer has enough completed transactions.
+  Widget _paylaterTile(BuildContext context, PaymentMethod method) {
+    final info = method.paylater;
+    // Not logged in / eligibility unknown: leave it selectable, the server enforces the rule.
+    final locked = info != null && !info.available;
+    final subtitle = locked
+        ? (info.reason ?? 'Belum memenuhi syarat transaksi untuk Paylater.')
+        : info != null && info.requiresVerification
+        ? 'Verifikasi wajah diperlukan saat pertama kali memakai Paylater.'
+        : method.description;
+
+    return _PickerOptionTile(
+      icon: Icons.schedule_rounded,
+      iconColor: const Color(0xFFDB2777),
+      title: method.name,
+      subtitle: subtitle,
+      badge: locked ? 'Belum tersedia' : 'Bayar Nanti',
+      enabled: !locked,
+      selected: selected?.id == method.id,
+      onTap: () {
+        if (locked) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(info.reason ?? 'Paylater belum bisa digunakan.'),
+              ),
+            );
+          return;
+        }
+        Navigator.of(context).pop(method);
       },
     );
   }
@@ -1635,10 +2009,13 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
   }
 
   static IconData _iconFor(PaymentMethod method) {
-    if (method.type == 'cod') return Icons.payments_rounded;
+    if (method.isCod) return Icons.payments_rounded;
     if (method.type == 'bank_transfer') return Icons.account_balance_rounded;
     return switch (method.group) {
-      'E-Wallet & QRIS' => method.gatewayChannel == 'other_qris' ? Icons.qr_code_2_rounded : Icons.account_balance_wallet_rounded,
+      'E-Wallet & QRIS' =>
+        method.gatewayChannel == 'other_qris'
+            ? Icons.qr_code_2_rounded
+            : Icons.account_balance_wallet_rounded,
       'Virtual Account' => Icons.account_balance_rounded,
       'Kartu' => Icons.credit_card_rounded,
       _ => Icons.account_balance_wallet_rounded,
@@ -1680,10 +2057,17 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                   children: [
                     const Text(
                       'Pilih Metode Pembayaran',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
@@ -1707,27 +2091,37 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                           padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
                           child: Text(
                             group.key,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF64748B),
+                            ),
                           ),
                         ),
                       for (final method in group.value)
                         if (method.isWallet)
                           _walletTile(context, method)
+                        else if (method.isPaylater)
+                          _paylaterTile(context, method)
                         else
                           _PickerOptionTile(
                             icon: _iconFor(method),
-                            iconColor: method.type == 'cod'
+                            iconColor: method.isCod
                                 ? const Color(0xFFEA580C)
                                 : method.type == 'bank_transfer'
-                                    ? const Color(0xFF2563EB)
-                                    : const Color(0xFF7C3AED),
+                                ? const Color(0xFF2563EB)
+                                : const Color(0xFF7C3AED),
                             title: method.name,
-                            subtitle: method.type == 'bank_transfer' && method.bankName != null
+                            subtitle:
+                                method.type == 'bank_transfer' &&
+                                    method.bankName != null
                                 ? method.bankName
                                 : method.description,
-                            badge: method.type == 'cod'
+                            badge: method.isCod
                                 ? 'COD'
-                                : (method.type == 'bank_transfer' ? 'Transfer' : null),
+                                : (method.type == 'bank_transfer'
+                                      ? 'Transfer'
+                                      : null),
                             selected: selected?.id == method.id,
                             onTap: () => Navigator.of(context).pop(method),
                           ),
@@ -1787,10 +2181,17 @@ class _ShippingMethodPickerSheet extends StatelessWidget {
                   children: [
                     const Text(
                       'Pilih Opsi Pengiriman',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
@@ -1810,14 +2211,22 @@ class _ShippingMethodPickerSheet extends StatelessWidget {
                 ),
               for (final method in methods)
                 _PickerOptionTile(
-                  icon: method.requiresSchedule ? Icons.event_available_rounded : Icons.bolt_rounded,
-                  iconColor: method.requiresSchedule ? const Color(0xFF2563EB) : const Color(0xFF16A34A),
+                  icon: method.requiresSchedule
+                      ? Icons.event_available_rounded
+                      : Icons.bolt_rounded,
+                  iconColor: method.requiresSchedule
+                      ? const Color(0xFF2563EB)
+                      : const Color(0xFF16A34A),
                   title: method.name,
                   subtitle: method.estimatedDeliveryTime,
                   badge: method.requiresSchedule
                       ? 'Terjadwal'
-                      : (method.type == 'io_express' || method.isTableRate ? 'Instan' : 'Reguler'),
-                  trailing: method.displayFee == 0 ? 'GRATIS' : formatCurrency(method.displayFee),
+                      : (method.type == 'io_express' || method.isTableRate
+                            ? 'Instan'
+                            : 'Reguler'),
+                  trailing: method.displayFee == 0
+                      ? 'GRATIS'
+                      : formatCurrency(method.displayFee),
                   selected: selected?.id == method.id,
                   onTap: () => Navigator.of(context).pop(method),
                 ),
@@ -1839,7 +2248,8 @@ class _DeliverySlotPickerSheet extends StatefulWidget {
   final SelectedDeliverySlot? selected;
 
   @override
-  State<_DeliverySlotPickerSheet> createState() => _DeliverySlotPickerSheetState();
+  State<_DeliverySlotPickerSheet> createState() =>
+      _DeliverySlotPickerSheetState();
 }
 
 class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
@@ -1848,9 +2258,13 @@ class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
   @override
   void initState() {
     super.initState();
-    final selectedIndex = widget.days.indexWhere((d) => d.date == widget.selected?.slot.date);
+    final selectedIndex = widget.days.indexWhere(
+      (d) => d.date == widget.selected?.slot.date,
+    );
     final firstOpen = widget.days.indexWhere((d) => d.hasAvailable);
-    _dayIndex = selectedIndex >= 0 ? selectedIndex : (firstOpen >= 0 ? firstOpen : 0);
+    _dayIndex = selectedIndex >= 0
+        ? selectedIndex
+        : (firstOpen >= 0 ? firstOpen : 0);
   }
 
   @override
@@ -1890,10 +2304,17 @@ class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
                   children: [
                     const Text(
                       'Pilih Jadwal Pengiriman',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A)),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
@@ -1927,10 +2348,14 @@ class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           decoration: BoxDecoration(
-                            color: active ? const Color(0xFFF0FDF4) : Colors.white,
+                            color: active
+                                ? const Color(0xFFF0FDF4)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: active ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0),
+                              color: active
+                                  ? const Color(0xFF0D9488)
+                                  : const Color(0xFFE2E8F0),
                               width: active ? 1.6 : 1,
                             ),
                           ),
@@ -1942,14 +2367,18 @@ class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
-                                  color: d.hasAvailable ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                                  color: d.hasAvailable
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFF94A3B8),
                                 ),
                               ),
                               Text(
                                 d.holiday != null ? 'Libur' : d.dateLabel,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: d.holiday != null ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                                  color: d.holiday != null
+                                      ? const Color(0xFFDC2626)
+                                      : const Color(0xFF64748B),
                                 ),
                               ),
                             ],
@@ -1971,7 +2400,11 @@ class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
                     ),
                     child: Text(
                       'Libur: ${day.holiday} — tidak ada pengiriman di hari ini.',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFB91C1C)),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB91C1C),
+                      ),
                     ),
                   ),
                 if (day.slots.isEmpty)
@@ -1992,11 +2425,14 @@ class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
                       iconColor: const Color(0xFF2563EB),
                       title: slot.label,
                       subtitle: slot.available
-                          ? (slot.remaining != null ? '${slot.timeRange} · sisa ${slot.remaining} slot' : slot.timeRange)
+                          ? (slot.remaining != null
+                                ? '${slot.timeRange} · sisa ${slot.remaining} slot'
+                                : slot.timeRange)
                           : '${slot.timeRange} · ${slot.reason ?? 'tidak tersedia'}',
                       selected: slot.isSameAs(widget.selected?.slot),
                       onTap: slot.available
-                          ? () => Navigator.of(context).pop(SelectedDeliverySlot(slot: slot, day: day))
+                          ? () => Navigator.of(context)
+                                .pop(SelectedDeliverySlot(slot: slot, day: day))
                           : () {},
                     ),
                   ),
@@ -2020,8 +2456,10 @@ class _PickerOptionTile extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.badge,
+    this.enabled = true,
   });
 
+  final bool enabled;
   final IconData icon;
   final Color iconColor;
   final String title;
@@ -2035,86 +2473,114 @@ class _PickerOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0),
-              width: selected ? 1.6 : 1,
-            ),
-            borderRadius: BorderRadius.circular(14),
-            color: selected ? const Color(0xFFF0FDF4) : Colors.white,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 20, color: iconColor),
+      child: Opacity(
+        opacity: enabled ? 1 : 0.55,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFF0D9488)
+                    : const Color(0xFFE2E8F0),
+                width: selected ? 1.6 : 1,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            title,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+              borderRadius: BorderRadius.circular(14),
+              color: selected ? const Color(0xFFF0FDF4) : Colors.white,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 20, color: iconColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (badge != null) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                badge!,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (subtitle != null && subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
                           ),
                         ),
-                        if (badge != null) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              badge!,
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
-                            ),
-                          ),
-                        ],
                       ],
-                    ),
-                    if (subtitle != null && subtitle!.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(subtitle!, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                     ],
-                  ],
-                ),
-              ),
-              if (trailing != null) ...[
-                const SizedBox(width: 8),
-                Text(
-                  trailing!,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: trailing == 'GRATIS' ? const Color(0xFF16A34A) : const Color(0xFF0F172A),
                   ),
                 ),
+                if (trailing != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    trailing!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: trailing == 'GRATIS'
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 10),
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 20,
+                  color: selected
+                      ? const Color(0xFF0D9488)
+                      : const Color(0xFF94A3B8),
+                ),
               ],
-              const SizedBox(width: 10),
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                size: 20,
-                color: selected ? const Color(0xFF0D9488) : const Color(0xFF94A3B8),
-              ),
-            ],
+            ),
           ),
         ),
       ),

@@ -17,6 +17,7 @@ class CategoryListScreen extends ConsumerWidget {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (_) => _CategoryForm(
         category: category,
         parents: all.where((c) => c.parentId == null && c.id != category?.id).toList(),

@@ -19,6 +19,8 @@ class OrderSettingController extends Controller
     {
         $data = $request->validate([
             'buyer_cancel_window_seconds' => ['required', 'integer', 'min:0', 'max:86400'],
+            'paylater_min_transactions' => ['required', 'integer', 'min:0', 'max:1000'],
+            'paylater_due_days' => ['required', 'integer', 'min:1', 'max:90'],
         ], [
             'buyer_cancel_window_seconds.max' => 'Batas waktu maksimal 24 jam (86400 detik).',
         ]);

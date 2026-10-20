@@ -6,7 +6,7 @@ import { adminApi, ApiError } from '../../../../lib/api';
 import { OrderSettings } from '../../../../types';
 import { AlertCircle, CheckCircle2, Loader2, Save } from 'lucide-react';
 
-const DEFAULTS: OrderSettings = { buyer_cancel_window_seconds: 60 };
+const DEFAULTS: OrderSettings = { buyer_cancel_window_seconds: 60, paylater_min_transactions: 3, paylater_due_days: 7 };
 
 /** e.g. 90 -> "1 menit 30 detik" */
 function describe(seconds: number): string {
@@ -43,7 +43,11 @@ export default function OrderCancellationPage() {
   }, []);
 
   const seconds = form.buyer_cancel_window_seconds;
-  const valid = Number.isInteger(seconds) && seconds >= 0 && seconds <= 86400;
+  const minTx = form.paylater_min_transactions;
+  const dueDays = form.paylater_due_days;
+  const validTx = Number.isInteger(minTx) && minTx >= 0 && minTx <= 1000;
+  const validDue = Number.isInteger(dueDays) && dueDays >= 1 && dueDays <= 90;
+  const valid = Number.isInteger(seconds) && seconds >= 0 && seconds <= 86400 && validTx && validDue;
   const dirty = JSON.stringify(form) !== initial;
 
   const save = async () => {
@@ -116,11 +120,11 @@ export default function OrderCancellationPage() {
                 value={Number.isNaN(seconds) ? '' : seconds}
                 onChange={(e) => {
                   setSuccess(null);
-                  setForm({ buyer_cancel_window_seconds: e.target.value === '' ? NaN : Number(e.target.value) });
+                  setForm({ ...form, buyer_cancel_window_seconds: e.target.value === '' ? NaN : Number(e.target.value) });
                 }}
               />
               <p className={`mt-1 text-xs ${valid ? 'text-slate-500' : 'text-rose-600'}`}>
-                {valid ? describe(seconds) + '.' : 'Isi angka bulat 0 – 86400 detik.'}
+                {Number.isInteger(seconds) && seconds >= 0 && seconds <= 86400 ? describe(seconds) + '.' : 'Isi angka bulat 0 – 86400 detik.'}
               </p>
             </div>
             <ul className="list-disc space-y-1 pl-5 text-xs text-slate-500">
@@ -134,6 +138,59 @@ export default function OrderCancellationPage() {
               <li>Pesanan yang sudah dibayar dikembalikan penuh ke Saldo Belanja pembeli sesuai total yang dibayar.</li>
               <li>Isi 0 untuk menutup pembatalan oleh pembeli begitu pesanan mulai disiapkan.</li>
             </ul>
+          </section>
+        )}
+
+        {!loading && (
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Paylater</h2>
+              <p className="text-xs text-slate-500">
+                Metode bayar nanti hanya bisa dipakai pelanggan yang sudah menyelesaikan sejumlah transaksi. Pelanggan
+                yang belum memenuhi melihat keterangan dan tidak bisa memilihnya. Pemakaian pertama wajib verifikasi
+                wajah.
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Minimal transaksi selesai</label>
+              <input
+                type="number"
+                min={0}
+                max={1000}
+                step={1}
+                className={input}
+                value={Number.isNaN(minTx) ? '' : minTx}
+                onChange={(e) => {
+                  setSuccess(null);
+                  setForm({ ...form, paylater_min_transactions: e.target.value === '' ? NaN : Number(e.target.value) });
+                }}
+              />
+              <p className={`mt-1 text-xs ${validTx ? 'text-slate-500' : 'text-rose-600'}`}>
+                {validTx
+                  ? minTx === 0
+                    ? 'Semua pelanggan langsung bisa memakai Paylater (tetap perlu verifikasi pertama kali).'
+                    : `Pelanggan perlu ${minTx} pesanan berstatus selesai.`
+                  : 'Isi angka bulat 0 – 1000.'}
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Jatuh tempo tagihan (hari)</label>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                step={1}
+                className={input}
+                value={Number.isNaN(dueDays) ? '' : dueDays}
+                onChange={(e) => {
+                  setSuccess(null);
+                  setForm({ ...form, paylater_due_days: e.target.value === '' ? NaN : Number(e.target.value) });
+                }}
+              />
+              <p className={`mt-1 text-xs ${validDue ? 'text-slate-500' : 'text-rose-600'}`}>
+                {validDue ? `Tagihan Paylater jatuh tempo ${dueDays} hari setelah pesanan dibuat.` : 'Isi angka bulat 1 – 90.'}
+              </p>
+            </div>
           </section>
         )}
       </div>

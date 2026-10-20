@@ -117,6 +117,7 @@ class Order {
     this.adminNotes,
     this.history = const [],
     this.paidAt,
+    this.qrCode,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
@@ -144,6 +145,7 @@ class Order {
         .map((e) => StatusHistoryEntry.fromJson(e as Map<String, dynamic>))
         .toList(),
     paidAt: DateTime.tryParse(json['paid_at']?.toString() ?? ''),
+    qrCode: json['qr_code'] as String?,
     createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
   );
 
@@ -169,6 +171,9 @@ class Order {
   final String? adminNotes;
   final List<StatusHistoryEntry> history;
   final DateTime? paidAt;
+
+  /// Value of the parcel label QR the driver app scans.
+  final String? qrCode;
   final DateTime createdAt;
 
   List<OrderStatus> get nextStatuses => status.next(storePickup: deliveryMethod == 'store_pickup');

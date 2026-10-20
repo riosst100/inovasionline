@@ -9,6 +9,8 @@ use App\Models\PaymentMethod;
 use App\Models\ServiceFeeSetting;
 use App\Models\ShippingMethod;
 use App\Services\DeliveryScheduleService;
+use App\Services\PaylaterService;
+use App\Support\Enums\PaymentMethodType;
 use App\Services\ShippingRateResolver;
 use App\Support\Enums\ShippingRateType;
 use App\Support\Responses\ApiResponse;
@@ -23,9 +25,19 @@ class CheckoutOptionsController extends Controller
         return ApiResponse::success(ServiceFeeSetting::current()->toPayload(), 'Service fee retrieved successfully.');
     }
 
-    public function paymentMethods(): JsonResponse
+    public function paymentMethods(Request $request, PaylaterService $paylater): JsonResponse
     {
         $methods = PaymentMethod::query()->where('is_enabled', true)->orderBy('sort_order')->get();
+
+        // Route is public; attach Paylater eligibility when a valid token is sent.
+        $user = $request->user('sanctum');
+        $eligibility = $user ? $paylater->eligibility($user) : null;
+
+        $methods->each(function (PaymentMethod $method) use ($eligibility) {
+            if ($method->type === PaymentMethodType::PAYLATER) {
+                $method->paylater = $eligibility;
+            }
+        });
 
         return ApiResponse::success(PaymentMethodResource::collection($methods), 'Payment methods retrieved successfully.');
     }

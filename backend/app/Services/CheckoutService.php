@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderSetting;
 use App\Models\PaymentMethod;
 use App\Models\ProductVariant;
 use App\Models\ServiceFeeSetting;
@@ -30,6 +31,8 @@ class CheckoutService
         private readonly ProductStockService $stockService,
         private readonly DeliveryScheduleService $scheduleService,
         private readonly WalletService $walletService,
+        private readonly CodVerificationService $codVerification,
+        private readonly PaylaterService $paylater,
     ) {}
 
     public function checkout(User $user, array $validated): Order
@@ -65,6 +68,14 @@ class CheckoutService
 
         if (! $paymentMethod) {
             throw new RuntimeException('Selected payment method is not available.');
+        }
+
+        if ($paymentMethod->type === PaymentMethodType::CASH_ON_DELIVERY && ! $this->codVerification->current($user)) {
+            throw new CodVerificationRequiredException;
+        }
+
+        if ($paymentMethod->type === PaymentMethodType::PAYLATER) {
+            $this->paylater->assertCanUse($user);
         }
 
         $shippingMethod = ShippingMethod::where('id', $validated['shipping_method_id'])
@@ -109,7 +120,9 @@ class CheckoutService
             ? OrderStatus::PENDING
             : OrderStatus::PROCESSING;
 
-        $order = DB::transaction(function () use ($user, $validated, $items, $paymentMethod, $shippingMethod, $needsSchedule, $subtotal, $discountTotal, $shippingFee, $serviceFee, $taxTotal, $grandTotal, $initialStatus) {
+        $isPaylater = $paymentMethod->type === PaymentMethodType::PAYLATER;
+
+        $order = DB::transaction(function () use ($isPaylater, $user, $validated, $items, $paymentMethod, $shippingMethod, $needsSchedule, $subtotal, $discountTotal, $shippingFee, $serviceFee, $taxTotal, $grandTotal, $initialStatus) {
             // Locks the schedule row, so concurrent checkouts cannot exceed its quota.
             $reservation = $needsSchedule
                 ? $this->scheduleService->reserve($shippingMethod, $validated['delivery_schedule_id'], $validated['delivery_date'])
@@ -129,6 +142,8 @@ class CheckoutService
                 'grand_total' => $grandTotal,
                 'status' => $initialStatus,
                 'payment_status' => PaymentStatus::UNPAID,
+                // Paylater: the bill is due this many days from now.
+                'payment_expires_at' => $isPaylater ? now()->addDays((int) OrderSetting::current()->paylater_due_days) : null,
                 'delivery_method' => $shippingMethod->type->value,
                 'delivery_address' => $this->buildDeliveryAddress($validated),
                 'delivery_schedule_id' => $reservation ? $validated['delivery_schedule_id'] : null,

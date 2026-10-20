@@ -94,6 +94,34 @@ class AdminAuthController extends Controller
         return ApiResponse::success(null, 'Logout admin berhasil.')->withCookie($this->forgetCookie());
     }
 
+    public function changePassword(Request $request): JsonResponse
+    {
+        $adminUser = $request->user();
+
+        if (! $adminUser instanceof AdminUser) {
+            return ApiResponse::error('Unauthenticated.', [], 401);
+        }
+
+        $data = $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed|different:current_password',
+        ]);
+
+        if (! Hash::check($data['current_password'], $adminUser->password)) {
+            return ApiResponse::error('Kata sandi saat ini salah.', [
+                'current_password' => ['Kata sandi saat ini salah.'],
+            ], 422);
+        }
+
+        $adminUser->forceFill(['password' => $data['password']])->save();
+
+        // Sign out every other device; keep the one that made this request.
+        $current = $adminUser->currentAccessToken();
+        $adminUser->tokens()->when($current?->id, fn ($q, $id) => $q->where('id', '!=', $id))->delete();
+
+        return ApiResponse::success(null, 'Kata sandi berhasil diubah.');
+    }
+
     public function sessions(Request $request): JsonResponse
     {
         $currentId = $request->user()->currentAccessToken()?->id;

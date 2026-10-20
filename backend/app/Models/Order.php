@@ -49,6 +49,9 @@ class Order extends Model
         'status_history',
         'accepted_at',
         'completed_at',
+        'shipped_proof_path',
+        'shipped_at',
+        'delivered_proof_path',
         'cancelled_at',
         'cancel_hold_started_at',
         'cancel_declined_at',
@@ -73,6 +76,7 @@ class Order extends Model
             'paid_at' => 'datetime',
             'accepted_at' => 'datetime',
             'completed_at' => 'datetime',
+            'shipped_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'cancel_hold_started_at' => 'datetime',
             'cancel_declined_at' => 'datetime',
@@ -136,6 +140,32 @@ class Order extends Model
         }
 
         return in_array($next->value, self::TRANSITIONS[$this->status->value] ?? [], true);
+    }
+
+    /**
+     * Value printed as the parcel's QR code: "IO:<order number>:<signature>". The signature is an
+     * HMAC of the order id, so a code cannot be forged from a guessed order number.
+     */
+    public function qrCode(): string
+    {
+        return 'IO:'.$this->order_number.':'.$this->qrSignature();
+    }
+
+    public static function findByQrCode(string $code): ?self
+    {
+        $parts = explode(':', trim($code));
+        if (count($parts) !== 3 || $parts[0] !== 'IO') {
+            return null;
+        }
+
+        $order = static::where('order_number', $parts[1])->first();
+
+        return $order && hash_equals($order->qrSignature(), $parts[2]) ? $order : null;
+    }
+
+    private function qrSignature(): string
+    {
+        return substr(hash_hmac('sha256', (string) $this->id, (string) config('app.key')), 0, 10);
     }
 
     public function isStorePickup(): bool

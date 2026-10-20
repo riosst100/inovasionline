@@ -10,4 +10,5 @@ enum PaymentMethodType: string
     case CASH_ON_DELIVERY = 'cash_on_delivery';
     case PAYMENT_GATEWAY = 'payment_gateway';
     case WALLET = 'wallet';
+    case PAYLATER = 'paylater';
 }

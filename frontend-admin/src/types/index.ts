@@ -456,6 +456,10 @@ export interface WalletDetail {
 export interface OrderSettings {
   /** How long a buyer may still cancel once the order is being prepared; 0 = not at all */
   buyer_cancel_window_seconds: number;
+  /** Completed orders a customer needs before Paylater unlocks */
+  paylater_min_transactions: number;
+  /** Days a customer has to settle a Paylater order */
+  paylater_due_days: number;
 }
 
 export interface NavBadgeSettings {
@@ -529,4 +533,20 @@ export interface FlashSalePayload {
   ends_at: string;
   is_active: boolean;
   products: { product_id: string; flash_sale_price: number }[];
+}
+
+export type CodVerificationStatus = 'verified' | 'revoked';
+
+export interface CodVerificationRow {
+  id: string;
+  user_id: string;
+  video_url: string;
+  steps: string[];
+  device: string | null;
+  ip_address: string | null;
+  status: CodVerificationStatus;
+  revoked_reason: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  user: { id: string; name: string; email: string | null; phone: string | null } | null;
 }

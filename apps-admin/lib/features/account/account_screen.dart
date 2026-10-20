@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common.dart';
+import '../cod/cod_verification_screen.dart';
+import 'change_password_screen.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -56,7 +58,24 @@ class AccountScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.logout, color: AppColors.destructive),
+                  leading: const Icon(Icons.lock_outline),
+                  title: const Text('Ganti Kata Sandi'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () =>
+                      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen())),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.face_retouching_natural_outlined),
+                  title: const Text('Verifikasi COD'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => const CodVerificationListScreen())),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.logout,color: AppColors.destructive),
                   title: const Text('Keluar', style: TextStyle(color: AppColors.destructive)),
                   onTap: () async {
                     final ok = await confirm(

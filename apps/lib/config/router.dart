@@ -8,6 +8,7 @@ import '../features/auth/register_screen.dart';
 import '../features/cart/cart_screen.dart';
 import '../features/categories/category_products_screen.dart';
 import '../features/checkout/checkout_screen.dart';
+import '../features/checkout/face_verification_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/flash_sale/flash_sale_screen.dart';
 import '../features/home/ad_chest.dart';
@@ -109,6 +110,7 @@ final router = GoRouter(
       builder: (context, state) =>
           CheckoutScreen(selection: state.extra as CartSelection),
     ),
+    GoRoute(path: '/face-verification', builder: (context, state) => const FaceVerificationScreen()),
     GoRoute(path: '/wallet', builder: (context, state) => const WalletScreen()),
     GoRoute(path: '/chest', builder: (context, state) => const AdChestScreen()),
     GoRoute(

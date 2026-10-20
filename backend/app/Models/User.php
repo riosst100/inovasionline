@@ -111,6 +111,11 @@ class User extends Authenticatable
         return $this->hasMany(PhotographerApplication::class);
     }
 
+    public function codVerifications(): HasMany
+    {
+        return $this->hasMany(CodVerification::class);
+    }
+
     public function faceProfile(): HasOne
     {
         return $this->hasOne(UserFaceProfile::class);

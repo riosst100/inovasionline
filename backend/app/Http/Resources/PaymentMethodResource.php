@@ -22,6 +22,7 @@ class PaymentMethodResource extends JsonResource
             'is_enabled' => $this->is_enabled,
             'sort_order' => $this->sort_order,
             'created_at' => $this->created_at,
+            'paylater' => $this->when(isset($this->paylater), fn () => $this->paylater),
         ];
     }
 }
