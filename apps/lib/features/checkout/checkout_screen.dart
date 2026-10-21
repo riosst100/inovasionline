@@ -115,20 +115,40 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           as String? ??
       'Biaya Layanan';
 
-  /// Shipping is free when the admin's Gratis Ongkir rule matches the chosen
-  /// payment and shipping method (the server applies the same rule).
-  bool get _freeShipping {
+  /// Shipping is free when the admin's Gratis Ongkir rule or the method's own
+  /// minimum amount matches (the server applies the same rule).
+  bool _isShippingMethodFree(ShippingMethod? shipping) {
+    if (shipping == null) return false;
+
+    if (shipping.freeShippingMinAmount != null &&
+        widget.selection.subtotal >= shipping.freeShippingMinAmount!) {
+      return true;
+    }
+
     final cfg = ref.watch(checkoutFreeShippingConfigProvider).valueOrNull;
-    final payment = _paymentMethod;
-    final shipping = _shippingMethod;
-    if (cfg == null || cfg['is_active'] != true || payment == null || shipping == null) {
+    if (cfg == null || cfg['is_active'] != true) {
       return false;
     }
+
     final min = (cfg['min_subtotal'] as num?)?.toDouble();
-    return (cfg['payment_method_ids'] as List? ?? const []).contains(payment.id) &&
-        (cfg['shipping_method_ids'] as List? ?? const []).contains(shipping.id) &&
-        (min == null || widget.selection.subtotal >= min);
+    if (min != null && widget.selection.subtotal < min) {
+      return false;
+    }
+
+    final shippingIds = (cfg['shipping_method_ids'] as List? ?? const []);
+    if (!shippingIds.contains(shipping.id)) {
+      return false;
+    }
+
+    final paymentIds = (cfg['payment_method_ids'] as List? ?? const []);
+    if (_paymentMethod != null) {
+      return paymentIds.contains(_paymentMethod!.id);
+    }
+
+    return paymentIds.isNotEmpty;
   }
+
+  bool get _freeShipping => _isShippingMethodFree(_shippingMethod);
 
   double? get _shippingFee =>
       _shippingMethod == null ? null : (_freeShipping ? 0 : _shippingMethod!.displayFee);
@@ -243,6 +263,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       builder: (context) => _ShippingMethodPickerSheet(
         methods: methods,
         selected: _shippingMethod,
+        isFreeShipping: _isShippingMethodFree,
       ),
     );
     if (selected == null || !mounted) return;
@@ -638,6 +659,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           _OrderSummaryCard(
             subtotal: widget.selection.subtotal,
             shippingFee: _shippingFee,
+            originalShippingFee: _shippingMethod?.displayFee,
+            freeShipping: _freeShipping,
             serviceFee: _serviceFee,
             serviceFeeLabel: _serviceFeeLabel,
             total: _total,
@@ -1484,16 +1507,44 @@ class _SelectedShippingTile extends StatelessWidget {
             ],
           ),
         ),
-        Text(
-          freeShipping || method.displayFee == 0
-              ? 'GRATIS'
-              : formatCurrency(method.displayFee),
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF15803D),
+        if (freeShipping && method.displayFee > 0)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                formatCurrency(method.displayFee),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF94A3B8),
+                  decoration: TextDecoration.lineThrough,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                formatCurrency(0),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF15803D),
+                ),
+              ),
+            ],
+          )
+        else
+          Text(
+            freeShipping || method.displayFee == 0
+                ? formatCurrency(0)
+                : formatCurrency(method.displayFee),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: (freeShipping || method.displayFee == 0)
+                  ? const Color(0xFF15803D)
+                  : const Color(0xFF0F172A),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1705,8 +1756,12 @@ class _OrderSummaryCard extends StatelessWidget {
     required this.serviceFee,
     required this.serviceFeeLabel,
     required this.total,
+    this.freeShipping = false,
+    this.originalShippingFee,
   });
 
+  final bool freeShipping;
+  final double? originalShippingFee;
   final double subtotal;
   final double? shippingFee;
   final double serviceFee;
@@ -1759,11 +1814,18 @@ class _OrderSummaryCard extends StatelessWidget {
           const SizedBox(height: 8),
           _SummaryLine(
             label: 'Biaya Pengiriman',
+            strikethroughValue: freeShipping &&
+                    originalShippingFee != null &&
+                    originalShippingFee! > 0
+                ? formatCurrency(originalShippingFee!)
+                : null,
             value: shippingFee != null
-                ? (shippingFee == 0 ? 'GRATIS' : formatCurrency(shippingFee!))
+                ? formatCurrency(shippingFee!)
                 : 'Pilih kurir',
             valueColor: shippingFee != null
-                ? const Color(0xFF0F172A)
+                ? (freeShipping || shippingFee == 0
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFF0F172A))
                 : const Color(0xFF94A3B8),
           ),
           const SizedBox(height: 8),
@@ -1809,11 +1871,13 @@ class _SummaryLine extends StatelessWidget {
   const _SummaryLine({
     required this.label,
     required this.value,
+    this.strikethroughValue,
     this.valueColor = const Color(0xFF0F172A),
   });
 
   final String label;
   final String value;
+  final String? strikethroughValue;
   final Color valueColor;
 
   @override
@@ -1829,13 +1893,30 @@ class _SummaryLine extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: valueColor,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (strikethroughValue != null) ...[
+              Text(
+                strikethroughValue!,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF94A3B8),
+                  decoration: TextDecoration.lineThrough,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: valueColor,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -2073,10 +2154,15 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
 // SHIPPING METHOD PICKER SHEET
 // ==========================================
 class _ShippingMethodPickerSheet extends StatelessWidget {
-  const _ShippingMethodPickerSheet({required this.methods, this.selected});
+  const _ShippingMethodPickerSheet({
+    required this.methods,
+    this.selected,
+    required this.isFreeShipping,
+  });
 
   final List<ShippingMethod> methods;
   final ShippingMethod? selected;
+  final bool Function(ShippingMethod method) isFreeShipping;
 
   @override
   Widget build(BuildContext context) {
@@ -2141,27 +2227,41 @@ class _ShippingMethodPickerSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-              for (final method in methods)
-                _PickerOptionTile(
-                  icon: method.requiresSchedule
-                      ? Icons.event_available_rounded
-                      : Icons.bolt_rounded,
-                  iconColor: method.requiresSchedule
-                      ? const Color(0xFF2563EB)
-                      : const Color(0xFF16A34A),
-                  title: method.name,
-                  subtitle: method.estimatedDeliveryTime,
-                  badge: method.requiresSchedule
-                      ? 'Terjadwal'
-                      : (method.type == 'io_express' || method.isTableRate
+              for (final method in methods) ...[
+                () {
+                  final isFree = isFreeShipping(method);
+                  final isFreeWithDiscount = isFree && method.displayFee > 0;
+                  final String? strikethrough = isFreeWithDiscount
+                      ? formatCurrency(method.displayFee)
+                      : null;
+                  final String trailing = isFree || method.displayFee == 0
+                      ? formatCurrency(0)
+                      : formatCurrency(method.displayFee);
+
+                  return _PickerOptionTile(
+                    icon: method.requiresSchedule
+                        ? Icons.event_available_rounded
+                        : Icons.bolt_rounded,
+                    iconColor: method.requiresSchedule
+                        ? const Color(0xFF2563EB)
+                        : const Color(0xFF16A34A),
+                    title: method.name,
+                    subtitle: method.estimatedDeliveryTime,
+                    badge: method.requiresSchedule
+                        ? 'Terjadwal'
+                        : (method.type == 'io_express' || method.isTableRate
                             ? 'Instan'
                             : 'Reguler'),
-                  trailing: method.displayFee == 0
-                      ? 'GRATIS'
-                      : formatCurrency(method.displayFee),
-                  selected: selected?.id == method.id,
-                  onTap: () => Navigator.of(context).pop(method),
-                ),
+                    strikethroughTrailing: strikethrough,
+                    trailing: trailing,
+                    trailingColor: (isFree || method.displayFee == 0)
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFF0F172A),
+                    selected: selected?.id == method.id,
+                    onTap: () => Navigator.of(context).pop(method),
+                  );
+                }(),
+              ],
             ],
           ),
         ),
@@ -2387,6 +2487,8 @@ class _PickerOptionTile extends StatelessWidget {
     this.iconColor = const Color(0xFF0D9488),
     this.subtitle,
     this.trailing,
+    this.strikethroughTrailing,
+    this.trailingColor,
     this.badge,
     this.enabled = true,
   });
@@ -2397,6 +2499,8 @@ class _PickerOptionTile extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? trailing;
+  final String? strikethroughTrailing;
+  final Color? trailingColor;
   final String? badge;
   final bool selected;
   final VoidCallback onTap;
@@ -2488,17 +2592,35 @@ class _PickerOptionTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (trailing != null) ...[
+                if (trailing != null || strikethroughTrailing != null) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    trailing!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: trailing == 'GRATIS'
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFF0F172A),
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (strikethroughTrailing != null)
+                        Text(
+                          strikethroughTrailing!,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF94A3B8),
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      if (trailing != null)
+                        Text(
+                          trailing!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: trailingColor ??
+                                (trailing == 'GRATIS' || trailing == formatCurrency(0)
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFF0F172A)),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
                 const SizedBox(width: 10),
