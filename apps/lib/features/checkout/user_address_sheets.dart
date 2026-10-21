@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../models/nearest_address.dart';
+import '../../models/region.dart';
 import '../../models/user_address.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
+import '../../providers/delivery_address_provider.dart';
 import '../../providers/user_address_provider.dart';
 import '../../widgets/address_picker.dart';
 
@@ -402,14 +405,61 @@ class _UserAddressFormSheetState extends ConsumerState<_UserAddressFormSheet> {
   bool _saving = false;
   String? _error;
 
+  /// A new address starts from the location last detected by GPS; the user
+  /// can still change every field. The picker is held back until it is
+  /// resolved because it only reads its initial value once.
+  late bool _prefilling = widget.existing == null;
+
+  /// Set once the user tried to save; from then on empty required fields
+  /// are marked.
+  bool _submitted = false;
+
+  String? _required(TextEditingController c, String message) =>
+      _submitted && c.text.trim().isEmpty ? message : null;
+
   @override
   void initState() {
     super.initState();
     final existing = widget.existing;
+    if (existing == null) _prefillFromGps();
     // A new address starts with the account's own name and phone.
     final user = ref.read(authProvider).user;
     _nameController.text = existing?.recipientName ?? user?.name ?? '';
     _phoneController.text = existing?.recipientPhone ?? user?.phone ?? '';
+  }
+
+  Future<void> _prefillFromGps() async {
+    final gps = ref.read(deliveryAddressProvider);
+    AddressSelection? region;
+    if (gps != null) {
+      try {
+        region = await _resolveRegion(gps);
+      } catch (_) {
+        // Fall back to an empty picker.
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      if (region != null) _region = region;
+      _prefilling = false;
+    });
+  }
+
+  Future<AddressSelection> _resolveRegion(NearestAddress gps) async {
+    final service = ref.read(regionServiceProvider);
+    Region? find(List<Region> list, String code) =>
+        list.where((r) => r.code == code).firstOrNull;
+
+    final province = find(await service.provinces(), gps.provinceCode);
+    final city = find(await service.cities(gps.provinceCode), gps.cityCode);
+    final district = find(await service.districts(gps.cityCode), gps.districtCode);
+    final village = find(await service.villages(gps.districtCode), gps.villageCode);
+    return AddressSelection(
+      province: province,
+      city: city,
+      district: district,
+      village: village,
+    );
   }
 
   @override
@@ -428,7 +478,11 @@ class _UserAddressFormSheetState extends ConsumerState<_UserAddressFormSheet> {
       _detailController.text.trim().isNotEmpty;
 
   Future<void> _save() async {
-    if (!_valid || _saving) return;
+    if (_saving) return;
+    if (!_valid) {
+      setState(() => _submitted = true);
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -503,9 +557,10 @@ class _UserAddressFormSheetState extends ConsumerState<_UserAddressFormSheet> {
                 const SizedBox(height: 18),
                 TextField(
                   controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama Penerima',
-                    prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                  decoration: InputDecoration(
+                    label: requiredLabel('Nama Penerima'),
+                    errorText: _required(_nameController, 'Nama penerima wajib diisi'),
+                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -513,28 +568,51 @@ class _UserAddressFormSheetState extends ConsumerState<_UserAddressFormSheet> {
                 TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Nomor Telepon Penerima',
-                    prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                  decoration: InputDecoration(
+                    label: requiredLabel('Nomor Telepon Penerima'),
+                    errorText: _required(_phoneController, 'Nomor telepon wajib diisi'),
+                    prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: 18),
-                AddressPicker(
-                  initial: _region,
-                  onChanged: (selection) =>
-                      setState(() => _region = selection),
-                ),
+                if (_prefilling)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  AddressPicker(
+                    initial: _region,
+                    showErrors: _submitted,
+                    onChanged: (selection) =>
+                        setState(() => _region = selection),
+                  ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _detailController,
                   maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText:
-                        'Detail Alamat (Nama Jalan, No. Rumah, RT/RW, Patokan)',
+                  decoration: InputDecoration(
+                    label: requiredLabel(
+                      'Detail Alamat (Nama Jalan, No. Rumah, RT/RW, Patokan)',
+                    ),
+                    errorText: _required(_detailController, 'Detail alamat wajib diisi'),
                     alignLabelWithHint: true,
                   ),
                   onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 12),
+                const Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '*',
+                        style: TextStyle(color: Color(0xFFEF4444)),
+                      ),
+                      TextSpan(text: ' ini wajib diisi'),
+                    ],
+                  ),
+                  style: TextStyle(fontSize: 12, color: _muted),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
@@ -546,7 +624,7 @@ class _UserAddressFormSheetState extends ConsumerState<_UserAddressFormSheet> {
           _BottomButton(
             label: 'Simpan Alamat',
             loading: _saving,
-            onPressed: _valid ? _save : null,
+            onPressed: _save,
           ),
         ],
       ),

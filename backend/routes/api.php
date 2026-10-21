@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\V1\Admin\NavBadgeController as AdminNavBadgeControl
 use App\Http\Controllers\Api\V1\Admin\OrderSettingController as AdminOrderSettingController;
 use App\Http\Controllers\Api\V1\Admin\AdChestController as AdminAdChestController;
 use App\Http\Controllers\Api\V1\Admin\AdmobController as AdminAdmobController;
+use App\Http\Controllers\Api\V1\Admin\FreeShippingController as AdminFreeShippingController;
 use App\Http\Controllers\Api\V1\Admin\WalletBonusController as AdminWalletBonusController;
 use App\Http\Controllers\Api\V1\Admin\WalletController as AdminWalletController;
 use App\Http\Controllers\Api\V1\Admin\WalletReportController as AdminWalletReportController;
@@ -151,6 +152,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/shipping-methods', [CheckoutOptionsController::class, 'shippingMethods']);
     Route::get('/delivery-schedules', [CheckoutOptionsController::class, 'deliverySchedules']);
     Route::get('/service-fee', [CheckoutOptionsController::class, 'serviceFee']);
+    Route::get('/free-shipping', [CheckoutOptionsController::class, 'freeShipping']);
     Route::get('/nav-badge', [NavBadgeController::class, 'show']);
     Route::post('/app/heartbeat', [AppPresenceController::class, 'heartbeat'])->middleware('throttle:30,1');
     Route::get('/admob-config', [AdmobConfigController::class, 'show']);
@@ -507,6 +509,9 @@ Route::prefix('admin')->group(function () {
 
         Route::get('service-fee', [AdminServiceFeeController::class, 'show']);
         Route::put('service-fee', [AdminServiceFeeController::class, 'update']);
+
+        Route::get('free-shipping', [AdminFreeShippingController::class, 'show']);
+        Route::put('free-shipping', [AdminFreeShippingController::class, 'update']);
 
         Route::get('wallet-bonus', [AdminWalletBonusController::class, 'show']);
         Route::put('wallet-bonus', [AdminWalletBonusController::class, 'update']);

@@ -131,6 +131,7 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
             { name: 'Voucher', href: '/dashboard/promotions/vouchers', icon: Ticket },
             { name: 'Diskon', href: '/dashboard/promotions/discounts', icon: Percent },
             { name: 'Flash Sale', href: '/dashboard/promotions/flash-sales', icon: Zap },
+            { name: 'Gratis Ongkir', href: '/dashboard/promotions/free-shipping', icon: Truck },
             { name: 'Bonus Saldo Belanja', href: '/dashboard/promotions/wallet-bonus', icon: Gift },
           ],
         },

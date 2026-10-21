@@ -18,6 +18,12 @@ class CheckoutService {
     return (response.data['data'] as Map).cast<String, dynamic>();
   }
 
+  /// Admin rule for free shipping (Promosi > Gratis Ongkir).
+  Future<Map<String, dynamic>> freeShippingConfig() async {
+    final response = await _apiClient.dio.get('/free-shipping');
+    return (response.data['data'] as Map).cast<String, dynamic>();
+  }
+
   Future<List<PaymentMethod>> paymentMethods() async {
     final response = await _apiClient.dio.get('/payment-methods');
     return (response.data['data'] as List<dynamic>)

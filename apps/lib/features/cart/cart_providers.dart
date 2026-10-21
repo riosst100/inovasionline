@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/api/api_exception.dart';
 import '../../models/cart.dart';
 import '../../providers/auth_provider.dart';
@@ -76,6 +77,69 @@ class CartNotifier extends StateNotifier<CartState> {
     }
   }
 }
+
+/// Ids of the cart items ticked for checkout. Persisted so the last choice is
+/// restored when the cart is reopened, and cleared on logout.
+class CartSelectionNotifier extends StateNotifier<Set<String>> {
+  CartSelectionNotifier() : super(const {}) {
+    _restore();
+  }
+
+  static const _key = 'cart_selected_item_ids';
+  final _storage = const FlutterSecureStorage();
+
+  Future<void> _restore() async {
+    try {
+      final raw = await _storage.read(key: _key);
+      if (raw == null || raw.isEmpty) return;
+      // Anything toggled before the read finished wins over the stored value.
+      state = {...raw.split(','), ...state};
+    } catch (_) {}
+  }
+
+  void _save() {
+    try {
+      if (state.isEmpty) {
+        _storage.delete(key: _key);
+      } else {
+        _storage.write(key: _key, value: state.join(','));
+      }
+    } catch (_) {}
+  }
+
+  void toggle(String itemId, bool selected) {
+    state = selected ? {...state, itemId} : ({...state}..remove(itemId));
+    _save();
+  }
+
+  void toggleAll(Iterable<String> itemIds, bool selected) {
+    state = selected ? {...state, ...itemIds} : ({...state}..removeAll(itemIds));
+    _save();
+  }
+
+  /// Drops ids of items that are no longer in the cart.
+  void retainOnly(Set<String> validIds) {
+    if (state.every(validIds.contains)) return;
+    state = state.where(validIds.contains).toSet();
+    _save();
+  }
+
+  void clear() {
+    state = const {};
+    _save();
+  }
+}
+
+final cartSelectionProvider = StateNotifierProvider<CartSelectionNotifier, Set<String>>((ref) {
+  final notifier = CartSelectionNotifier();
+  ref.listen<AuthStatus>(
+    authProvider.select((s) => s.status),
+    (_, status) {
+      if (status == AuthStatus.unauthenticated) notifier.clear();
+    },
+  );
+  return notifier;
+});
 
 /// Loads on login and clears on logout, so the cart badges are filled before
 /// the cart screen is ever opened.

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentMethodResource;
 use App\Http\Resources\ShippingMethodResource;
+use App\Models\FreeShippingSetting;
 use App\Models\PaymentMethod;
 use App\Models\ServiceFeeSetting;
 use App\Models\ShippingMethod;
@@ -20,6 +21,11 @@ use Illuminate\Http\Request;
 /** Payment methods, shipping methods and service fee offered at checkout. */
 class CheckoutOptionsController extends Controller
 {
+    public function freeShipping(): JsonResponse
+    {
+        return ApiResponse::success(FreeShippingSetting::current()->toPayload(), 'Free shipping retrieved successfully.');
+    }
+
     public function serviceFee(): JsonResponse
     {
         return ApiResponse::success(ServiceFeeSetting::current()->toPayload(), 'Service fee retrieved successfully.');

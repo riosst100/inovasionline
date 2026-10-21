@@ -15,8 +15,6 @@ class CartScreen extends ConsumerStatefulWidget {
 }
 
 class _CartScreenState extends ConsumerState<CartScreen> {
-  final Set<String> _selectedItemIds = {};
-
   @override
   void initState() {
     super.initState();
@@ -24,31 +22,26 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   }
 
   void _toggleItem(String itemId, bool selected) {
-    setState(() {
-      if (selected) {
-        _selectedItemIds.add(itemId);
-      } else {
-        _selectedItemIds.remove(itemId);
-      }
-    });
+    ref.read(cartSelectionProvider.notifier).toggle(itemId, selected);
   }
 
   void _toggleAll(List<CartItem> items, bool selected) {
-    setState(() {
-      final ids = items.map((item) => item.id);
-      if (selected) {
-        _selectedItemIds.addAll(ids);
-      } else {
-        _selectedItemIds.removeAll(ids);
-      }
-    });
+    ref.read(cartSelectionProvider.notifier).toggleAll(items.map((item) => item.id), selected);
   }
 
   @override
   Widget build(BuildContext context) {
     final cartState = ref.watch(cartProvider);
+    final selectedItemIds = ref.watch(cartSelectionProvider);
     final cart = cartState.cart;
     final itemCount = cart?.itemCount ?? 0;
+
+    // Forget selections of items that were removed from the cart.
+    ref.listen(cartProvider.select((s) => s.cart), (_, next) {
+      if (next != null) {
+        ref.read(cartSelectionProvider.notifier).retainOnly(next.items.map((i) => i.id).toSet());
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -71,7 +64,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     children: [
                       _CartItemsCard(
                         items: cart.items,
-                        selectedItemIds: _selectedItemIds,
+                        selectedItemIds: selectedItemIds,
                         onToggleItem: _toggleItem,
                         onToggleAll: _toggleAll,
                       ),
@@ -82,7 +75,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ? null
           : _CheckoutBar(
               selection: CartSelection(
-                items: cart.items.where((i) => _selectedItemIds.contains(i.id)).toList(),
+                items: cart.items.where((i) => selectedItemIds.contains(i.id)).toList(),
               ),
             ),
     );

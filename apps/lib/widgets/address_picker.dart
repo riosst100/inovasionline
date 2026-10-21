@@ -19,11 +19,29 @@ class AddressSelection {
   bool get isComplete => province != null && city != null && district != null && village != null;
 }
 
+/// A field label followed by a red asterisk, marking the field as required.
+Widget requiredLabel(String text) => Text.rich(
+      TextSpan(
+        text: text,
+        children: const [
+          TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444))),
+        ],
+      ),
+    );
+
 class AddressPicker extends ConsumerStatefulWidget {
-  const AddressPicker({super.key, required this.onChanged, this.initial});
+  const AddressPicker({
+    super.key,
+    required this.onChanged,
+    this.initial,
+    this.showErrors = false,
+  });
 
   final ValueChanged<AddressSelection> onChanged;
   final AddressSelection? initial;
+
+  /// Marks every region still empty as required.
+  final bool showErrors;
 
   @override
   ConsumerState<AddressPicker> createState() => _AddressPickerState();
@@ -159,6 +177,7 @@ class _AddressPickerState extends ConsumerState<AddressPicker> {
           label: 'Provinsi',
           value: _province,
           items: _provinces,
+          showError: widget.showErrors,
           onChanged: _onProvinceChanged,
         ),
         const SizedBox(height: 16),
@@ -166,6 +185,7 @@ class _AddressPickerState extends ConsumerState<AddressPicker> {
           label: 'Kabupaten/Kota',
           value: _city,
           items: _cities,
+          showError: widget.showErrors,
           enabled: _province != null,
           onChanged: _onCityChanged,
         ),
@@ -174,6 +194,7 @@ class _AddressPickerState extends ConsumerState<AddressPicker> {
           label: 'Kecamatan',
           value: _district,
           items: _districts,
+          showError: widget.showErrors,
           enabled: _city != null,
           onChanged: _onDistrictChanged,
         ),
@@ -182,6 +203,7 @@ class _AddressPickerState extends ConsumerState<AddressPicker> {
           label: 'Desa/Kelurahan',
           value: _village,
           items: _villages,
+          showError: widget.showErrors,
           enabled: _district != null,
           onChanged: _onVillageChanged,
         ),
@@ -197,8 +219,10 @@ class _RegionDropdown extends StatelessWidget {
     required this.items,
     required this.onChanged,
     this.enabled = true,
+    this.showError = false,
   });
 
+  final bool showError;
   final String label;
   final Region? value;
   final List<Region> items;
@@ -212,7 +236,10 @@ class _RegionDropdown extends StatelessWidget {
     return DropdownButtonFormField<Region>(
       initialValue: items.contains(value) ? value : null,
       isExpanded: true,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        label: requiredLabel(label),
+        errorText: showError && value == null ? '$label wajib dipilih' : null,
+      ),
       items: items
           .map((region) => DropdownMenuItem(value: region, child: Text(region.name, overflow: TextOverflow.ellipsis)))
           .toList(),

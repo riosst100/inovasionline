@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, AdChestSettings, NavBadgeSettings, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -554,6 +554,21 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
+  },
+
+  async getFreeShipping(): Promise<FreeShippingSettings> {
+    return apiRequest<FreeShippingSettings>('/admin/free-shipping');
+  },
+
+  async saveFreeShipping(payload: FreeShippingSettings): Promise<FreeShippingSettings> {
+    return apiRequest<FreeShippingSettings>('/admin/free-shipping', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getPaymentMethodOptions(): Promise<PaymentMethodOption[]> {
+    return apiRequest<PaymentMethodOption[]>('/v1/admin/payment-methods?per_page=100');
   },
 
   async getWalletBonus(): Promise<WalletBonusSettings> {

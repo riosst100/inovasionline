@@ -23,12 +23,18 @@ class CartController extends Controller
         $cart = $this->cartService->cartForUser($request->user());
         $cart->load(['items.product' => fn ($q) => $q->withStock(), 'items.product.images', 'items.variant']);
 
-        $items = CartItemResource::collection($cart->items)->resolve();
+        // Products can be soft-deleted after being carted; drop those stale lines.
+        [$valid, $stale] = $cart->items->partition(fn (CartItem $item) => $item->product !== null);
+        if ($stale->isNotEmpty()) {
+            CartItem::whereIn('id', $stale->pluck('id'))->delete();
+        }
+
+        $items = CartItemResource::collection($valid->values())->resolve();
 
         return ApiResponse::success([
             'items' => $items,
             'grand_total' => array_sum(array_column($items, 'line_total')),
-            'item_count' => $cart->items->sum('quantity'),
+            'item_count' => $valid->sum('quantity'),
         ], 'Cart retrieved successfully.');
     }
 

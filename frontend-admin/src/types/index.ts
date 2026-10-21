@@ -332,6 +332,22 @@ export interface DeliverySchedule {
   sort_order: number;
 }
 
+/** Promosi > Gratis Ongkir: free shipping when payment AND shipping method both qualify. */
+export interface FreeShippingSettings {
+  is_active: boolean;
+  /** Minimal belanja (Rp); null = tanpa minimal */
+  min_subtotal: number | null;
+  payment_method_ids: string[];
+  shipping_method_ids: string[];
+}
+
+export interface PaymentMethodOption {
+  id: string;
+  name: string;
+  type: string;
+  is_enabled: boolean;
+}
+
 export interface WalletBonusTier {
   from: number;
   to: number;

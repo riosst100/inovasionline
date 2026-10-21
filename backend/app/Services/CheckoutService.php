@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CartItem;
+use App\Models\FreeShippingSetting;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderSetting;
@@ -107,6 +108,10 @@ class CheckoutService
         }
 
         if ($shippingMethod->free_shipping_min_amount !== null && $subtotal >= (float) $shippingMethod->free_shipping_min_amount) {
+            $shippingFee = 0.0;
+        }
+
+        if (FreeShippingSetting::current()->applies((string) $paymentMethod->id, (string) $shippingMethod->id, (float) $subtotal)) {
             $shippingFee = 0.0;
         }
 

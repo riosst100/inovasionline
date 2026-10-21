@@ -55,7 +55,7 @@ wsl -d %DISTRO% -- bash -lc "%DC% restart reverb" || goto :fail
 
 echo.
 echo ==^> Auto sync (wsl-watch)
-powershell -NoProfile -Command "if (Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { $_.CommandLine -like '*wsl-watch.ps1*' }) { 'wsl-watch sudah jalan' } else { Start-Process powershell -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','%~dp0scripts\wsl-watch.ps1'; 'wsl-watch dinyalakan di jendela baru' }"
+powershell -NoProfile -Command "if (Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like '*wsl-watch.ps1*' }) { 'wsl-watch sudah jalan' } else { Start-Process powershell -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','%~dp0scripts\wsl-watch.ps1'; 'wsl-watch dinyalakan di jendela baru' }"
 
 echo.
 echo ==^> Selesai

@@ -266,8 +266,8 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
         // Temp file; the OS cleans it up eventually.
       }
       if (!mounted) return;
-      await _showSuccess();
-      if (mounted) context.pop(true);
+      // The success popup is shown by the caller, once this screen is closed.
+      context.pop(true);
     } catch (e) {
       if (!mounted) return;
       final message = e is DioException && e.error is ApiException
@@ -280,33 +280,6 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
         _error = message;
       });
     }
-  }
-
-  Future<void> _showSuccess() {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          icon: const Icon(Icons.verified_rounded, size: 48, color: Color(0xFF16A34A)),
-          title: const Text('Verifikasi Berhasil'),
-          content: const Text(
-            'Wajah Anda berhasil diverifikasi. Anda tidak perlu verifikasi lagi untuk pesanan berikutnya.',
-            textAlign: TextAlign.center,
-          ),
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Lanjutkan Checkout'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   // ---------------------------------------------------------- detection

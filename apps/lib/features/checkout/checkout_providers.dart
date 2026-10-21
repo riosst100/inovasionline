@@ -24,6 +24,10 @@ final checkoutServiceFeeConfigProvider = FutureProvider.autoDispose<Map<String, 
   return ref.watch(checkoutServiceProvider).serviceFeeConfig();
 });
 
+final checkoutFreeShippingConfigProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) {
+  return ref.watch(checkoutServiceProvider).freeShippingConfig();
+});
+
 typedef ShippingMethodsQuery = ({String districtCode, String? villageCode});
 
 final checkoutShippingMethodsProvider =

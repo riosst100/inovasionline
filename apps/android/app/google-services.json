@@ -59,108 +59,18 @@
       },
       "oauth_client": [
         {
-          "client_id": "962366033380-9fog0s6egq0oq5k0d12h68c7vt8eg53q.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBUClz3FZvWgB12VQiKMRO9hOObW6KVtvo"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "962366033380-169mr3kth1sl22fh94ek79ioalj7us4b.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:962366033380:android:42f6e938e7a33e8e7f4bf1",
-        "android_client_info": {
-          "package_name": "com.inovasionline.twa"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "962366033380-s1f587kgnmpvj91vd5iednhjbki9si2e.apps.googleusercontent.com",
+          "client_id": "962366033380-6q334balmo8434tprdjr02luadcclal6.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.inovasionline.twa",
-            "certificate_hash": "690bfb7557d502ac305da3cb927fcf18e03e1870"
+            "package_name": "com.inovasionline.app.dev",
+            "certificate_hash": "d3b19ebb917ff743b50c55d2ea1ea283803fe8fb"
           }
         },
         {
-          "client_id": "962366033380-vhia3gp6nl9cu0p9b278u1d32fpcjjbm.apps.googleusercontent.com",
+          "client_id": "962366033380-m3uvku3odc8vld3erurv3m3t08qto0tm.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.inovasionline.twa",
-            "certificate_hash": "bc3293f1e8c18a24fc83d8048eb2b02040c0a2ed"
-          }
-        },
-        {
-          "client_id": "962366033380-vlmpd625vf2qpjo5pnnppbqi2b31knk6.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.inovasionline.twa",
-            "certificate_hash": "ef8766adba45ab6ecc5de0559274f79587ad16e5"
-          }
-        },
-        {
-          "client_id": "962366033380-9fog0s6egq0oq5k0d12h68c7vt8eg53q.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBUClz3FZvWgB12VQiKMRO9hOObW6KVtvo"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "962366033380-169mr3kth1sl22fh94ek79ioalj7us4b.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:962366033380:android:7180e3192cad8b297f4bf1",
-        "android_client_info": {
-          "package_name": "com.inovasionline.twa.dev"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "962366033380-159hli94cb0lng4v6i2o80n6uurb7ntm.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.inovasionline.twa.dev",
-            "certificate_hash": "ef8766adba45ab6ecc5de0559274f79587ad16e5"
-          }
-        },
-        {
-          "client_id": "962366033380-ge4fkkh9qcmnlagk4nsl8rqs49p8rmt7.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.inovasionline.twa.dev",
-            "certificate_hash": "7d912e51d00240866a415230b69dd161f44f9e92"
-          }
-        },
-        {
-          "client_id": "962366033380-hq5fpndfbriiadtotji50ha3omo4f31o.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.inovasionline.twa.dev",
+            "package_name": "com.inovasionline.app.dev",
             "certificate_hash": "15192317190aa9984c7f2453e2ab244cc2ea0b8e"
           }
         },
