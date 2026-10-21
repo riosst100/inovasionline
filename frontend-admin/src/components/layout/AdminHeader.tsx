@@ -24,6 +24,7 @@ const LABELS: Record<string, string> = {
   search: 'Pencarian',
   suggestions: 'Saran Pencarian',
   orders: 'Pesanan',
+  'order-statuses': 'Status Pesanan',
   sessions: 'Sesi & Perangkat',
   'data-transfers': 'Import / Export',
 };

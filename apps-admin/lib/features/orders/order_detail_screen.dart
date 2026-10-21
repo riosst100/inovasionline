@@ -241,24 +241,72 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     if (updated != null && mounted) setState(() => _order = _changed = updated);
   }
 
-  /// Parcels with their contents and, while a driver still has to scan them, one QR each.
-  Widget? _packagesSection(Order order) {
-    final showQr = order.deliveryMethod != 'store_pickup' && order.status.next().isNotEmpty;
-    final packages = order.packages;
-    // Older API without parcels: fall back to the single order QR.
-    if (packages.isEmpty) {
-      if (!showQr || order.qrCode == null) return null;
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: _Section(
-          title: 'QR Paket',
+  void _showQr(Order order) {
+    final packages = order.packages.where((p) => p.qrCode != null).toList();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        builder: (context, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.all(20),
           children: [
-            Center(child: QrImageView(data: order.qrCode!, size: 180, backgroundColor: Colors.white)),
+            Text(
+              'QR Code ${order.orderNumber}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 16),
+            if (packages.isEmpty)
+              Center(child: QrImageView(data: order.qrCode!, size: 220, backgroundColor: Colors.white))
+            else
+              for (final package in packages) ...[
+                Center(child: QrImageView(data: package.qrCode!, size: 220, backgroundColor: Colors.white)),
+                Center(
+                  child: Text(
+                    'Paket ${package.number} dari ${order.packages.length}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            Text(
+              order.packages.length > 1
+                  ? 'Tempel QR di paket yang sesuai. Driver scan salah satu QR dan wajib membawa semua ${order.packages.length} paket.'
+                  : 'Driver scan QR ini saat mengambil dan menyerahkan paket.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.mutedForeground, fontSize: 12),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Parcels with their contents, a button to view the QR labels, and the split action.
+  Widget? _packagesSection(Order order) {
+    final packages = order.packages;
+    final hasQr = order.qrCode != null || packages.any((p) => p.qrCode != null);
+    final qrButton = hasQr
+        ? OutlinedButton.icon(
+            onPressed: () => _showQr(order),
+            icon: const Icon(Icons.qr_code_2_rounded, size: 20),
+            label: const Text('Lihat QR Code'),
+          )
+        : null;
+
+    // Older API without parcels: only the single order QR.
+    if (packages.isEmpty) {
+      if (qrButton == null) return null;
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: _Section(title: 'QR Paket', children: [qrButton]),
       );
     }
-    if (!showQr && !order.canEditPackages && packages.length == 1) return null;
 
     final items = {for (final item in order.items) item.id: item};
 
@@ -280,33 +328,17 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 '${items[key]?.variantName != null ? ' (${items[key]!.variantName})' : ''}',
                 style: const TextStyle(fontSize: 13),
               ),
-            if (showQr && package.qrCode != null) ...[
-              const SizedBox(height: 8),
-              Center(child: QrImageView(data: package.qrCode!, size: 160, backgroundColor: Colors.white)),
-              Center(
-                child: Text(
-                  '${order.orderNumber} · ${package.number}/${packages.length}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
           ],
-          if (showQr) ...[
-            const SizedBox(height: 8),
-            Text(
-              packages.length > 1
-                  ? 'Tempel QR di paket yang sesuai. Driver scan salah satu QR dan wajib membawa semua ${packages.length} paket.'
-                  : 'Driver scan QR ini saat mengambil dan menyerahkan paket.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.mutedForeground, fontSize: 12),
-            ),
-          ],
+          if (qrButton != null) ...[const SizedBox(height: 12), SizedBox(width: double.infinity, child: qrButton)],
           if (order.canEditPackages) ...[
             const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _updating ? null : _editPackages,
-              icon: const Icon(Icons.call_split, size: 18),
-              label: Text(packages.length > 1 ? 'Ubah Pembagian Paket' : 'Split Paket'),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _updating ? null : _editPackages,
+                icon: const Icon(Icons.call_split, size: 18),
+                label: Text(packages.length > 1 ? 'Ubah Pembagian Paket' : 'Split Paket'),
+              ),
             ),
           ],
         ],

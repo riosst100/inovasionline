@@ -8,7 +8,7 @@ membawa banyak paket; setiap paket dikenali dari QR-nya, jadi scan bisa berulang
 
 1. Admin menandai pesanan **Siap** (`ready`). Detail pesanan di `apps-admin` menampilkan **QR Paket**.
 2. Driver scan QR -> foto paket -> **Konfirmasi dikirim**. Pesanan menjadi `on_delivery`, terikat ke driver itu.
-3. Di tujuan: driver scan QR yang sama (atau ketuk kartu di tab *Dalam perjalanan*) -> foto bukti ->
+3. Di tujuan: driver scan QR yang sama (atau ketuk kartu di tab *Perlu Dikirim*) -> foto bukti ->
    **Konfirmasi diterima**. Pesanan menjadi `completed`; COD otomatis `paid`.
 
 Format QR: `IO:<nomor pesanan>:<tanda tangan HMAC>`; server menolak QR yang tanda tangannya tidak cocok.

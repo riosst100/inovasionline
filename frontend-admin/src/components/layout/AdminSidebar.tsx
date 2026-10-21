@@ -13,6 +13,7 @@ import {
   LayoutTemplate,
   FolderTree,
   ShoppingBag,
+  ListChecks,
   LogOut,
   Truck,
   Boxes,
@@ -79,7 +80,15 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
     {
       title: 'Operasional',
       items: [
-        { name: 'Pesanan', href: '/dashboard/orders', icon: ShoppingBag },
+        {
+          name: 'Pesanan',
+          href: '/dashboard/orders-menu',
+          icon: ShoppingBag,
+          children: [
+            { name: 'Daftar Pesanan', href: '/dashboard/orders', icon: ShoppingBag },
+            { name: 'Status Pesanan', href: '/dashboard/order-statuses', icon: ListChecks },
+          ],
+        },
         {
           name: 'Pengiriman',
           href: '/dashboard/shipping',

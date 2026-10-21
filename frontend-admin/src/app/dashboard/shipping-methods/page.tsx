@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi, ApiError } from '../../../lib/api';
+import { useLabels } from '../../../lib/labels';
 import { ShippingMethod } from '../../../types';
 import { AlertCircle, CalendarClock, CheckCircle2, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 
@@ -32,6 +33,7 @@ const emptyForm: FormState = {
 };
 
 export default function ShippingMethodsPage() {
+  const { get: getLabel } = useLabels();
   const [items, setItems] = useState<ShippingMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -207,6 +209,9 @@ export default function ShippingMethodsPage() {
                   <tr key={m.id}>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{m.name}</div>
+                      <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${getLabel('shipping_type', m.type).badge}`}>
+                        {getLabel('shipping_type', m.type).label}
+                      </span>
                       {m.description && <div className="text-xs text-slate-500">{m.description}</div>}
                     </td>
                     <td className="px-4 py-3 text-slate-600">{m.estimated_delivery_time || '-'}</td>

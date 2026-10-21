@@ -4,9 +4,9 @@ import 'package:permission_handler/permission_handler.dart';
 
 /// Asked once right after the splash, so scanning and proof photos never stop for a camera
 /// prompt. Already granted or permanently denied permissions do not show a dialog again.
+/// The GPS switch is deliberately not asked here; that only happens on each scan.
 Future<void> requestStartupPermissions() async {
-  final statuses = await [Permission.camera, Permission.locationWhenInUse].request();
-  if (statuses[Permission.locationWhenInUse]?.isGranted ?? false) await _requestGps();
+  await [Permission.camera, Permission.locationWhenInUse].request();
 }
 
 /// Every scan and every delivery confirmation needs location permission and GPS switched on.

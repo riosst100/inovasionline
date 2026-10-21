@@ -3,12 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { useAuth } from '../../context/AuthContext';
 import { adminApi } from '../../lib/api';
 import { Role, AdminUser } from '../../types';
 import {
   ShieldCheck,
-  Plus,
   ArrowRight,
   Truck,
   UserCog,
@@ -17,14 +15,6 @@ import {
   ShoppingBag,
   Image as ImageIcon,
 } from 'lucide-react';
-
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 11) return 'Selamat pagi';
-  if (h < 15) return 'Selamat siang';
-  if (h < 19) return 'Selamat sore';
-  return 'Selamat malam';
-}
 
 const AVATAR_COLORS = [
   'from-emerald-500 to-teal-500',
@@ -35,25 +25,10 @@ const AVATAR_COLORS = [
 ];
 
 export default function DashboardOverviewPage() {
-  const { user } = useAuth();
   const [roles, setRoles] = useState<Role[]>([]);
   const [staffUsers, setStaffUsers] = useState<AdminUser[]>([]);
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [today, setToday] = useState('');
-  const [salam, setSalam] = useState('Halo');
-
-  useEffect(() => {
-    setSalam(greeting());
-    setToday(
-      new Date().toLocaleDateString('id-ID', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
-    );
-  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -118,42 +93,6 @@ export default function DashboardOverviewPage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Hero */}
-        <section className="relative overflow-hidden rounded-3xl bg-slate-950 p-6 text-white shadow-xl shadow-slate-900/10 md:p-8">
-          <div className="bg-dots absolute inset-0" />
-          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-emerald-500/30 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-teal-500/20 blur-3xl" />
-
-          <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-2xl space-y-2">
-              <p className="h-4 text-xs font-medium text-emerald-300">{today}</p>
-              <h2 className="text-2xl font-extrabold tracking-tight md:text-3xl">
-                {salam}, {user?.name?.split(' ')[0] || 'Admin'}
-              </h2>
-              <p className="text-sm leading-relaxed text-slate-300">
-                Pantau role, personil, pelanggan, dan operasional marketplace dari satu tempat.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Link
-                href="/dashboard/roles"
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/30 transition-colors hover:bg-emerald-400"
-              >
-                <Plus className="h-4 w-4" />
-                Buat Role Baru
-              </Link>
-              <Link
-                href="/dashboard/users"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-bold text-white backdrop-blur transition-colors hover:bg-white/20"
-              >
-                <UserCog className="h-4 w-4" />
-                Tambah Staff
-              </Link>
-            </div>
-          </div>
-        </section>
-
         {/* Stats */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map((s) => {

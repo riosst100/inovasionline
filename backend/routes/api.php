@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\Admin\PhotographerApplicationController as Admin
 use App\Http\Controllers\Api\V1\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Api\V1\Admin\ServiceCityController as AdminServiceCityController;
 use App\Http\Controllers\Api\V1\Admin\NavBadgeController as AdminNavBadgeController;
+use App\Http\Controllers\Api\V1\Admin\LabelConfigController as AdminLabelConfigController;
 use App\Http\Controllers\Api\V1\Admin\OrderSettingController as AdminOrderSettingController;
 use App\Http\Controllers\Api\V1\Admin\AdChestController as AdminAdChestController;
 use App\Http\Controllers\Api\V1\Admin\AdmobController as AdminAdmobController;
@@ -533,6 +534,9 @@ Route::prefix('admin')->group(function () {
 
         Route::get('nav-badge', [AdminNavBadgeController::class, 'show']);
         Route::put('nav-badge', [AdminNavBadgeController::class, 'update']);
+
+        Route::get('label-configs', [AdminLabelConfigController::class, 'index']);
+        Route::put('label-configs', [AdminLabelConfigController::class, 'update']);
 
         Route::get('order-settings', [AdminOrderSettingController::class, 'show']);
         Route::put('order-settings', [AdminOrderSettingController::class, 'update']);
