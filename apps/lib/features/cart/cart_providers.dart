@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import '../../core/api/api_exception.dart';
 import '../../models/cart.dart';
 import '../../providers/auth_provider.dart';
@@ -14,17 +15,28 @@ String _errorMessage(Object error, String fallback) {
 }
 
 class CartState {
-  const CartState({this.cart, this.loading = false, this.error});
+  const CartState({this.cart, this.loading = false, this.error, this.busyItemIds = const {}});
 
   final Cart? cart;
   final bool loading;
   final String? error;
 
-  CartState copyWith({Cart? cart, bool? loading, String? error}) => CartState(
-        cart: cart ?? this.cart,
-        loading: loading ?? this.loading,
-        error: error,
-      );
+  /// Items with an update or removal in flight; their controls are locked.
+  final Set<String> busyItemIds;
+
+  CartState copyWith({Cart? cart, bool? loading, String? error, Set<String>? busyItemIds}) => CartState(
+    cart: cart ?? this.cart,
+    loading: loading ?? this.loading,
+    error: error,
+    busyItemIds: busyItemIds ?? this.busyItemIds,
+  );
+
+  CartState _withBusy(String id, bool busy) => CartState(
+    cart: cart,
+    loading: loading,
+    error: error,
+    busyItemIds: busy ? {...busyItemIds, id} : ({...busyItemIds}..remove(id)),
+  );
 }
 
 class CartNotifier extends StateNotifier<CartState> {
@@ -44,11 +56,9 @@ class CartNotifier extends StateNotifier<CartState> {
 
   Future<bool> addItem({required String productId, String? variantId, int quantity = 1}) async {
     try {
-      final cart = await _ref.read(cartServiceProvider).addItem(
-            productId: productId,
-            variantId: variantId,
-            quantity: quantity,
-          );
+      final cart = await _ref
+          .read(cartServiceProvider)
+          .addItem(productId: productId, variantId: variantId, quantity: quantity);
       state = CartState(cart: cart);
       return true;
     } catch (e) {
@@ -58,22 +68,29 @@ class CartNotifier extends StateNotifier<CartState> {
   }
 
   Future<void> updateQuantity(String cartItemId, int quantity) async {
+    if (state.busyItemIds.contains(cartItemId)) return;
+    state = state._withBusy(cartItemId, true);
     try {
       final cart = await _ref.read(cartServiceProvider).updateQuantity(cartItemId, quantity);
       state = CartState(cart: cart);
     } catch (e) {
-      state = state.copyWith(error: _errorMessage(e, 'Gagal mengubah jumlah.'));
+      state = state._withBusy(cartItemId, false).copyWith(error: _errorMessage(e, 'Gagal mengubah jumlah.'));
     }
   }
 
   void clear() => state = const CartState();
 
-  Future<void> removeItem(String cartItemId) async {
+  /// Returns whether the item was removed.
+  Future<bool> removeItem(String cartItemId) async {
+    if (state.busyItemIds.contains(cartItemId)) return false;
+    state = state._withBusy(cartItemId, true);
     try {
       final cart = await _ref.read(cartServiceProvider).removeItem(cartItemId);
       state = CartState(cart: cart);
+      return true;
     } catch (e) {
-      state = state.copyWith(error: _errorMessage(e, 'Gagal menghapus item.'));
+      state = state._withBusy(cartItemId, false).copyWith(error: _errorMessage(e, 'Gagal menghapus item.'));
+      return false;
     }
   }
 }
@@ -132,12 +149,9 @@ class CartSelectionNotifier extends StateNotifier<Set<String>> {
 
 final cartSelectionProvider = StateNotifierProvider<CartSelectionNotifier, Set<String>>((ref) {
   final notifier = CartSelectionNotifier();
-  ref.listen<AuthStatus>(
-    authProvider.select((s) => s.status),
-    (_, status) {
-      if (status == AuthStatus.unauthenticated) notifier.clear();
-    },
-  );
+  ref.listen<AuthStatus>(authProvider.select((s) => s.status), (_, status) {
+    if (status == AuthStatus.unauthenticated) notifier.clear();
+  });
   return notifier;
 });
 
@@ -145,16 +159,12 @@ final cartSelectionProvider = StateNotifierProvider<CartSelectionNotifier, Set<S
 /// the cart screen is ever opened.
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
   final notifier = CartNotifier(ref);
-  ref.listen<AuthStatus>(
-    authProvider.select((s) => s.status),
-    (_, status) {
-      if (status == AuthStatus.authenticated) {
-        Future.microtask(notifier.load);
-      } else if (status == AuthStatus.unauthenticated) {
-        notifier.clear();
-      }
-    },
-    fireImmediately: true,
-  );
+  ref.listen<AuthStatus>(authProvider.select((s) => s.status), (_, status) {
+    if (status == AuthStatus.authenticated) {
+      Future.microtask(notifier.load);
+    } else if (status == AuthStatus.unauthenticated) {
+      notifier.clear();
+    }
+  }, fireImmediately: true);
   return notifier;
 });

@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../config/theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/cart.dart';
@@ -26,7 +27,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   }
 
   void _toggleAll(List<CartItem> items, bool selected) {
-    ref.read(cartSelectionProvider.notifier).toggleAll(items.map((item) => item.id), selected);
+    ref
+        .read(cartSelectionProvider.notifier)
+        .toggleAll(items.where((item) => item.isAvailable).map((item) => item.id), selected);
   }
 
   @override
@@ -37,6 +40,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final itemCount = cart?.itemCount ?? 0;
 
     // Forget selections of items that were removed from the cart.
+    ref.listen(cartProvider.select((s) => s.error), (_, error) {
+      if (error != null && mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(error), behavior: SnackBarBehavior.floating));
+      }
+    });
+
     ref.listen(cartProvider.select((s) => s.cart), (_, next) {
       if (next != null) {
         ref.read(cartSelectionProvider.notifier).retainOnly(next.items.map((i) => i.id).toSet());
@@ -47,35 +58,42 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       backgroundColor: AppColors.surface,
       appBar: AppBar(
         title: Text(itemCount > 0 ? 'Keranjang ($itemCount)' : 'Keranjang'),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1),
-        ),
+        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1)),
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(cartProvider.notifier).load(),
         child: cartState.loading && cart == null
             ? const Center(child: CircularProgressIndicator())
+            : cart == null && cartState.error != null
+            ? _CartLoadError(message: cartState.error!, onRetry: () => ref.read(cartProvider.notifier).load())
             : cart == null || cart.isEmpty
-                ? const _EmptyCart()
-                : ListView(
+            ? const _EmptyCart()
+            : Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  // Keeps rows readable on tablets instead of stretching edge to edge.
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + MediaQuery.paddingOf(context).bottom),
                     children: [
                       _CartItemsCard(
                         items: cart.items,
                         selectedItemIds: selectedItemIds,
+                        busyItemIds: cartState.busyItemIds,
                         onToggleItem: _toggleItem,
                         onToggleAll: _toggleAll,
                       ),
                     ],
                   ),
+                ),
+              ),
       ),
       bottomNavigationBar: cart == null || cart.isEmpty
           ? null
           : _CheckoutBar(
               selection: CartSelection(
-                items: cart.items.where((i) => selectedItemIds.contains(i.id)).toList(),
+                items: cart.items.where((i) => i.isAvailable && selectedItemIds.contains(i.id)).toList(),
               ),
             ),
     );
@@ -110,7 +128,7 @@ class _CheckoutBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  count > 0 ? 'Subtotal ($count produk)' : 'Subtotal',
+                  count > 0 ? 'Subtotal ($count produk)' : 'Pilih produk untuk checkout',
                   style: const TextStyle(fontSize: 11.5, color: AppColors.mutedForeground),
                 ),
                 const SizedBox(height: 2),
@@ -128,13 +146,46 @@ class _CheckoutBar extends StatelessWidget {
             label: const Text('Checkout'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
-              minimumSize: Size.zero,
-              disabledBackgroundColor: AppColors.surface,
+              minimumSize: const Size(0, 48),
+              disabledBackgroundColor: AppColors.border,
               disabledForegroundColor: AppColors.mutedForeground,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CartLoadError extends StatelessWidget {
+  const _CartLoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      children: [
+        const SizedBox(height: 120),
+        const Icon(Icons.cloud_off_rounded, size: 56, color: AppColors.mutedForeground),
+        const SizedBox(height: 16),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 14, height: 1.4, color: AppColors.foreground),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Coba Lagi'),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -153,10 +204,7 @@ class _EmptyCart extends StatelessWidget {
           child: Container(
             width: 104,
             height: 104,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
             child: const Icon(Icons.shopping_cart_outlined, size: 48, color: AppColors.primary),
           ),
         ),
@@ -189,19 +237,22 @@ class _CartItemsCard extends ConsumerWidget {
   const _CartItemsCard({
     required this.items,
     required this.selectedItemIds,
+    required this.busyItemIds,
     required this.onToggleItem,
     required this.onToggleAll,
   });
 
   final List<CartItem> items;
   final Set<String> selectedItemIds;
+  final Set<String> busyItemIds;
   final void Function(String itemId, bool selected) onToggleItem;
   final void Function(List<CartItem> items, bool selected) onToggleAll;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedItems = items.where((item) => selectedItemIds.contains(item.id)).toList();
-    final allSelected = selectedItems.length == items.length;
+    final available = items.where((item) => item.isAvailable).toList();
+    final selectedItems = available.where((item) => selectedItemIds.contains(item.id)).toList();
+    final allSelected = available.isNotEmpty && selectedItems.length == available.length;
     final someSelected = selectedItems.isNotEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -209,20 +260,14 @@ class _CartItemsCard extends ConsumerWidget {
         color: Colors.white,
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: () => onToggleAll(items, !allSelected),
+            onTap: available.isEmpty ? null : () => onToggleAll(items, !allSelected),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
               child: Row(
@@ -231,12 +276,12 @@ class _CartItemsCard extends ConsumerWidget {
                     value: allSelected ? true : (someSelected ? null : false),
                     tristate: true,
                     visualDensity: VisualDensity.compact,
-                    onChanged: (value) => onToggleAll(items, !allSelected),
+                    onChanged: available.isEmpty ? null : (value) => onToggleAll(items, !allSelected),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'Pilih Semua (${items.length})',
+                      'Pilih Semua (${available.length})',
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                     ),
                   ),
@@ -253,7 +298,8 @@ class _CartItemsCard extends ConsumerWidget {
             if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
             _CartItemTile(
               item: items[i],
-              selected: selectedItemIds.contains(items[i].id),
+              selected: items[i].isAvailable && selectedItemIds.contains(items[i].id),
+              busy: busyItemIds.contains(items[i].id),
               onSelectedChanged: (selected) => onToggleItem(items[i].id, selected),
             ),
           ],
@@ -264,10 +310,16 @@ class _CartItemsCard extends ConsumerWidget {
 }
 
 class _CartItemTile extends ConsumerWidget {
-  const _CartItemTile({required this.item, required this.selected, required this.onSelectedChanged});
+  const _CartItemTile({
+    required this.item,
+    required this.selected,
+    required this.busy,
+    required this.onSelectedChanged,
+  });
 
   final CartItem item;
   final bool selected;
+  final bool busy;
   final ValueChanged<bool> onSelectedChanged;
 
   Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {
@@ -290,110 +342,141 @@ class _CartItemTile extends ConsumerWidget {
         ],
       ),
     );
-    if (ok == true) {
-      ref.read(cartProvider.notifier).removeItem(item.id);
+    if (ok != true) return;
+    final removed = await ref.read(cartProvider.notifier).removeItem(item.id);
+    if (removed && context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('${item.productName} dihapus dari keranjang'), behavior: SnackBarBehavior.floating),
+        );
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final available = item.isAvailable;
     return InkWell(
-      onTap: () => onSelectedChanged(!selected),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 12, 12, 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: selected,
-              visualDensity: VisualDensity.compact,
-              onChanged: (value) => onSelectedChanged(value ?? false),
-            ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(10),
+      onTap: available ? () => onSelectedChanged(!selected) : null,
+      child: Opacity(
+        opacity: busy ? 0.55 : 1,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 12, 12, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: selected,
+                visualDensity: VisualDensity.compact,
+                onChanged: available ? (value) => onSelectedChanged(value ?? false) : null,
+              ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: item.productImageUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: item.productImageUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, _, _) => const Icon(Icons.image_outlined, color: AppColors.mutedForeground),
+                        )
+                      : const Icon(Icons.image_outlined, color: AppColors.mutedForeground),
                 ),
-                child: item.productImageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: item.productImageUrl!,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, _, _) =>
-                            const Icon(Icons.image_outlined, color: AppColors.mutedForeground),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.productName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.3),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: busy ? null : () => _confirmRemove(context, ref),
+                          tooltip: 'Hapus ${item.productName}',
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.mutedForeground),
+                        ),
+                      ],
+                    ),
+                    if (item.variantName != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(6)),
+                        child: Text(
+                          item.variantName!,
+                          style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    if (!available)
+                      const Text(
+                        'Stok habis, tidak bisa dipesan',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.destructive),
                       )
-                    : const Icon(Icons.image_outlined, color: AppColors.mutedForeground),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.productName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, height: 1.3),
-                        ),
+                    else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  formatCurrency(item.lineTotal),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                    fontSize: 14.5,
+                                  ),
+                                ),
+                                if (item.quantity > 1)
+                                  Text(
+                                    '${formatCurrency(item.unitPrice)} / item',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          _QuantityStepper(item: item, busy: busy),
+                        ],
                       ),
-                      InkWell(
-                        onTap: () => _confirmRemove(context, ref),
-                        borderRadius: BorderRadius.circular(16),
-                        child: const Padding(
-                          padding: EdgeInsets.all(4),
-                          child: Icon(Icons.delete_outline, size: 20, color: AppColors.mutedForeground),
+                      if (item.stock <= 5)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            item.quantity >= item.stock
+                                ? 'Stok maksimal tercapai (${item.stock})'
+                                : 'Sisa ${item.stock}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent),
+                          ),
                         ),
-                      ),
                     ],
-                  ),
-                  if (item.variantName != null)
-                    Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item.variantName!,
-                        style: const TextStyle(fontSize: 11, color: AppColors.mutedForeground),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          formatCurrency(item.unitPrice),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary, fontSize: 14),
-                        ),
-                      ),
-                      _QuantityStepper(item: item),
-                    ],
-                  ),
-                  if (item.stock > 0 && item.stock <= 5)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        'Sisa ${item.stock}',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -401,23 +484,22 @@ class _CartItemTile extends ConsumerWidget {
 }
 
 class _QuantityStepper extends ConsumerWidget {
-  const _QuantityStepper({required this.item});
+  const _QuantityStepper({required this.item, required this.busy});
 
   final CartItem item;
+  final bool busy;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           _StepperButton(
             icon: Icons.remove,
-            onTap: item.quantity > 1
+            label: 'Kurangi jumlah ${item.productName}',
+            onTap: !busy && item.quantity > 1
                 ? () => ref.read(cartProvider.notifier).updateQuantity(item.id, item.quantity - 1)
                 : null,
           ),
@@ -431,7 +513,8 @@ class _QuantityStepper extends ConsumerWidget {
           ),
           _StepperButton(
             icon: Icons.add,
-            onTap: item.quantity < item.stock
+            label: 'Tambah jumlah ${item.productName}',
+            onTap: !busy && item.quantity < item.stock
                 ? () => ref.read(cartProvider.notifier).updateQuantity(item.id, item.quantity + 1)
                 : null,
           ),
@@ -442,19 +525,26 @@ class _QuantityStepper extends ConsumerWidget {
 }
 
 class _StepperButton extends StatelessWidget {
-  const _StepperButton({required this.icon, required this.onTap});
+  const _StepperButton({required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
+  final String label;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(icon, size: 16, color: onTap == null ? AppColors.border : AppColors.foreground),
+    return Semantics(
+      button: true,
+      label: label,
+      enabled: onTap != null,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(icon, size: 18, color: onTap == null ? AppColors.border : AppColors.foreground),
+        ),
       ),
     );
   }

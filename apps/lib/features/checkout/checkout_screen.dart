@@ -39,6 +39,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   ShippingMethod? _shippingMethod;
   SelectedDeliverySlot? _deliverySlot;
   final _addressCardKey = GlobalKey();
+
   /// Set once the user tried to continue without an address; keeps the
   /// hint visible until one is chosen.
   bool _addressRequired = false;
@@ -148,15 +149,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return paymentIds.isNotEmpty;
   }
 
+  /// True when paying with [payment] is part of the admin's Gratis Ongkir rule
+  /// (and the subtotal reaches its minimum).
+  bool _isPaymentMethodFreeShipping(PaymentMethod payment) {
+    final cfg = ref.read(checkoutFreeShippingConfigProvider).valueOrNull;
+    if (cfg == null || cfg['is_active'] != true) return false;
+
+    final min = (cfg['min_subtotal'] as num?)?.toDouble();
+    if (min != null && widget.selection.subtotal < min) return false;
+
+    final paymentIds = (cfg['payment_method_ids'] as List? ?? const []);
+    return paymentIds.contains(payment.id);
+  }
+
   bool get _freeShipping => _isShippingMethodFree(_shippingMethod);
 
-  double? get _shippingFee =>
-      _shippingMethod == null ? null : (_freeShipping ? 0 : _shippingMethod!.displayFee);
+  double? get _shippingFee => _shippingMethod == null
+      ? null
+      : (_freeShipping ? 0 : _shippingMethod!.displayFee);
 
   double get _total =>
-      widget.selection.subtotal +
-      (_shippingFee ?? 0) +
-      _serviceFee;
+      widget.selection.subtotal + (_shippingFee ?? 0) + _serviceFee;
 
   bool get _scheduleMissing =>
       _shippingMethod?.requiresSchedule == true && _deliverySlot == null;
@@ -166,6 +179,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _shippingMethod != null &&
       !_scheduleMissing &&
       _addressStepDone;
+
+  int get _stepsDone =>
+      (_addressStepDone ? 1 : 0) +
+      (_shippingMethod != null && !_scheduleMissing ? 1 : 0) +
+      (_paymentMethod != null ? 1 : 0);
+
+  /// Button label that tells the user what is still missing.
+  String get _submitLabel {
+    if (!_addressStepDone) return 'Pilih Alamat';
+    if (_shippingMethod == null) return 'Pilih Pengiriman';
+    if (_scheduleMissing) return 'Pilih Jadwal';
+    if (_paymentMethod == null) return 'Pilih Pembayaran';
+    return 'Buat Pesanan';
+  }
 
   /// Lets the user pick one of their saved addresses, or add one straight
   /// away when they have none yet.
@@ -219,6 +246,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         selected: _paymentMethod,
         total: _total,
         walletBalance: walletBalance,
+        isFreeShipping: _isPaymentMethodFreeShipping,
         // Verify at selection time so "Buat Pesanan" never detours into the camera.
         verifyFace: _ensureFaceVerified,
       ),
@@ -317,6 +345,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   void _handleDisabledSubmitTap() {
     if (!_addressStepDone) {
+      setState(() => _addressRequired = true);
       _showSnack('Lengkapi alamat pengiriman terlebih dahulu.');
       _editAddress();
     } else if (_shippingMethod == null) {
@@ -344,7 +373,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final start = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.face_retouching_natural_rounded, size: 40, color: Color(0xFFEA580C)),
+        icon: const Icon(
+          Icons.face_retouching_natural_rounded,
+          size: 40,
+          color: Color(0xFFEA580C),
+        ),
         title: const Text('Verifikasi Wajah'),
         content: const Text(
           'Untuk memakai metode pembayaran ini, Anda perlu verifikasi wajah satu kali.\n\n'
@@ -352,15 +385,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           textAlign: TextAlign.center,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Batal')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Mulai')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Mulai'),
+          ),
         ],
       ),
     );
     if (start != true || !mounted) return false;
     final passed = await context.push<bool>('/face-verification');
     if (passed != true) {
-      if (mounted) _showSnack('Verifikasi wajah diperlukan untuk metode pembayaran ini.');
+      if (mounted)
+        _showSnack('Verifikasi wajah diperlukan untuk metode pembayaran ini.');
       return false;
     }
     if (mounted) await _showFaceVerifiedDialog();
@@ -564,6 +604,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ],
       ),
       body: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           // 1. Purchased Products Card
@@ -577,6 +618,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             icon: Icons.location_on_rounded,
             iconColor: const Color(0xFF0D9488),
             title: 'Alamat Pengiriman',
+            highlight: _addressRequired && !_addressStepDone,
             done: _addressStepDone,
             enabled: _addressStepDone,
             actionLabel: 'Ubah',
@@ -689,9 +731,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Total Pembayaran',
-                        style: TextStyle(
+                      Text(
+                        'Total Pembayaran · $_stepsDone/3 langkah',
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF64748B),
@@ -711,53 +753,50 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                GestureDetector(
-                  onTap: _canSubmit ? null : _handleDisabledSubmitTap,
-                  child: SizedBox(
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _canSubmit && !checkoutState.submitting
-                          ? _submit
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D9488),
-                        disabledBackgroundColor: const Color(0xFFCBD5E1),
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: Colors.white.withValues(
-                          alpha: 0.9,
-                        ),
-                        elevation: _canSubmit ? 2 : 0,
-                        shadowColor: const Color(0xFF0D9488)
-                            .withValues(alpha: 0.35),
-                        padding: const EdgeInsets.symmetric(horizontal: 26),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    // Always tappable: an incomplete order jumps to the
+                    // missing step instead of a dead, greyed-out button.
+                    onPressed: checkoutState.submitting ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _canSubmit
+                          ? const Color(0xFF0D9488)
+                          : const Color(0xFF475569),
+                      disabledBackgroundColor: const Color(0xFF99D5CF),
+                      foregroundColor: Colors.white,
+                      disabledForegroundColor: Colors.white,
+                      elevation: _canSubmit ? 2 : 0,
+                      shadowColor: const Color(0xFF0D9488)
+                          .withValues(alpha: 0.35),
+                      padding: const EdgeInsets.symmetric(horizontal: 26),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: checkoutState.submitting
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Buat Pesanan',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                SizedBox(width: 6),
-                                Icon(Icons.arrow_forward_rounded, size: 18),
-                              ],
-                            ),
                     ),
+                    child: checkoutState.submitting
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _submitLabel,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.arrow_forward_rounded, size: 18),
+                            ],
+                          ),
                   ),
                 ),
               ],
@@ -1100,14 +1139,26 @@ class _StepCard extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          color: Color(0xFF0F172A),
+                      Flexible(
+                        child: Text(
+                          '$step. $title',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: Color(0xFF0F172A),
+                          ),
                         ),
                       ),
+                      if (done) ...[
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 16,
+                          color: Color(0xFF16A34A),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1483,6 +1534,10 @@ class _SelectedShippingTile extends StatelessWidget {
                   ),
                 ],
               ),
+              if (freeShipping) ...[
+                const SizedBox(height: 3),
+                const _FreeShippingBadge(),
+              ],
               const SizedBox(height: 2),
               if (method.estimatedDeliveryTime != null &&
                   method.estimatedDeliveryTime!.isNotEmpty)
@@ -1814,7 +1869,8 @@ class _OrderSummaryCard extends StatelessWidget {
           const SizedBox(height: 8),
           _SummaryLine(
             label: 'Biaya Pengiriman',
-            strikethroughValue: freeShipping &&
+            strikethroughValue:
+                freeShipping &&
                     originalShippingFee != null &&
                     originalShippingFee! > 0
                 ? formatCurrency(originalShippingFee!)
@@ -1824,8 +1880,8 @@ class _OrderSummaryCard extends StatelessWidget {
                 : 'Pilih kurir',
             valueColor: shippingFee != null
                 ? (freeShipping || shippingFee == 0
-                    ? const Color(0xFF16A34A)
-                    : const Color(0xFF0F172A))
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFF0F172A))
                 : const Color(0xFF94A3B8),
           ),
           const SizedBox(height: 8),
@@ -1931,11 +1987,15 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
     required this.methods,
     required this.total,
     required this.verifyFace,
+    required this.isFreeShipping,
     this.selected,
     this.walletBalance,
   });
 
   final List<PaymentMethod> methods;
+
+  /// Whether choosing this method qualifies the order for Gratis Ongkir.
+  final bool Function(PaymentMethod method) isFreeShipping;
   final PaymentMethod? selected;
 
   /// Runs the one-time face check; COD/Paylater only become selected once it passes.
@@ -1965,6 +2025,7 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
           ? 'Saldo ${formatCurrency(balance)}'
           : 'Saldo ${formatCurrency(balance)} · kurang ${formatCurrency(total - balance)}, ketuk untuk top up',
       badge: enough ? 'Instan' : 'Top Up',
+      freeShippingBadge: isFreeShipping(method),
       selected: selected?.id == method.id,
       onTap: () {
         if (enough) {
@@ -1994,6 +2055,7 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
       title: method.name,
       subtitle: subtitle,
       badge: locked ? 'Belum tersedia' : 'Bayar Nanti',
+      freeShippingBadge: isFreeShipping(method),
       enabled: !locked,
       selected: selected?.id == method.id,
       onTap: () {
@@ -2135,6 +2197,7 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                                 : (method.type == 'bank_transfer'
                                       ? 'Transfer'
                                       : null),
+                            freeShippingBadge: isFreeShipping(method),
                             selected: selected?.id == method.id,
                             onTap: () => _choose(context, method),
                           ),
@@ -2145,6 +2208,42 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Small "Gratis Ongkir" pill shown on shipping methods that qualify.
+class _FreeShippingBadge extends StatelessWidget {
+  const _FreeShippingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDCFCE7),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF86EFAC)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.local_shipping_rounded,
+            size: 11,
+            color: Color(0xFF15803D),
+          ),
+          SizedBox(width: 3),
+          Text(
+            'Gratis Ongkir',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF15803D),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2227,41 +2326,51 @@ class _ShippingMethodPickerSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-              for (final method in methods) ...[
-                () {
-                  final isFree = isFreeShipping(method);
-                  final isFreeWithDiscount = isFree && method.displayFee > 0;
-                  final String? strikethrough = isFreeWithDiscount
-                      ? formatCurrency(method.displayFee)
-                      : null;
-                  final String trailing = isFree || method.displayFee == 0
-                      ? formatCurrency(0)
-                      : formatCurrency(method.displayFee);
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final method in methods) ...[
+                      () {
+                        final isFree = isFreeShipping(method);
+                        final isFreeWithDiscount =
+                            isFree && method.displayFee > 0;
+                        final String? strikethrough = isFreeWithDiscount
+                            ? formatCurrency(method.displayFee)
+                            : null;
+                        final String trailing = isFree || method.displayFee == 0
+                            ? formatCurrency(0)
+                            : formatCurrency(method.displayFee);
 
-                  return _PickerOptionTile(
-                    icon: method.requiresSchedule
-                        ? Icons.event_available_rounded
-                        : Icons.bolt_rounded,
-                    iconColor: method.requiresSchedule
-                        ? const Color(0xFF2563EB)
-                        : const Color(0xFF16A34A),
-                    title: method.name,
-                    subtitle: method.estimatedDeliveryTime,
-                    badge: method.requiresSchedule
-                        ? 'Terjadwal'
-                        : (method.type == 'io_express' || method.isTableRate
-                            ? 'Instan'
-                            : 'Reguler'),
-                    strikethroughTrailing: strikethrough,
-                    trailing: trailing,
-                    trailingColor: (isFree || method.displayFee == 0)
-                        ? const Color(0xFF16A34A)
-                        : const Color(0xFF0F172A),
-                    selected: selected?.id == method.id,
-                    onTap: () => Navigator.of(context).pop(method),
-                  );
-                }(),
-              ],
+                        return _PickerOptionTile(
+                          icon: method.requiresSchedule
+                              ? Icons.event_available_rounded
+                              : Icons.bolt_rounded,
+                          iconColor: method.requiresSchedule
+                              ? const Color(0xFF2563EB)
+                              : const Color(0xFF16A34A),
+                          title: method.name,
+                          subtitle: method.estimatedDeliveryTime,
+                          badge: method.requiresSchedule
+                              ? 'Terjadwal'
+                              : (method.type == 'io_express' ||
+                                        method.isTableRate
+                                    ? 'Instan'
+                                    : 'Reguler'),
+                          freeShippingBadge: isFree,
+                          strikethroughTrailing: strikethrough,
+                          trailing: trailing,
+                          trailingColor: (isFree || method.displayFee == 0)
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFF0F172A),
+                          selected: selected?.id == method.id,
+                          onTap: () => Navigator.of(context).pop(method),
+                        );
+                      }(),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -2449,25 +2558,33 @@ class _DeliverySlotPickerSheetState extends State<_DeliverySlotPickerSheet> {
                       ),
                     ),
                   ),
-                for (final slot in day.slots)
-                  Opacity(
-                    opacity: slot.available ? 1 : 0.5,
-                    child: _PickerOptionTile(
-                      icon: Icons.schedule_rounded,
-                      iconColor: const Color(0xFF2563EB),
-                      title: slot.label,
-                      subtitle: slot.available
-                          ? (slot.remaining != null
-                                ? '${slot.timeRange} · sisa ${slot.remaining} slot'
-                                : slot.timeRange)
-                          : '${slot.timeRange} · ${slot.reason ?? 'tidak tersedia'}',
-                      selected: slot.isSameAs(widget.selected?.slot),
-                      onTap: slot.available
-                          ? () => Navigator.of(context)
-                                .pop(SelectedDeliverySlot(slot: slot, day: day))
-                          : () {},
-                    ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final slot in day.slots)
+                        Opacity(
+                          opacity: slot.available ? 1 : 0.5,
+                          child: _PickerOptionTile(
+                            icon: Icons.schedule_rounded,
+                            iconColor: const Color(0xFF2563EB),
+                            title: slot.label,
+                            subtitle: slot.available
+                                ? (slot.remaining != null
+                                      ? '${slot.timeRange} · sisa ${slot.remaining} slot'
+                                      : slot.timeRange)
+                                : '${slot.timeRange} · ${slot.reason ?? 'tidak tersedia'}',
+                            selected: slot.isSameAs(widget.selected?.slot),
+                            onTap: slot.available
+                                ? () => Navigator.of(context).pop(
+                                    SelectedDeliverySlot(slot: slot, day: day),
+                                  )
+                                : () {},
+                          ),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ],
           ),
@@ -2490,10 +2607,12 @@ class _PickerOptionTile extends StatelessWidget {
     this.strikethroughTrailing,
     this.trailingColor,
     this.badge,
+    this.freeShippingBadge = false,
     this.enabled = true,
   });
 
   final bool enabled;
+  final bool freeShippingBadge;
   final IconData icon;
   final Color iconColor;
   final String title;
@@ -2589,6 +2708,10 @@ class _PickerOptionTile extends StatelessWidget {
                           ),
                         ),
                       ],
+                      if (freeShippingBadge) ...[
+                        const SizedBox(height: 4),
+                        const _FreeShippingBadge(),
+                      ],
                     ],
                   ),
                 ),
@@ -2614,8 +2737,10 @@ class _PickerOptionTile extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
-                            color: trailingColor ??
-                                (trailing == 'GRATIS' || trailing == formatCurrency(0)
+                            color:
+                                trailingColor ??
+                                (trailing == 'GRATIS' ||
+                                        trailing == formatCurrency(0)
                                     ? const Color(0xFF16A34A)
                                     : const Color(0xFF0F172A)),
                           ),
