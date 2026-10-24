@@ -1,14 +1,21 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <!-- The location/geolocator plugins ship a location foreground service for background
+         tracking. This app only reads a one-off position and asks to turn GPS on, so strip
+         the service and its permission; otherwise Play requires a foreground-service declaration. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:node="remove"/>
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <service android:name="com.lyokone.location.FlutterLocationService" tools:node="remove"/>
+        <service android:name="com.baseflow.geolocator.GeolocatorLocationService" tools:node="remove"/>
         <!-- No android:taskAffinity="" here (the Flutter template adds it): with an
              empty affinity, AdMob's AdActivity opens in a separate task, and after an
              ad click the launcher icon brings back the browser instead of the app. -->
