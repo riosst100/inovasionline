@@ -37,6 +37,7 @@ export default function AdminUsersPage() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
     phone: '',
     password: '',
@@ -79,6 +80,7 @@ export default function AdminUsersPage() {
     setEditingUser(null);
     setFormData({
       name: '',
+      username: '',
       email: '',
       phone: '',
       password: '',
@@ -91,6 +93,7 @@ export default function AdminUsersPage() {
     setEditingUser(u);
     setFormData({
       name: u.name,
+      username: u.username,
       email: u.email,
       phone: u.phone || '',
       password: '',
@@ -108,6 +111,7 @@ export default function AdminUsersPage() {
       if (editingUser) {
         await adminApi.updateStaffUser(editingUser.id, {
           name: formData.name,
+          username: formData.username,
           email: formData.email,
           phone: formData.phone || undefined,
           password: formData.password || undefined,
@@ -117,6 +121,7 @@ export default function AdminUsersPage() {
       } else {
         await adminApi.createStaffUser({
           name: formData.name,
+          username: formData.username,
           email: formData.email,
           phone: formData.phone || undefined,
           password: formData.password,
@@ -196,7 +201,7 @@ export default function AdminUsersPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari nama atau email..."
+              placeholder="Cari nama, username, atau email..."
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs md:text-sm text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500"
             />
           </form>
@@ -268,7 +273,7 @@ export default function AdminUsersPage() {
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs text-slate-400">{u.email}</span>
+                              <span className="text-xs text-slate-400">@{u.username} · {u.email}</span>
                             </div>
                           </div>
                         </td>
@@ -363,6 +368,24 @@ export default function AdminUsersPage() {
                     required
                     className="w-full rounded-xl border border-slate-300 py-2.5 px-3.5 text-xs md:text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Username <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, '') })}
+                    placeholder="budi.driver"
+                    required
+                    minLength={3}
+                    maxLength={50}
+                    autoCapitalize="none"
+                    className="w-full rounded-xl border border-slate-300 py-2.5 px-3.5 text-xs md:text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400">Dipakai untuk login. Huruf kecil, angka, titik, atau garis bawah.</p>
                 </div>
 
                 <div>

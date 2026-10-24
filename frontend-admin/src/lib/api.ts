@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -119,7 +119,7 @@ export async function apiDownload(endpoint: string, fileName: string): Promise<v
 
 export const adminApi = {
   // Admin Auth (/api/admin/auth/*)
-  async login(credentials: { email: string; password: string }): Promise<{ user: AdminUser }> {
+  async login(credentials: { username: string; password: string }): Promise<{ user: AdminUser }> {
     return apiRequest<{ user: AdminUser }>('/admin/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
@@ -136,6 +136,16 @@ export const adminApi = {
 
   async getMe(): Promise<AdminUser> {
     return apiRequest<AdminUser>('/admin/auth/me');
+  },
+
+  async updateAvatar(file: File): Promise<AdminUser> {
+    const form = new FormData();
+    form.append('avatar', file);
+    return apiRequest<AdminUser>('/admin/auth/avatar', { method: 'POST', body: form }, 60000);
+  },
+
+  async deleteAvatar(): Promise<AdminUser> {
+    return apiRequest<AdminUser>('/admin/auth/avatar', { method: 'DELETE' });
   },
 
   async getSessions(): Promise<AdminSession[]> {
@@ -189,14 +199,14 @@ export const adminApi = {
     return apiRequest<PaginatedData<AdminUser>>(`/admin/staff?${query.toString()}`);
   },
 
-  async createStaffUser(data: { name: string; email: string; phone?: string; password: string; role_id: string }): Promise<AdminUser> {
+  async createStaffUser(data: { name: string; username: string; email: string; phone?: string; password: string; role_id: string }): Promise<AdminUser> {
     return apiRequest<AdminUser>('/admin/staff', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  async updateStaffUser(id: string, data: { name: string; email: string; phone?: string; password?: string; role_id?: string; is_active?: boolean }): Promise<AdminUser> {
+  async updateStaffUser(id: string, data: { name: string; username: string; email: string; phone?: string; password?: string; role_id?: string; is_active?: boolean }): Promise<AdminUser> {
     return apiRequest<AdminUser>(`/admin/staff/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -309,6 +319,13 @@ export const adminApi = {
 
   async unbanCustomer(id: string): Promise<Customer> {
     return apiRequest<Customer>(`/admin/customers/${id}/unban`, { method: 'POST' });
+  },
+
+  async revokeCustomerVerification(id: string, reason: string): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/revoke-verification`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
   },
 
   async unblockCustomer(id: string): Promise<Customer> {
@@ -505,6 +522,36 @@ export const adminApi = {
 
   async getRegionVillages(districtCode: string): Promise<RegionItem[]> {
     return trimCodes(await apiRequest<RegionItem[]>(`/v1/regions/districts/${districtCode}/villages`));
+  },
+
+  async getSuppliers(): Promise<Supplier[]> {
+    return apiRequest<Supplier[]>('/admin/suppliers');
+  },
+
+  async saveSupplier(data: Partial<Supplier>, id?: string): Promise<Supplier> {
+    return apiRequest<Supplier>(id ? `/admin/suppliers/${id}` : '/admin/suppliers', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteSupplier(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/suppliers/${id}`, { method: 'DELETE' });
+  },
+
+  async getBrands(): Promise<Brand[]> {
+    return apiRequest<Brand[]>('/admin/brands');
+  },
+
+  async saveBrand(data: Partial<Brand>, id?: string): Promise<Brand> {
+    return apiRequest<Brand>(id ? `/admin/brands/${id}` : '/admin/brands', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBrand(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/brands/${id}`, { method: 'DELETE' });
   },
 
   async getWarehouses(): Promise<Warehouse[]> {

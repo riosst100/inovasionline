@@ -6,6 +6,7 @@ use App\Notifications\ResetPasswordNotification;
 use App\Support\Enums\UserRole;
 use App\Support\Enums\UserVerificationStatus;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class User extends Authenticatable
 {
@@ -49,6 +51,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            // Only present when loaded through withLastSeen().
+            'last_seen_at' => 'datetime',
             'phone_verified_at' => 'datetime',
             'wallet_balance' => 'decimal:2',
             'wallet_bonus_claimed_at' => 'datetime',
@@ -119,6 +123,36 @@ class User extends Authenticatable
     public function codVerifications(): HasMany
     {
         return $this->hasMany(CodVerification::class);
+    }
+
+    /**
+     * Adds `last_seen_at`: the latest app heartbeat or authenticated API call (Sanctum updates
+     * tokens.last_used_at on every request), whichever is later.
+     */
+    public function scopeWithLastSeen(Builder $query): Builder
+    {
+        $installs = AppInstall::query()->selectRaw('max(last_seen_at)')->whereColumn('app_installs.user_id', 'users.id');
+        $tokens = PersonalAccessToken::query()
+            ->selectRaw('max(last_used_at)')
+            ->whereColumn('personal_access_tokens.tokenable_id', 'users.id')
+            ->where('personal_access_tokens.tokenable_type', $this->getMorphClass());
+
+        return $query
+            ->select('users.*')
+            // Postgres greatest() skips nulls, so either source alone is enough.
+            ->selectRaw(
+                'greatest(('.$installs->toSql().'), ('.$tokens->toSql().')) as last_seen_at',
+                [...$installs->getBindings(), ...$tokens->getBindings()]
+            );
+    }
+
+    /**
+     * The face-verification event behind `verification_status` (verified by it, or revoked on it).
+     * Only CodVerificationService writes these two columns.
+     */
+    public function verification(): BelongsTo
+    {
+        return $this->belongsTo(CodVerification::class, 'verification_id');
     }
 
     public function faceProfile(): HasOne

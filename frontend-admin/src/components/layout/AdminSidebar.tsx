@@ -16,15 +16,12 @@ import {
   ListChecks,
   LogOut,
   Truck,
-  Boxes,
   Package,
   Warehouse,
-  Layers,
   PackageSearch,
   SlidersHorizontal,
   ChevronDown,
   MonitorSmartphone,
-  Search,
   TextSearch,
   Settings,
   MapPinned,
@@ -48,6 +45,13 @@ import {
   BadgeDollarSign,
   PackageOpen,
   Award,
+  Building2,
+  Database,
+  IdCard,
+  Landmark,
+  ReceiptText,
+  Scale,
+  TrendingUp,
   Code,
   X,
 } from 'lucide-react';
@@ -75,55 +79,48 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
   const sections: NavSection[] = [
     {
       title: 'Utama',
-      items: [{ name: 'Ringkasan Dashboard', href: '/dashboard', icon: LayoutDashboard }],
+      items: [
+        { name: 'Ringkasan Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Pesanan', href: '/dashboard/orders', icon: ShoppingBag },
+        { name: 'Jadwal Pengiriman', href: '/dashboard/delivery-schedules', icon: CalendarClock },
+        { name: 'Verifikasi Pengguna', href: '/dashboard/cod-verifications', icon: ScanFace },
+      ],
     },
     {
       title: 'Operasional',
       items: [
+        { name: 'Pengguna', href: '/dashboard/customers', icon: Users2 },
         {
-          name: 'Pesanan',
-          href: '/dashboard/orders-menu',
-          icon: ShoppingBag,
+          name: 'Saldo Belanja',
+          href: '/dashboard/wallet',
+          icon: Wallet,
           children: [
-            { name: 'Daftar Pesanan', href: '/dashboard/orders', icon: ShoppingBag },
-            { name: 'Status Pesanan', href: '/dashboard/order-statuses', icon: ListChecks },
+            { name: 'Saldo Pengguna', href: '/dashboard/wallets', icon: Coins },
+            { name: 'Top Up Saldo', href: '/dashboard/wallet-topups', icon: ArrowUpCircle },
           ],
         },
         {
-          name: 'Pengiriman',
-          href: '/dashboard/shipping',
-          icon: Truck,
-          children: [
-            { name: 'Metode Pengiriman', href: '/dashboard/shipping-methods', icon: PackageCheck },
-            { name: 'Kurir', href: '/dashboard/drivers', icon: Bike },
-            { name: 'Jadwal Pengiriman', href: '/dashboard/delivery-schedules', icon: CalendarClock },
-          ],
-        },
-        {
-          name: 'Katalog',
-          href: '/dashboard/catalog',
-          icon: Boxes,
+          name: 'Master Data',
+          href: '/dashboard/master-data',
+          icon: Database,
           children: [
             { name: 'Produk', href: '/dashboard/products', icon: Package },
             { name: 'Kategori', href: '/dashboard/categories', icon: FolderTree },
             { name: 'Atribut Produk', href: '/dashboard/attributes', icon: SlidersHorizontal },
-          ],
-        },
-        {
-          name: 'Stok',
-          href: '/dashboard/stock',
-          icon: Layers,
-          children: [
+            { name: 'Supplier', href: '/dashboard/master-data/suppliers', icon: Building2 },
+            { name: 'Brand', href: '/dashboard/master-data/brands', icon: Award },
             { name: 'Gudang', href: '/dashboard/warehouses', icon: Warehouse },
-            { name: 'Stok Produk', href: '/dashboard/product-stocks', icon: PackageSearch },
+            { name: 'Kurir', href: '/dashboard/drivers', icon: Bike },
           ],
         },
         {
-          name: 'Pencarian',
-          href: '/dashboard/search',
-          icon: Search,
+          name: 'Laporan',
+          href: '/dashboard/reports',
+          icon: FileBarChart,
           children: [
-            { name: 'Saran Pencarian', href: '/dashboard/search/suggestions', icon: TextSearch },
+            { name: 'Stok Produk', href: '/dashboard/product-stocks', icon: PackageSearch },
+            { name: 'Kueri Pencarian', href: '/dashboard/search/suggestions', icon: TextSearch },
+            { name: 'Laporan Saldo Belanja', href: '/dashboard/wallet-report', icon: Wallet },
           ],
         },
         {
@@ -150,44 +147,10 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
           icon: BadgeDollarSign,
           children: [
             { name: 'Iklan Produk', href: '/dashboard/ads/products', icon: PackageOpen },
-            { name: 'Iklan Brands', href: '/dashboard/ads/brands', icon: Award },
             { name: 'Adsense / Admob', href: '/dashboard/ads/adsense', icon: Code },
             { name: 'Peti Hadiah', href: '/dashboard/ads/reward-chest', icon: Gift },
           ],
         },
-      ],
-    },
-    {
-      title: 'Pengguna',
-      items: [
-        { name: 'Customer', href: '/dashboard/customers', icon: Users2 },
-        {
-          name: 'Saldo Belanja',
-          href: '/dashboard/wallet',
-          icon: Wallet,
-          children: [
-            { name: 'Saldo Customer', href: '/dashboard/wallets', icon: Coins },
-            { name: 'Top Up History', href: '/dashboard/wallet-topups', icon: ArrowUpCircle },
-            { name: 'Laporan', href: '/dashboard/wallet-report', icon: FileBarChart },
-          ],
-        },
-        { name: 'Verifikasi COD', href: '/dashboard/cod-verifications', icon: ScanFace },
-        { name: 'User', href: '/dashboard/users', icon: UserCog, badge: 'Internal' },
-        {
-          name: 'Hak Akses & Role',
-          href: '/dashboard/roles',
-          icon: ShieldCheck,
-          badge: isSuperAdmin ? 'Super' : undefined,
-        },
-      ],
-    },
-    {
-      title: 'Data',
-      items: [{ name: 'Import / Export', href: '/dashboard/data-transfers', icon: ArrowDownUp }],
-    },
-    {
-      title: 'Pengaturan',
-      items: [
         {
           name: 'Pengaturan',
           href: '/dashboard/settings',
@@ -196,14 +159,41 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
             { name: 'Cakupan Kota', href: '/dashboard/settings/service-cities', icon: MapPinned },
             { name: 'Biaya Layanan', href: '/dashboard/settings/service-fee', icon: Receipt },
             { name: 'Badge Menu', href: '/dashboard/settings/nav-badge', icon: Tag },
+            { name: 'Status Pesanan', href: '/dashboard/order-statuses', icon: ListChecks },
+            { name: 'Metode Pengiriman', href: '/dashboard/shipping-methods', icon: PackageCheck },
             { name: 'Pembatalan Pesanan', href: '/dashboard/settings/order-cancellation', icon: Timer },
           ],
         },
       ],
     },
     {
-      title: 'Keamanan',
-      items: [{ name: 'Sesi & Perangkat', href: '/dashboard/sessions', icon: MonitorSmartphone }],
+      title: 'Perusahaan',
+      items: [
+        { name: 'Karyawan', href: '/dashboard/employees', icon: IdCard },
+        {
+          name: 'Keuangan',
+          href: '/dashboard/finance',
+          icon: Landmark,
+          children: [
+            { name: 'Cashflow', href: '/dashboard/finance/cashflow', icon: Scale },
+            { name: 'Laporan Keuangan', href: '/dashboard/finance/report', icon: FileBarChart },
+            { name: 'Keuntungan', href: '/dashboard/finance/profit', icon: TrendingUp },
+            { name: 'Tagihan Supplier', href: '/dashboard/finance/bills', icon: ReceiptText },
+          ],
+        },
+      ],
+    },
+    {
+      title: 'Admin',
+      items: [
+        { name: 'User', href: '/dashboard/users', icon: UserCog },
+        { name: 'Hak Akses & Role', href: '/dashboard/roles', icon: ShieldCheck },
+        { name: 'Sesi & Perangkat', href: '/dashboard/sessions', icon: MonitorSmartphone },
+      ],
+    },
+    {
+      title: 'Data',
+      items: [{ name: 'Import / Export', href: '/dashboard/data-transfers', icon: ArrowDownUp }],
     },
   ];
 

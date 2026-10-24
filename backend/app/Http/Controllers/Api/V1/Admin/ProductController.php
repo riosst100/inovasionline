@@ -24,7 +24,7 @@ class ProductController extends Controller
 
         $products = Product::query()
             ->withStock()
-            ->with(['category:id,name', 'images'])
+            ->with(['category:id,name', 'supplier:id,name', 'brand:id,name', 'images'])
             ->when($search !== '', fn ($query) => $query->where('name', 'ilike', "%{$search}%"))
             ->when(
                 ProductStatus::tryFrom($request->string('status')->toString()),
@@ -53,10 +53,13 @@ class ProductController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['nullable', 'exists:categories,id'],
+            'supplier_id' => ['nullable', 'exists:suppliers,id'],
+            'brand_id' => ['nullable', 'exists:brands,id'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string'],
             'regular_price' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['nullable', 'numeric', 'min:0', 'lte:regular_price'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
             'stocks' => ['nullable', 'array'],
             'stocks.*.warehouse_id' => ['required', 'distinct', 'exists:warehouses,id'],
             'stocks.*.quantity' => ['required', 'integer', 'min:0'],
@@ -87,10 +90,13 @@ class ProductController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['nullable', 'exists:categories,id'],
+            'supplier_id' => ['nullable', 'exists:suppliers,id'],
+            'brand_id' => ['nullable', 'exists:brands,id'],
             'short_description' => ['nullable', 'string', 'max:500'],
             'description' => ['nullable', 'string'],
             'regular_price' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['nullable', 'numeric', 'min:0', 'lte:regular_price'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
             'stocks' => ['nullable', 'array'],
             'stocks.*.warehouse_id' => ['required', 'distinct', 'exists:warehouses,id'],
             'stocks.*.quantity' => ['required', 'integer', 'min:0'],
@@ -204,7 +210,7 @@ class ProductController extends Controller
 
     private function freshResponse(Product $product, string $message): JsonResponse
     {
-        $product->load(['category:id,name', 'images', 'warehouses:id,name']);
+        $product->load(['category:id,name', 'supplier:id,name', 'brand:id,name', 'images', 'warehouses:id,name']);
 
         return ApiResponse::success($this->transform($product), $message);
     }
@@ -243,13 +249,18 @@ class ProductController extends Controller
             'slug' => $product->slug,
             'regular_price' => $product->regular_price,
             'sale_price' => $product->sale_price,
+            'cost_price' => $product->cost_price,
             'category_id' => $product->category_id,
+            'supplier_id' => $product->supplier_id,
+            'brand_id' => $product->brand_id,
             'sku' => $product->sku,
             'short_description' => $product->short_description,
             'description' => $product->description,
             'stock' => $product->stock,
             'status' => $product->status instanceof \BackedEnum ? $product->status->value : $product->status,
             'category_name' => $product->category?->name,
+            'supplier_name' => $product->supplier?->name,
+            'brand_name' => $product->brand?->name,
             'stocks' => $product->relationLoaded('warehouses')
                 ? $product->warehouses->map(fn ($w) => [
                     'warehouse_id' => $w->id,

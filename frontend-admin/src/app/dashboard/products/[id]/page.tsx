@@ -7,6 +7,8 @@ import NoWarehouseNotice from '../../../../components/warehouses/NoWarehouseNoti
 import AdminLayout from '../../../../components/layout/AdminLayout';
 import SearchableSelect from '../../../../components/ui/SearchableSelect';
 import { adminApi } from '../../../../lib/api';
+import { Brand, Supplier } from '../../../../types';
+import CostHint from '../CostHint';
 import { ArrowLeft, ImagePlus, Loader2, Pencil, Plus, Star, Trash2, Warehouse } from 'lucide-react';
 
 const STATUSES: Record<string, string> = {
@@ -31,6 +33,8 @@ function EditProductPageContent() {
   const router = useRouter();
   const [product, setProduct] = useState<any | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [form, setForm] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,10 +49,15 @@ function EditProductPageContent() {
       adminApi.getProduct(id),
       adminApi.getCategories().catch(() => []),
       adminApi.getWarehouses().catch(() => []),
+      adminApi.getSuppliers().catch(() => []),
+      adminApi.getBrands().catch(() => []),
     ])
-      .then(([p, cats, whs]: any[]) => {
+      .then(([p, cats, whs, sups, brs]: any[]) => {
         setProduct(p);
         setCategories(Array.isArray(cats) ? cats : cats?.data ?? []);
+        // Keep the current pick listed even if it has since been deactivated.
+        setSuppliers((sups as Supplier[]).filter((s) => s.is_active || s.id === p.supplier_id));
+        setBrands((brs as Brand[]).filter((b) => b.is_active || b.id === p.brand_id));
         const whList = Array.isArray(whs) ? whs : whs?.data ?? [];
         setWarehouses(whList.filter((w: any) => w.is_active !== false));
         const initial = (p.stocks ?? []).map((r: any) => ({
@@ -59,10 +68,13 @@ function EditProductPageContent() {
         setForm({
           name: p.name ?? '',
           category_id: p.category_id ?? '',
+          supplier_id: p.supplier_id ?? '',
+          brand_id: p.brand_id ?? '',
           short_description: p.short_description ?? '',
           description: p.description ?? '',
           regular_price: initPrice(p.regular_price),
           sale_price: initPrice(p.sale_price),
+          cost_price: initPrice(p.cost_price),
           sku: p.sku ?? '',
           status: p.status ?? 'draft',
         });
@@ -120,7 +132,10 @@ function EditProductPageContent() {
       await adminApi.updateProduct(id, {
         ...form,
         category_id: form.category_id || null,
+        supplier_id: form.supplier_id || null,
+        brand_id: form.brand_id || null,
         sale_price: form.sale_price === '' ? null : form.sale_price,
+        cost_price: form.cost_price === '' ? null : form.cost_price,
         sku: form.sku || null,
         ...(warehouses.length > 0
           ? { stocks: rows.map((r) => ({ warehouse_id: r.warehouse_id, quantity: Number(r.quantity) || 0 })) }
@@ -140,7 +155,7 @@ function EditProductPageContent() {
       <div className="mx-auto max-w-3xl space-y-6">
         <div>
           <Link href="/dashboard/products" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
-            <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Katalog
+            <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Produk
           </Link>
           <div className="mt-2 flex items-center gap-2">
             <Pencil className="h-6 w-6 text-emerald-600" />
@@ -209,6 +224,24 @@ function EditProductPageContent() {
                   emptyLabel="- Tanpa kategori -"
                 />
               </div>
+              <div className="block text-xs font-semibold text-slate-600">
+                Supplier
+                <SearchableSelect
+                  value={String(form.supplier_id ?? '')}
+                  onChange={(v) => setField('supplier_id', v)}
+                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                  emptyLabel="- Tanpa supplier -"
+                />
+              </div>
+              <div className="block text-xs font-semibold text-slate-600">
+                Brand (opsional)
+                <SearchableSelect
+                  value={String(form.brand_id ?? '')}
+                  onChange={(v) => setField('brand_id', v)}
+                  options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                  emptyLabel="- Tanpa brand -"
+                />
+              </div>
               <label className="block text-xs font-semibold text-slate-600">
                 Status
                 <select value={form.status} onChange={(e) => setField('status', e.target.value)} className={inputCls}>
@@ -232,6 +265,14 @@ function EditProductPageContent() {
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">Rp</span>
                   <input inputMode="numeric" value={formatRupiah(form.sale_price)} onChange={(e) => setField('sale_price', toDigits(e.target.value))} className={`${inputCls} pl-9`} />
                 </div>
+              </label>
+              <label className="block text-xs font-semibold text-slate-600">
+                Harga Modal
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">Rp</span>
+                  <input inputMode="numeric" value={formatRupiah(form.cost_price)} onChange={(e) => setField('cost_price', toDigits(e.target.value))} className={`${inputCls} pl-9`} />
+                </div>
+                <CostHint price={form.sale_price || form.regular_price} cost={form.cost_price} />
               </label>
               <label className="block text-xs font-semibold text-slate-600">
                 SKU

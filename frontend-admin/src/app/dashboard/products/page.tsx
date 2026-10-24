@@ -12,8 +12,8 @@ import { Loader2, Package, Pencil, Plus, Trash2, EyeOff } from 'lucide-react';
 
 const IMPORT_HINT = (
   <>
-    Kolom: <b>name</b> & <b>regular_price</b> (wajib untuk produk baru), id, sku, store, category (slug/nama),
-    product_type, status, sale_price, cost_price, short_description, description, weight, length, width, height,
+    Kolom: <b>name</b> & <b>regular_price</b> (wajib untuk produk baru), id, sku, category (slug/nama),
+    supplier (nama), brand (nama), product_type, status, sale_price, cost_price, short_description, description, weight, length, width, height,
     min_stock. Baris dengan id/sku yang sudah ada akan <b>diperbarui</b>, selain itu dibuat baru. Stok tidak ada di
     file ini — gunakan import/export di menu <b>Stok Produk</b>. Gambar produk tidak ikut diimport.
   </>

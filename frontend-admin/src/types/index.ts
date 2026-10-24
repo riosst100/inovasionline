@@ -13,6 +13,7 @@ export interface Role {
 export interface AdminUser {
   id: string;
   name: string;
+  username: string;
   email: string;
   phone: string | null;
   vehicle_type?: string | null;
@@ -72,6 +73,12 @@ export interface Customer {
   role: string;
   avatar_url: string | null;
   is_verified: boolean;
+  /** Face verification (COD/Paylater). null = never verified */
+  verification_status: CodVerificationStatus | null;
+  /** The verification event behind verification_status (verified by it, or revoked on it) */
+  verification_id: string | null;
+  /** Latest app heartbeat or API use; sent by the admin customer list/detail only */
+  last_seen_at?: string | null;
   is_blocked: boolean;
   blocked_at: string | null;
   block_reason: string | null;
@@ -154,7 +161,8 @@ export interface ApiResponse<T = any> {
   message: string;
   data: T;
   errors?: Record<string, string[]>;
-  meta?: PaginationMeta;
+  /** `summary`: optional endpoint-specific totals sent next to pagination (e.g. supplier bills) */
+  meta?: PaginationMeta & { summary?: unknown };
 }
 
 export interface PaginationMeta {
@@ -263,6 +271,26 @@ export interface Warehouse {
   notes: string | null;
   is_active: boolean;
   coverage?: WarehouseCoverage[];
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+  products_count?: number;
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  products_count?: number;
 }
 
 export interface ProductStockRow {
@@ -463,6 +491,57 @@ export interface WalletReport {
   transactions: WalletReportTransaction[];
 }
 
+export interface SalesSummary {
+  revenue: number;
+  revenue_paid: number;
+  orders: number;
+  average_order: number;
+  items_sold: number;
+  /** Goods sold after order discounts (no shipping/service fee) */
+  product_sales: number;
+  cost: number;
+  gross_profit: number;
+  /** Gross profit as a percentage of product_sales */
+  margin: number;
+  /** Units sold whose product has no cost price yet; their cost counts as 0 */
+  items_without_cost: number;
+  buyers: number;
+  discount: number;
+  shipping: number;
+  completed: number;
+  cancelled: number;
+  new_customers: number;
+}
+
+export interface SalesReport {
+  period: { date_from: string; date_to: string; days: number; summary: SalesSummary };
+  previous: { date_from: string; date_to: string; summary: SalesSummary };
+  granularity: 'hour' | 'day';
+  series: { label: string; revenue: number; orders: number; previous_revenue: number; previous_orders: number }[];
+  by_status: { status: string; orders: number; revenue: number }[];
+  by_payment_method: { method: string; orders: number; revenue: number }[];
+  top_products: { product_id: string | null; name: string; sold: number; revenue: number; profit: number | null }[];
+  recent_orders: {
+    id: string;
+    order_number: string;
+    customer: string | null;
+    grand_total: number;
+    status: string;
+    payment_status: string | null;
+    created_at: string;
+  }[];
+  overall: {
+    revenue_total: number;
+    orders_total: number;
+    profit_total: number;
+    revenue_this_month: number;
+    orders_this_month: number;
+    profit_this_month: number;
+    open_orders: number;
+    awaiting_payment: number;
+  };
+}
+
 export interface WalletDetail {
   user: { id: string; name: string; email: string | null; phone: string | null };
   balance: number;
@@ -565,4 +644,132 @@ export interface CodVerificationRow {
   revoked_at: string | null;
   created_at: string;
   user: { id: string; name: string; email: string | null; phone: string | null } | null;
+}
+
+// Keuangan
+
+export interface FinancePeriod {
+  date_from: string;
+  date_to: string;
+  days: number;
+}
+
+export interface ProfitTotals {
+  product_sales: number;
+  discount: number;
+  net_sales: number;
+  cost: number;
+  gross_profit: number;
+  margin: number;
+  items_sold: number;
+  items_without_cost: number;
+}
+
+export interface FinanceReport {
+  period: FinancePeriod;
+  income_statement: ProfitTotals & {
+    shipping: number;
+    service_fee: number;
+    gross_income: number;
+    other_income: number;
+    operating_expenses: number;
+    net_income: number;
+  };
+  sales: { orders: number; total: number; tax: number; paid: number; unpaid: number; refunded: number };
+  by_payment_method: { method: string; orders: number; total: number; paid: number }[];
+  wallet: { topup: number; spent: number; other_credit: number; total_balance: number };
+  supplier_bills: { billed: number; paid: number; outstanding: number; overdue: number };
+}
+
+export type ProfitGroup = 'product' | 'category' | 'supplier' | 'brand';
+
+export interface ProfitReport {
+  period: FinancePeriod;
+  group: ProfitGroup;
+  totals: ProfitTotals;
+  rows: {
+    id: string | null;
+    name: string;
+    quantity: number;
+    revenue: number;
+    /** null while some units sold have no cost */
+    cost: number | null;
+    profit: number | null;
+    margin: number | null;
+  }[];
+  row_limit: number;
+}
+
+export type SupplierBillStatus = 'unpaid' | 'overdue' | 'paid';
+
+export interface SupplierBill {
+  id: string;
+  supplier_id: string;
+  supplier_name: string | null;
+  bill_number: string;
+  bill_date: string;
+  due_date: string | null;
+  amount: number;
+  notes: string | null;
+  status: SupplierBillStatus;
+  paid_at: string | null;
+  payment_notes: string | null;
+  created_at: string;
+}
+
+export interface SupplierBillSummary {
+  outstanding: number;
+  outstanding_count: number;
+  overdue: number;
+  overdue_count: number;
+  due_soon: number;
+  due_soon_count: number;
+  due_soon_days: number;
+  paid_this_month: number;
+}
+
+export type SalaryType = 'per_order' | 'monthly' | 'per_delivery';
+
+export interface Employee {
+  id: string;
+  name: string;
+  phone: string | null;
+  position: string;
+  salary_type: SalaryType;
+  /** Paid per salary_type unit */
+  salary_amount: string | number;
+  is_active: boolean;
+  notes: string | null;
+}
+
+export interface EmployeeList {
+  items: Employee[];
+  positions: string[];
+  summary: { active: number; monthly_total: number };
+}
+
+export type CashType = 'income' | 'expense';
+export type CashSource = 'order' | 'supplier_bill' | 'manual';
+
+export interface CashEntry {
+  source: CashSource;
+  /** Order, supplier bill or company transaction id, depending on source */
+  id: string;
+  type: CashType;
+  category: string;
+  amount: number;
+  date: string;
+  description: string | null;
+  /** Order number or bill number */
+  reference: string | null;
+  employee_id: string | null;
+  employee_name: string | null;
+}
+
+export interface CashBook {
+  period: { date_from: string; date_to: string };
+  summary: { income: number; expense: number; net: number };
+  by_category: { type: CashType; category: string; total: number; count: number }[];
+  categories: Record<CashType, string[]>;
+  entries: CashEntry[];
 }

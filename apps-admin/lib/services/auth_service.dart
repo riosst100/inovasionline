@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../core/api/api_client.dart';
 import '../core/storage/token_storage.dart';
 import '../models/admin_user.dart';
@@ -8,8 +10,8 @@ class AuthService {
   final ApiClient _api;
   final TokenStorage _tokenStorage;
 
-  Future<AdminUser> login({required String email, required String password}) async {
-    final res = await _api.dio.post('/admin/auth/login', data: {'email': email, 'password': password});
+  Future<AdminUser> login({required String username, required String password}) async {
+    final res = await _api.dio.post('/admin/auth/login', data: {'username': username, 'password': password});
     final data = res.data['data'] as Map<String, dynamic>;
     await _tokenStorage.saveToken(data['token'] as String);
     return AdminUser.fromJson(data['user'] as Map<String, dynamic>);
@@ -32,6 +34,17 @@ class AuthService {
       'password': newPassword,
       'password_confirmation': confirmation,
     });
+  }
+
+  Future<AdminUser> updateAvatar(String path) async {
+    final form = FormData.fromMap({'avatar': await MultipartFile.fromFile(path)});
+    final res = await _api.dio.post('/admin/auth/avatar', data: form);
+    return AdminUser.fromJson(res.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<AdminUser> deleteAvatar() async {
+    final res = await _api.dio.delete('/admin/auth/avatar');
+    return AdminUser.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 
   Future<void> logout() async {

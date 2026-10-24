@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/api/api_client.dart';
 import '../core/storage/token_storage.dart';
@@ -75,8 +76,18 @@ final postServiceProvider = Provider<PostService>(
 );
 
 final appUpdateServiceProvider = Provider<AppUpdateService>(
-  (ref) => AppUpdateService(ref.watch(apiClientProvider)),
+  (ref) => AppUpdateService(),
 );
+
+/// Installed version, e.g. for "Versi Aplikasi" on the account page.
+final packageInfoProvider = FutureProvider<PackageInfo>(
+  (ref) => PackageInfo.fromPlatform(),
+);
+
+/// Set by PermissionGate once the start-up flow (intro, permissions,
+/// locating, the current-location choice) is over and the app is showing.
+/// Anything that would pop up over the app at launch waits for this.
+final startupSettledProvider = StateProvider<bool>((ref) => false);
 
 final notificationServiceProvider = Provider<NotificationService>(
   (ref) => NotificationService(ref.watch(apiClientProvider)),

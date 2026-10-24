@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { io } from 'next/cache';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { apiRequestFull, ApiError } from '../../../lib/api';
 import { formatDateTime, rupiah, todayWib, TRANSACTION_TYPE_LABEL } from '../../../lib/wallet';
@@ -28,7 +29,17 @@ const PRESETS: { label: string; from: () => string; to: () => string }[] = [
   { label: 'Semua', from: () => '', to: () => '' },
 ];
 
+// The date presets read "today" during render, so keep it out of the prerendered shell.
 export default function WalletReportPage() {
+  return (
+    <Suspense>
+      <WalletReportContent />
+    </Suspense>
+  );
+}
+
+function WalletReportContent() {
+  use(io());
   const [report, setReport] = useState<WalletReport | null>(null);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);

@@ -21,12 +21,16 @@ class CodVerificationController extends Controller
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', 'in:verified,revoked'],
+            'user_id' => ['nullable', 'string', 'max:26'],
+            'id' => ['nullable', 'string', 'max:26'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $paginator = CodVerification::query()
             ->with('user:id,name,email,phone')
             ->when($data['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($data['user_id'] ?? null, fn ($q, $userId) => $q->where('user_id', $userId))
+            ->when($data['id'] ?? null, fn ($q, $id) => $q->whereKey($id))
             ->when($data['search'] ?? null, fn ($q, $search) => $q->whereHas('user', fn ($q) => $q
                 ->where('name', 'ilike', "%{$search}%")
                 ->orWhere('email', 'ilike', "%{$search}%")

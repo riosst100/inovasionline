@@ -3,13 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { ShieldCheck, Lock, Mail, Eye, EyeOff, Loader2, KeyRound, Sparkles } from 'lucide-react';
+import { ShieldCheck, Lock, User, Eye, EyeOff, Loader2, KeyRound, Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading } = useAuth();
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,17 +27,17 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login(email, password);
+      await login(username, password);
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err?.message || 'Login gagal. Periksa kembali email dan kata sandi Anda.');
+      setError(err?.message || 'Login gagal. Periksa kembali username dan kata sandi Anda.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleFillSuperAdmin = () => {
-    setEmail('admin@inovasionline.com');
+    setUsername('admin');
     setPassword('password');
     setError(null);
   };
@@ -81,7 +81,7 @@ export default function LoginPage() {
               </button>
             </div>
             <p className="mt-1 text-[11px] text-slate-400">
-              <span className="text-slate-300 font-mono">admin@inovasionline.com</span> | pass: <span className="text-slate-300 font-mono">password</span>
+              <span className="text-slate-300 font-mono">admin</span> | pass: <span className="text-slate-300 font-mono">password</span>
             </p>
           </div>
 
@@ -96,17 +96,19 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Alamat Email
+                Username
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                  <Mail className="h-4 w-4" />
+                  <User className="h-4 w-4" />
                 </div>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@inovasionline.com"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="username"
                   required
                   className="w-full rounded-xl border border-slate-700 bg-slate-800/80 py-2.5 pl-10 pr-3.5 text-sm text-white placeholder-slate-500 outline-none transition-all focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />

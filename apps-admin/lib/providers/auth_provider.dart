@@ -37,8 +37,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Throws on failure so the form can show the server's message.
-  Future<void> login({required String email, required String password}) async {
-    final user = await _ref.read(authServiceProvider).login(email: email, password: password);
+  Future<void> login({required String username, required String password}) async {
+    final user = await _ref.read(authServiceProvider).login(username: username, password: password);
+    state = AuthState(status: AuthStatus.authenticated, user: user);
+  }
+
+  /// Pass null to remove the current photo. Throws so the screen can show the error.
+  Future<void> setAvatar(String? path) async {
+    final service = _ref.read(authServiceProvider);
+    final user = path == null ? await service.deleteAvatar() : await service.updateAvatar(path);
     state = AuthState(status: AuthStatus.authenticated, user: user);
   }
 

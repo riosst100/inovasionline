@@ -45,7 +45,7 @@ export default function WalletsPage() {
           <div>
             <div className="flex items-center gap-2">
               <Wallet className="h-6 w-6 text-emerald-600" />
-              <h1 className="text-2xl font-bold text-slate-900">Saldo Customer</h1>
+              <h1 className="text-2xl font-bold text-slate-900">Saldo Pengguna</h1>
             </div>
             <p className="mt-1 text-sm text-slate-500">
               Saldo Inovasi customer: top up via Midtrans, dipakai saat checkout, dan menerima pengembalian dana

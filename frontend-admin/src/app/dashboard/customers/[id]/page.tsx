@@ -4,6 +4,8 @@ import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import AdminLayout from '../../../../components/layout/AdminLayout';
+import VerificationStatus from '../../../../components/customers/VerificationStatus';
+import LastSeen from '../../../../components/customers/LastSeen';
 import { adminApi, ApiError } from '../../../../lib/api';
 import { CustomerDetail, LoginMethod } from '../../../../types';
 import {
@@ -135,7 +137,7 @@ function CustomerDetailPageContent() {
           href="/dashboard/customers"
           className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800"
         >
-          <ArrowLeft className="h-4 w-4" /> Kembali ke daftar pelanggan
+          <ArrowLeft className="h-4 w-4" /> Kembali ke daftar pengguna
         </Link>
 
         {loading ? (
@@ -174,6 +176,7 @@ function CustomerDetailPageContent() {
                   {c.is_verified && (
                     <span className="rounded-md bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700">KYC Terverifikasi</span>
                   )}
+                  <VerificationStatus customer={c} />
                   {(c.banned_features ?? []).map((f) => (
                     <span key={f} className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
                       Banned: {f}
@@ -222,6 +225,7 @@ function CustomerDetailPageContent() {
                   </Field>
                   <Field label="Email Terverifikasi"><VerifiedBadge at={data.login.email_verified_at} /></Field>
                   <Field label="Telepon Terverifikasi"><VerifiedBadge at={data.login.phone_verified_at} /></Field>
+                  <Field label="Terakhir Online"><LastSeen at={c.last_seen_at} /></Field>
                   <Field label="Login Terakhir">
                     {data.login.last_login_at ? (
                       <>

@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Cookie as SymfonyCookie;
 
@@ -19,18 +20,24 @@ class AdminAuthController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
+        // Admin web and admin app sign in by username; the driver app still sends its email.
         $request->validate([
-            'email' => 'required|email',
+            'username' => 'required_without:email|string',
+            'email' => 'required_without:username|email',
             'password' => 'required|string',
         ]);
 
         $adminUser = AdminUser::with('role')
-            ->where('email', $request->string('email')->toString())
+            ->when(
+                $request->filled('username'),
+                fn ($q) => $q->where('username', AdminUser::normalizeUsername($request->string('username')->toString())),
+                fn ($q) => $q->where('email', $request->string('email')->toString()),
+            )
             ->first();
 
         if (! $adminUser || ! Hash::check($request->string('password')->toString(), $adminUser->password)) {
             return ApiResponse::error('Kredensial login admin tidak sesuai.', [
-                'login' => ['Email atau kata sandi admin salah.'],
+                'login' => ['Username atau kata sandi salah.'],
             ], 422);
         }
 
@@ -120,6 +127,44 @@ class AdminAuthController extends Controller
         $adminUser->tokens()->when($current?->id, fn ($q, $id) => $q->where('id', '!=', $id))->delete();
 
         return ApiResponse::success(null, 'Kata sandi berhasil diubah.');
+    }
+
+    public function updateAvatar(Request $request): JsonResponse
+    {
+        $adminUser = $request->user();
+
+        if (! $adminUser instanceof AdminUser) {
+            return ApiResponse::error('Unauthenticated.', [], 401);
+        }
+
+        $request->validate([
+            'avatar' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
+        ]);
+
+        $old = $adminUser->avatar_path;
+        $adminUser->forceFill(['avatar_path' => $request->file('avatar')->store('admin-avatars', 'public')])->save();
+
+        if ($old) {
+            Storage::disk('public')->delete($old);
+        }
+
+        return ApiResponse::success(new AdminUserResource($adminUser->load('role')), 'Foto profil berhasil diperbarui.');
+    }
+
+    public function deleteAvatar(Request $request): JsonResponse
+    {
+        $adminUser = $request->user();
+
+        if (! $adminUser instanceof AdminUser) {
+            return ApiResponse::error('Unauthenticated.', [], 401);
+        }
+
+        if ($adminUser->avatar_path) {
+            Storage::disk('public')->delete($adminUser->avatar_path);
+            $adminUser->forceFill(['avatar_path' => null])->save();
+        }
+
+        return ApiResponse::success(new AdminUserResource($adminUser->load('role')), 'Foto profil berhasil dihapus.');
     }
 
     public function sessions(Request $request): JsonResponse

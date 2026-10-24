@@ -35,6 +35,13 @@ class UserResource extends JsonResource
             'banned_features' => $this->banned_features ?? [],
             'ban_reason' => $this->ban_reason,
             'is_verified' => $this->isVerified(),
+            // Face verification (COD/Paylater): null = never, verified, or revoked; verification_id is the event behind it.
+            'verification_status' => $this->verification_status,
+            'verification_id' => $this->verification_id,
+            'last_seen_at' => $this->when(
+                array_key_exists('last_seen_at', $this->resource->getAttributes()),
+                fn () => $this->last_seen_at
+            ),
             'has_address' => $this->hasAddress(),
             'address_label' => $this->hasAddress() ? app(RegionLocator::class)->labelForVillage($this->village_code) : null,
             'province_code' => $this->province_code,

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\CodVerificationService;
 use App\Support\Enums\UserRole;
 use App\Support\Responses\ApiResponse;
 use App\Support\UserAgent;
@@ -13,12 +14,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
+use RuntimeException;
 
 class CustomerController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $paginator = User::query()
+            ->withLastSeen()
             ->where('role', '!=', UserRole::PLATFORM_ADMIN->value)
             ->when($request->string('search')->toString(), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -128,7 +131,7 @@ class CustomerController extends Controller
         }
 
         return ApiResponse::success([
-            'customer' => (new UserResource($user))->toArray($request) + [
+            'customer' => (new UserResource(User::query()->withLastSeen()->findOrFail($user->id)))->toArray($request) + [
                 'wallet_balance' => $user->wallet_balance,
                 'phone_verified_at' => $user->phone_verified_at,
             ],
@@ -229,5 +232,19 @@ class CustomerController extends Controller
         $user->forceFill(['blocked_at' => null, 'block_reason' => null])->save();
 
         return ApiResponse::success(new UserResource($user), 'Blokir customer berhasil dibuka.');
+    }
+
+    /** Revokes the event that currently verifies the customer; the user then points at that event. */
+    public function revokeVerification(Request $request, User $user, CodVerificationService $service): JsonResponse
+    {
+        $validated = $request->validate(['reason' => 'required|string|max:500']);
+
+        try {
+            $service->revokeUser($user, $validated['reason']);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), [], 422);
+        }
+
+        return ApiResponse::success(new UserResource($user->fresh()), 'Verifikasi customer berhasil dicabut.');
     }
 }

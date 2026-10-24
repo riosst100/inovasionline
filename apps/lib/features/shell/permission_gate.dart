@@ -85,6 +85,10 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   NearestAddress? _currentLocation;
   bool _applyingCurrentLocation = false;
 
+  /// The quiet current-location lookup has finished (or is not going to
+  /// happen), so no choice will pop up over the app any more.
+  bool _locationSuggestionDone = false;
+
   /// Completes once the logo + wordmark intro has finished playing, so the
   /// permission dialogs never pop up mid-animation.
   final _introPlayed = Completer<void>();
@@ -130,6 +134,7 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
         _notificationGranted = true;
         _permissionsDone = true;
         _locatingDone = true;
+        _locationSuggestionDone = true;
       });
       return;
     }
@@ -178,7 +183,11 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     setState(() => _checking = false);
     _evaluate();
 
-    if (!_locationNeeded) _offerCurrentLocation();
+    if (_locationNeeded) {
+      _locationSuggestionDone = true;
+    } else {
+      _offerCurrentLocation();
+    }
   }
 
   /// A default address exists, so nothing is prompted here: only when
@@ -197,6 +206,8 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
       setState(() => _currentLocation = found);
     } catch (_) {
       // Purely a suggestion; the default address stays in place.
+    } finally {
+      if (mounted) setState(() => _locationSuggestionDone = true);
     }
   }
 
@@ -518,6 +529,13 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     // Always a Stack so showing / hiding the choice never remounts the app.
     final current = ref.watch(deliveryAddressProvider);
     final found = _currentLocation;
+    if (_locationSuggestionDone &&
+        (found == null || current == null) &&
+        !ref.read(startupSettledProvider)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(startupSettledProvider.notifier).state = true;
+      });
+    }
     return Stack(
       children: [
         widget.child,

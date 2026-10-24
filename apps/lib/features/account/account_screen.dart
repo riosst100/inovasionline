@@ -10,6 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/core_providers.dart';
+import '../shell/app_update_checker.dart';
 import '../home/welcome_message.dart';
 import '../../core/utils/formatters.dart';
 import '../orders/order_providers.dart';
@@ -18,6 +20,43 @@ import 'edit_profile_screen.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
+
+  Future<void> _checkForUpdate(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Memeriksa update...'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+    try {
+      final info = await ref.read(appUpdateServiceProvider).checkForUpdate();
+      messenger.hideCurrentSnackBar();
+      if (!context.mounted) return;
+      if (info == null) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Aplikasi sudah versi terbaru.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      await showAppUpdateDialog(context, info);
+    } catch (_) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Gagal memeriksa update. Periksa koneksi lalu coba lagi.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
+  }
 
   Future<void> _showAvatarOptions(
     BuildContext context,
@@ -208,6 +247,17 @@ class AccountScreen extends ConsumerWidget {
                       subtitle: 'Butuh bantuan? Hubungi customer service',
                       onTap: () => context.push('/chat'),
                     ),
+                    if (ref.read(appUpdateServiceProvider).isSupported)
+                      _MenuTile(
+                        icon: Icons.system_update_rounded,
+                        color: const Color(0xFF6366F1),
+                        title: 'Versi Aplikasi',
+                        subtitle: switch (ref.watch(packageInfoProvider).valueOrNull) {
+                          final info? => 'v${info.version} (${info.buildNumber}) · Ketuk untuk cek update',
+                          null => 'Ketuk untuk cek update',
+                        },
+                        onTap: () => _checkForUpdate(context, ref),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 24),

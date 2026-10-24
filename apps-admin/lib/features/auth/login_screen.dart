@@ -14,7 +14,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _email = TextEditingController(text: 'admin@inovasionline.com');
+  final _username = TextEditingController(text: 'admin');
   final _password = TextEditingController(text: 'password');
   bool _obscure = true;
   bool _submitting = false;
@@ -22,7 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
-    _email.dispose();
+    _username.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -34,7 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authProvider.notifier).login(email: _email.text.trim(), password: _password.text);
+      await ref.read(authProvider.notifier).login(username: _username.text.trim(), password: _password.text);
     } catch (e) {
       if (mounted) setState(() => _error = errorMessage(e));
     } finally {
@@ -80,12 +80,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 16),
                   ],
                   TextFormField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
+                    controller: _username,
+                    keyboardType: TextInputType.text,
+                    autocorrect: false,
+                    autofillHints: const [AutofillHints.username],
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline)),
-                    validator: (v) => (v == null || !v.contains('@')) ? 'Masukkan email yang valid.' : null,
+                    decoration: const InputDecoration(labelText: 'Username', prefixIcon: Icon(Icons.person_outline)),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Masukkan username.' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(

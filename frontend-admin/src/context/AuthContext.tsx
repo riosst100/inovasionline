@@ -8,8 +8,9 @@ interface AuthContextType {
   user: AdminUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<AdminUser>;
+  login: (username: string, password: string) => Promise<AdminUser>;
   logout: () => Promise<void>;
+  updateUser: (user: AdminUser) => void;
   isSuperAdmin: boolean;
   hasPermission: (permissionKey: string) => boolean;
 }
@@ -41,8 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const login = async (email: string, password: string): Promise<AdminUser> => {
-    const res = await adminApi.login({ email, password });
+  const login = async (username: string, password: string): Promise<AdminUser> => {
+    const res = await adminApi.login({ username, password });
     setUser(res.user);
     localStorage.setItem('admin_user', JSON.stringify(res.user));
     return res.user;
@@ -58,6 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearSession();
       window.location.href = '/login';
     }
+  };
+
+  const updateUser = (adminUser: AdminUser): void => {
+    setUser(adminUser);
+    localStorage.setItem('admin_user', JSON.stringify(adminUser));
   };
 
   const isSuperAdmin = user?.is_super_admin || user?.role?.slug === 'super_admin';
@@ -76,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
+        updateUser,
         isSuperAdmin: !!isSuperAdmin,
         hasPermission,
       }}

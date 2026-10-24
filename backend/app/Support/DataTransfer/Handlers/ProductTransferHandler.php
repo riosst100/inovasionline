@@ -2,8 +2,10 @@
 
 namespace App\Support\DataTransfer\Handlers;
 
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Supplier;
 use App\Support\DataTransfer\ImportResult;
 use App\Support\DataTransfer\RowSkippedException;
 use App\Support\DataTransfer\TransferHandler;
@@ -31,7 +33,7 @@ class ProductTransferHandler implements TransferHandler
     public function headers(): array
     {
         return [
-            'id', 'sku', 'name', 'category', 'product_type', 'status',
+            'id', 'sku', 'name', 'category', 'supplier', 'brand', 'product_type', 'status',
             'regular_price', 'sale_price', 'cost_price',
             'short_description', 'description',
             'weight', 'length', 'width', 'height', 'min_stock',
@@ -58,7 +60,7 @@ class ProductTransferHandler implements TransferHandler
         $search = trim((string) ($filters['search'] ?? ''));
 
         return Product::query()
-            ->with('category:id,slug')
+            ->with(['category:id,slug', 'supplier:id,name', 'brand:id,name'])
             ->when($search !== '', fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
             ->when(ProductStatus::tryFrom((string) ($filters['status'] ?? '')), fn ($q, $s) => $q->where('status', $s))
             ->orderBy('name')
@@ -73,6 +75,8 @@ class ProductTransferHandler implements TransferHandler
             'sku' => $model->sku,
             'name' => $model->name,
             'category' => $model->category?->slug,
+            'supplier' => $model->supplier?->name,
+            'brand' => $model->brand?->name,
             'product_type' => $model->product_type?->value,
             'status' => $model->status?->value,
             'short_description' => $model->short_description,
@@ -115,6 +119,12 @@ class ProductTransferHandler implements TransferHandler
 
         if (array_key_exists('category', $row)) {
             $data['category_id'] = $this->resolveCategory($row['category']);
+        }
+        if (array_key_exists('supplier', $row)) {
+            $data['supplier_id'] = $this->resolveByName(Supplier::class, $row['supplier'], 'Supplier');
+        }
+        if (array_key_exists('brand', $row)) {
+            $data['brand_id'] = $this->resolveByName(Brand::class, $row['brand'], 'Brand');
         }
         if (filled($row['product_type'] ?? null)) {
             $data['product_type'] = ProductType::tryFrom(strtolower($row['product_type']))
@@ -186,6 +196,18 @@ class ProductTransferHandler implements TransferHandler
             ->where('slug', Str::slug($value))
             ->orWhereRaw('lower(name) = ?', [mb_strtolower(trim($value))])
             ->value('id') ?? throw new RowSkippedException("Kategori \"{$value}\" tidak ditemukan.");
+    }
+
+    /** @param  class-string<Model>  $model */
+    private function resolveByName(string $model, ?string $value, string $label): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        return $model::query()
+            ->whereRaw('lower(name) = ?', [mb_strtolower(trim($value))])
+            ->value('id') ?? throw new RowSkippedException("{$label} \"{$value}\" tidak ditemukan.");
     }
 
     private function decimal(?string $value, string $field): ?float

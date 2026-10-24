@@ -2,25 +2,33 @@ class AppUpdateInfo {
   const AppUpdateInfo({
     required this.version,
     required this.buildNumber,
-    required this.minSupportedBuildNumber,
     required this.forceUpdate,
     required this.releaseNotes,
     required this.apkUrl,
   });
 
-  factory AppUpdateInfo.fromJson(Map<String, dynamic> json) => AppUpdateInfo(
-    version: json['version'] as String,
-    buildNumber: json['build_number'] as int,
-    minSupportedBuildNumber: json['min_supported_build_number'] as int,
-    forceUpdate: json['force_update'] as bool,
-    releaseNotes: json['release_notes'] as String? ?? '',
-    apkUrl: json['apk_url'] as String?,
-  );
+  /// Reads release.json as written by scripts/publish-apk.sh (`version`,
+  /// `buildNumber`, `filename`). `minSupportedBuildNumber` and `releaseNotes`
+  /// are optional (the script does not write them yet): builds below the
+  /// minimum get an update they cannot dismiss.
+  factory AppUpdateInfo.fromReleaseJson(
+    Map<String, dynamic> json, {
+    required String baseUrl,
+    required int currentBuildNumber,
+  }) {
+    final minSupported = (json['minSupportedBuildNumber'] as num?)?.toInt() ?? 0;
+    return AppUpdateInfo(
+      version: json['version'] as String,
+      buildNumber: (json['buildNumber'] as num).toInt(),
+      forceUpdate: currentBuildNumber < minSupported,
+      releaseNotes: json['releaseNotes'] as String? ?? '',
+      apkUrl: '$baseUrl/${json['filename'] as String}',
+    );
+  }
 
   final String version;
   final int buildNumber;
-  final int minSupportedBuildNumber;
   final bool forceUpdate;
   final String releaseNotes;
-  final String? apkUrl;
+  final String apkUrl;
 }

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Admin\CodVerificationController as AdminCodVerif
 use App\Http\Controllers\Api\V1\CodVerificationController;
 use App\Http\Controllers\Api\V1\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\V1\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\V1\Admin\SalesReportController as AdminSalesReportController;
 use App\Http\Controllers\Api\V1\Admin\DataTransferController as AdminDataTransferController;
 use App\Http\Controllers\Api\V1\Admin\DeliveryHolidayController as AdminDeliveryHolidayController;
 use App\Http\Controllers\Api\V1\Admin\DeliveryScheduleController as AdminDeliveryScheduleController;
@@ -42,6 +43,12 @@ use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateRowController as Admin
 use App\Http\Controllers\Api\V1\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\UserVerificationController as AdminUserVerificationController;
 use App\Http\Controllers\Api\V1\Admin\WarehouseController as AdminWarehouseController;
+use App\Http\Controllers\Api\V1\Admin\SupplierController as AdminSupplierController;
+use App\Http\Controllers\Api\V1\Admin\BrandController as AdminBrandController;
+use App\Http\Controllers\Api\V1\Admin\CompanyTransactionController as AdminCompanyTransactionController;
+use App\Http\Controllers\Api\V1\Admin\EmployeeController as AdminEmployeeController;
+use App\Http\Controllers\Api\V1\Admin\FinanceController as AdminFinanceController;
+use App\Http\Controllers\Api\V1\Admin\SupplierBillController as AdminSupplierBillController;
 use App\Http\Controllers\Api\V1\AppPresenceController;
 use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\AuthController;
@@ -376,6 +383,8 @@ Route::prefix('admin')->group(function () {
             Route::get('/me', [AdminAuthController::class, 'me']);
             Route::post('/logout', [AdminAuthController::class, 'logout']);
             Route::put('/password', [AdminAuthController::class, 'changePassword']);
+            Route::post('/avatar', [AdminAuthController::class, 'updateAvatar']);
+            Route::delete('/avatar', [AdminAuthController::class, 'deleteAvatar']);
             Route::get('/sessions', [AdminAuthController::class, 'sessions']);
             Route::delete('/sessions', [AdminAuthController::class, 'revokeOtherSessions']);
             Route::delete('/sessions/{id}', [AdminAuthController::class, 'revokeSession']);
@@ -428,6 +437,7 @@ Route::prefix('admin')->group(function () {
             Route::post('/{user}/unblock', [CustomerController::class, 'unblock']);
             Route::post('/{user}/ban', [CustomerController::class, 'ban']);
             Route::post('/{user}/unban', [CustomerController::class, 'unban']);
+            Route::post('/{user}/revoke-verification', [CustomerController::class, 'revokeVerification']);
             Route::delete('/{user}/sessions/{session}', [CustomerController::class, 'revokeSession']);
         });
 
@@ -473,6 +483,28 @@ Route::prefix('admin')->group(function () {
             Route::post('/', [AdminProductAttributeController::class, 'store']);
             Route::put('/{productAttribute}', [AdminProductAttributeController::class, 'update']);
             Route::delete('/{productAttribute}', [AdminProductAttributeController::class, 'destroy']);
+        });
+
+        Route::prefix('employees')->group(function () {
+            Route::get('/', [AdminEmployeeController::class, 'index']);
+            Route::post('/', [AdminEmployeeController::class, 'store']);
+            Route::put('/{employee}', [AdminEmployeeController::class, 'update']);
+            Route::delete('/{employee}', [AdminEmployeeController::class, 'destroy']);
+        });
+
+        // Master Data
+        Route::prefix('suppliers')->group(function () {
+            Route::get('/', [AdminSupplierController::class, 'index']);
+            Route::post('/', [AdminSupplierController::class, 'store']);
+            Route::put('/{supplier}', [AdminSupplierController::class, 'update']);
+            Route::delete('/{supplier}', [AdminSupplierController::class, 'destroy']);
+        });
+
+        Route::prefix('brands')->group(function () {
+            Route::get('/', [AdminBrandController::class, 'index']);
+            Route::post('/', [AdminBrandController::class, 'store']);
+            Route::put('/{brand}', [AdminBrandController::class, 'update']);
+            Route::delete('/{brand}', [AdminBrandController::class, 'destroy']);
         });
 
         Route::prefix('warehouses')->group(function () {
@@ -531,6 +563,25 @@ Route::prefix('admin')->group(function () {
         Route::post('cod-verifications/{codVerification}/revoke', [AdminCodVerificationController::class, 'revoke']);
 
         Route::get('dashboard', [AdminDashboardController::class, 'index']);
+        Route::get('sales-report', [AdminSalesReportController::class, 'index']);
+
+        // Keuangan
+        Route::get('finance/report', [AdminFinanceController::class, 'report']);
+        Route::get('finance/profit', [AdminFinanceController::class, 'profit']);
+        Route::prefix('company-transactions')->group(function () {
+            Route::get('/', [AdminCompanyTransactionController::class, 'index']);
+            Route::post('/', [AdminCompanyTransactionController::class, 'store']);
+            Route::put('/{companyTransaction}', [AdminCompanyTransactionController::class, 'update']);
+            Route::delete('/{companyTransaction}', [AdminCompanyTransactionController::class, 'destroy']);
+        });
+        Route::prefix('supplier-bills')->group(function () {
+            Route::get('/', [AdminSupplierBillController::class, 'index']);
+            Route::post('/', [AdminSupplierBillController::class, 'store']);
+            Route::put('/{supplierBill}', [AdminSupplierBillController::class, 'update']);
+            Route::delete('/{supplierBill}', [AdminSupplierBillController::class, 'destroy']);
+            Route::post('/{supplierBill}/pay', [AdminSupplierBillController::class, 'pay']);
+            Route::post('/{supplierBill}/unpay', [AdminSupplierBillController::class, 'unpay']);
+        });
 
         Route::get('nav-badge', [AdminNavBadgeController::class, 'show']);
         Route::put('nav-badge', [AdminNavBadgeController::class, 'update']);

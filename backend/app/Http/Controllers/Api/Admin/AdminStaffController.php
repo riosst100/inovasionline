@@ -21,6 +21,7 @@ class AdminStaffController extends Controller
             ->when($request->string('search')->toString(), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('username', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%");
                 });
@@ -36,6 +37,7 @@ class AdminStaffController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:150',
+            'username' => ['required', 'string', AdminUser::USERNAME_RULE, Rule::unique('admin_users', 'username')],
             'email' => 'required|email|max:150|unique:admin_users,email',
             'phone' => 'nullable|string|max:30|unique:admin_users,phone',
             'password' => 'required|string|min:6',
@@ -44,6 +46,7 @@ class AdminStaffController extends Controller
 
         $adminUser = AdminUser::create([
             'name' => $validated['name'],
+            'username' => $validated['username'],
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'password' => Hash::make($validated['password']),
@@ -68,6 +71,7 @@ class AdminStaffController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:150',
+            'username' => ['required', 'string', AdminUser::USERNAME_RULE, Rule::unique('admin_users', 'username')->ignore($adminUser->id)],
             'email' => ['required', 'email', 'max:150', Rule::unique('admin_users', 'email')->ignore($adminUser->id)],
             'phone' => ['nullable', 'string', 'max:30', Rule::unique('admin_users', 'phone')->ignore($adminUser->id)],
             'password' => 'nullable|string|min:6',
@@ -77,6 +81,7 @@ class AdminStaffController extends Controller
 
         $data = [
             'name' => $validated['name'],
+            'username' => $validated['username'],
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
         ];

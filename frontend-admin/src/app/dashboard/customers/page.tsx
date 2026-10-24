@@ -3,16 +3,17 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminLayout from '../../../components/layout/AdminLayout';
+import VerificationStatus from '../../../components/customers/VerificationStatus';
+import LastSeen from '../../../components/customers/LastSeen';
 import { adminApi } from '../../../lib/api';
 import { BannableFeature, Customer } from '../../../types';
 import {
   Users2,
   Search,
   Loader2,
-  CheckCircle,
-  XCircle,
   Ban,
   ShieldCheck,
+  ShieldOff,
   MessageSquareOff,
   UserPlus,
   Eye
@@ -131,6 +132,27 @@ export default function CustomersPage() {
     }
   };
 
+  const handleRevokeVerification = async (c: Customer) => {
+    const reason = window.prompt(
+      `Cabut verifikasi wajah ${c.name}? Customer wajib verifikasi ulang sebelum memakai COD/Paylater.\nAlasan (wajib):`,
+      ''
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      window.alert('Alasan pencabutan wajib diisi.');
+      return;
+    }
+
+    try {
+      setBusyId(c.id);
+      applyUpdated(c.id, await adminApi.revokeCustomerVerification(c.id, reason.trim()));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Gagal mencabut verifikasi.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchCustomers();
@@ -145,11 +167,11 @@ export default function CustomersPage() {
             <div className="flex items-center gap-2">
               <Users2 className="h-6 w-6 text-emerald-600" />
               <h2 className="text-xl md:text-2xl font-extrabold text-slate-900">
-                Data Pelanggan (Customer Marketplace)
+                Data Pengguna
               </h2>
             </div>
             <p className="mt-1 text-xs md:text-sm text-slate-500">
-              Daftar pembeli dan pengguna yang mendaftar melalui aplikasi mobile Inovasi Online ({total} pelanggan).
+              Daftar pembeli dan pengguna yang mendaftar melalui aplikasi mobile Inovasi Online ({total} pengguna).
             </p>
           </div>
           <button
@@ -180,9 +202,10 @@ export default function CustomersPage() {
             <table className="w-full text-left text-xs md:text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="py-3.5 px-5">Nama Pelanggan</th>
+                  <th className="py-3.5 px-5">Nama Pengguna</th>
                   <th className="py-3.5 px-5">Kontak</th>
                   <th className="py-3.5 px-5">Status Verifikasi</th>
+                  <th className="py-3.5 px-5">Terakhir Online</th>
                   <th className="py-3.5 px-5">Terdaftar Sejak</th>
                   <th className="py-3.5 px-5">Status</th>
                   <th className="py-3.5 px-5 text-right">Aksi</th>
@@ -191,7 +214,7 @@ export default function CustomersPage() {
               <tbody className="divide-y divide-slate-100 font-medium">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                         <span>Memuat data pelanggan...</span>
@@ -200,7 +223,7 @@ export default function CustomersPage() {
                   </tr>
                 ) : customers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       Belum ada data pelanggan yang terdaftar.
                     </td>
                   </tr>
@@ -222,15 +245,10 @@ export default function CustomersPage() {
                         {c.phone || '-'}
                       </td>
                       <td className="py-4 px-5">
-                        {c.is_verified ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                            <CheckCircle className="h-3.5 w-3.5" /> Terverifikasi
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                            <XCircle className="h-3.5 w-3.5" /> Belum Verifikasi
-                          </span>
-                        )}
+                        <VerificationStatus customer={c} />
+                      </td>
+                      <td className="py-4 px-5 whitespace-nowrap">
+                        <LastSeen at={c.last_seen_at} />
                       </td>
                       <td className="py-4 px-5 text-xs text-slate-500">
                         {new Date(c.created_at).toLocaleDateString('id-ID', {
@@ -276,6 +294,15 @@ export default function CustomersPage() {
                         >
                           <MessageSquareOff className="h-3.5 w-3.5" /> Banned
                         </button>
+                        {c.verification_status === 'verified' && (
+                          <button
+                            onClick={() => handleRevokeVerification(c)}
+                            disabled={busyId === c.id}
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                          >
+                            <ShieldOff className="h-3.5 w-3.5" /> Cabut Verifikasi
+                          </button>
+                        )}
                         <button
                           onClick={() => handleToggleBlock(c)}
                           disabled={busyId === c.id}

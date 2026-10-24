@@ -21,6 +21,8 @@ class Product extends Model
 
     protected $fillable = [
         'category_id',
+        'supplier_id',
+        'brand_id',
         'name',
         'slug',
         'short_description',
@@ -45,6 +47,9 @@ class Product extends Model
         'meta_description',
     ];
 
+    /** Buyers must never see the cost; admin endpoints read it explicitly. */
+    protected $hidden = ['cost_price'];
+
     protected function casts(): array
     {
         return [
@@ -68,6 +73,16 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
     }
 
     public function warehouses(): BelongsToMany

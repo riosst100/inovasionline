@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { Menu, LogOut, ChevronRight, ChevronDown, Home, ShieldCheck, MonitorSmartphone } from 'lucide-react';
+import { Menu, LogOut, ChevronRight, ChevronDown, Home, ShieldCheck, MonitorSmartphone, UserCircle } from 'lucide-react';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -14,18 +14,27 @@ const LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   drivers: 'Kurir',
   'delivery-schedules': 'Jadwal Pengiriman',
+  'cod-verifications': 'Verifikasi Pengguna',
+  finance: 'Keuangan',
+  employees: 'Karyawan',
+  cashflow: 'Cashflow',
+  wallets: 'Saldo Pengguna',
+  report: 'Laporan Keuangan',
+  profit: 'Keuntungan',
+  bills: 'Tagihan Supplier',
   'shipping-methods': 'Metode Pengiriman',
   roles: 'Hak Akses & Role',
   users: 'User Admin & Staff',
-  customers: 'Pelanggan',
+  customers: 'Pengguna',
   banners: 'Banner & Promo',
   products: 'Produk',
   categories: 'Kategori',
   search: 'Pencarian',
-  suggestions: 'Saran Pencarian',
+  suggestions: 'Kueri Pencarian',
   orders: 'Pesanan',
   'order-statuses': 'Status Pesanan',
   sessions: 'Sesi & Perangkat',
+  profile: 'Profil Saya',
   'data-transfers': 'Import / Export',
 };
 
@@ -91,9 +100,14 @@ export default function AdminHeader({ onMenuToggle }: HeaderProps) {
           aria-expanded={menuOpen}
           className="flex items-center gap-2.5 rounded-full border border-transparent py-1 pl-1 pr-2.5 transition-colors hover:border-slate-200 hover:bg-white"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-500 text-xs font-bold text-white shadow-sm">
-            {user?.name?.slice(0, 2).toUpperCase() || 'SA'}
-          </div>
+          {user?.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover shadow-sm" />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-500 text-xs font-bold text-white shadow-sm">
+              {user?.name?.slice(0, 2).toUpperCase() || 'SA'}
+            </div>
+          )}
           <div className="hidden text-left md:block">
             <div className="text-xs font-semibold leading-tight text-slate-800">
               {user?.name || 'Super Admin'}
@@ -119,6 +133,15 @@ export default function AdminHeader({ onMenuToggle }: HeaderProps) {
               </span>
             </div>
             <div className="p-1.5">
+              <Link
+                href="/dashboard/profile"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100"
+              >
+                <UserCircle className="h-4 w-4 text-slate-400" />
+                Profil Saya
+              </Link>
               <Link
                 href="/dashboard/sessions"
                 role="menuitem"

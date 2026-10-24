@@ -22,7 +22,7 @@ export default function SearchSuggestionsPage() {
     try {
       setItems(await adminApi.getSearchSuggestions(search, source));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Gagal memuat saran pencarian.');
+      setError(e instanceof ApiError ? e.message : 'Gagal memuat kueri pencarian.');
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export default function SearchSuggestionsPage() {
     <AdminLayout>
       <div className="mx-auto max-w-4xl space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Saran Pencarian</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Kueri Pencarian</h1>
           <p className="text-sm text-slate-500">
             Query yang dicari pengguna beserta jumlahnya. Admin dapat menambah query manual untuk awal.
           </p>

@@ -185,6 +185,8 @@ class CheckoutService
                     'variant_name' => $item->variant?->name,
                     'product_image_path' => $item->product->images->first()?->path,
                     'unit_price' => $unitPrice,
+                    // Cost snapshot, so later changes to the product's cost do not rewrite past profit.
+                    'unit_cost' => $item->product->cost_price,
                     'quantity' => $item->quantity,
                     'stock_allocations' => $allocations,
                     'discount_amount' => 0,
