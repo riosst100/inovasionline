@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -635,6 +635,17 @@ export const adminApi = {
 
   async saveNavBadge(payload: NavBadgeSettings): Promise<NavBadgeSettings> {
     return apiRequest<NavBadgeSettings>('/admin/nav-badge', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAppUpdate(): Promise<AppUpdateOverview> {
+    return apiRequest<AppUpdateOverview>('/admin/app-update');
+  },
+
+  async saveAppUpdate(payload: AppUpdateSettings): Promise<AppUpdateOverview> {
+    return apiRequest<AppUpdateOverview>('/admin/app-update', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });

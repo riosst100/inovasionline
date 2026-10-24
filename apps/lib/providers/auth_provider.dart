@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -80,6 +81,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
       await _syncDeviceToken();
+      unawaited(_ref.read(contactSyncProvider).claim());
       return true;
     } on DioException catch (e) {
       state = state.copyWith(error: _errorMessage(e));
@@ -112,6 +114,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
       await _syncDeviceToken();
+      unawaited(_ref.read(contactSyncProvider).claim());
       return true;
     } on DioException catch (e) {
       state = state.copyWith(error: _errorMessage(e));
@@ -176,6 +179,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
       await _syncDeviceToken();
+      unawaited(_ref.read(contactSyncProvider).claim());
       return true;
     } on DioException catch (e) {
       debugPrint('[GOOGLE_AUTH] DioException: $e');

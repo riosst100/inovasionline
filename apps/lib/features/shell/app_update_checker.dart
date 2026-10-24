@@ -1,22 +1,27 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:open_filex/open_filex.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:in_app_update/in_app_update.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../../models/app_update_info.dart';
+import '../../config/theme.dart';
 import '../../providers/core_providers.dart';
+import '../../services/app_update_service.dart';
 
-/// Checks for an app update once per launch and, if one is available,
-/// offers to download and install it in-app. Wrap the app shell with this
-/// widget; it renders nothing on its own.
+/// Checks Google Play for an app update once per launch. Wrap the app shell
+/// with this widget; it renders nothing on its own.
 ///
 /// The check is the very last thing at start-up: it waits for the splash,
 /// permissions, locating and the current-location choice
 /// ([startupSettledProvider]), then a few more seconds so home's API calls
 /// and images get to load first.
+///
+/// - Optional (default): Play downloads the update in the background while
+///   the app stays usable; a snackbar then offers to restart into it.
+/// - Mandatory (this build is below the minimum set in admin, Pengaturan →
+///   Update Aplikasi): Play's full-screen update starts right away, and a
+///   screen that cannot be dismissed stays up until the user updates.
 class AppUpdateChecker extends ConsumerStatefulWidget {
   const AppUpdateChecker({super.key, required this.child});
 
@@ -56,150 +61,188 @@ class _AppUpdateCheckerState extends ConsumerState<AppUpdateChecker> {
   Future<void> _checkForUpdate() async {
     _checkedThisLaunch = true;
     try {
-      final info = await ref.read(appUpdateServiceProvider).checkForUpdate();
-      if (info == null || !mounted) return;
-      await showAppUpdateDialog(context, info);
+      final update = await ref.read(appUpdateServiceProvider).checkForUpdate();
+      if (update == null || !mounted) return;
+
+      if (update.mandatory) {
+        await _showMandatoryUpdate(context, update);
+        return;
+      }
+
+      final info = update.play;
+      // Already downloaded on an earlier launch but never installed.
+      if (info.installStatus == InstallStatus.downloaded) {
+        _offerRestart();
+        return;
+      }
+      if (info.flexibleUpdateAllowed) {
+        // Completes once the download is done (or throws / is declined).
+        final result = await InAppUpdate.startFlexibleUpdate();
+        if (result == AppUpdateResult.success && mounted) _offerRestart();
+      }
     } catch (_) {
-      // Silent failure: update checks must never block or interrupt app usage.
+      // Silent failure (offline, not installed from Play, ...): update checks
+      // must never block or interrupt app usage.
     }
+  }
+
+  void _offerRestart() {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: const Text('Versi baru sudah diunduh.'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(days: 1),
+        action: SnackBarAction(
+          label: 'Pasang',
+          onPressed: () => InAppUpdate.completeFlexibleUpdate().catchError((_) {}),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) => widget.child;
 }
 
-/// "Update Tersedia": downloads the APK with a progress bar and hands it to
-/// the Android installer. Not dismissible when [AppUpdateInfo.forceUpdate].
-Future<void> showAppUpdateDialog(BuildContext context, AppUpdateInfo info) {
-  return showDialog<void>(
+/// Full-screen and not dismissible: the app stays unusable until the update
+/// is installed (which restarts the app).
+Future<void> _showMandatoryUpdate(BuildContext context, AvailableUpdate update) {
+  return showGeneralDialog<void>(
     context: context,
     useRootNavigator: true,
-    barrierDismissible: !info.forceUpdate,
-    builder: (context) => _UpdateDialog(info: info),
+    barrierDismissible: false,
+    pageBuilder: (_, _, _) => _MandatoryUpdateScreen(update: update),
   );
 }
 
-class _UpdateDialog extends ConsumerStatefulWidget {
-  const _UpdateDialog({required this.info});
+class _MandatoryUpdateScreen extends StatefulWidget {
+  const _MandatoryUpdateScreen({required this.update});
 
-  final AppUpdateInfo info;
+  final AvailableUpdate update;
 
   @override
-  ConsumerState<_UpdateDialog> createState() => _UpdateDialogState();
+  State<_MandatoryUpdateScreen> createState() => _MandatoryUpdateScreenState();
 }
 
-class _UpdateDialogState extends ConsumerState<_UpdateDialog> {
-  bool _downloading = false;
-  double _progress = 0;
-  String? _error;
-  final _cancelToken = CancelToken();
+class _MandatoryUpdateScreenState extends State<_MandatoryUpdateScreen> {
+  bool _busy = false;
 
   @override
-  void dispose() {
-    _cancelToken.cancel();
-    super.dispose();
+  void initState() {
+    super.initState();
+    // Straight into Play's own update screen; this one is what is left if
+    // the user backs out of it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _update());
   }
 
-  Future<void> _startUpdate() async {
-    setState(() {
-      _downloading = true;
-      _progress = 0;
-      _error = null;
-    });
-
+  Future<void> _update() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final info = widget.update.play;
     try {
-      final status = await Permission.requestInstallPackages.request();
-      if (!status.isGranted) {
-        if (!mounted) return;
-        setState(() {
-          _downloading = false;
-          _error = 'Izinkan "Instal aplikasi tidak dikenal" untuk melanjutkan update.';
-        });
-        return;
-      }
-
-      final file = await ref
-          .read(appUpdateServiceProvider)
-          .downloadApk(
-            widget.info,
-            cancelToken: _cancelToken,
-            onProgress: (progress) {
-              if (mounted) setState(() => _progress = progress);
-            },
-          );
-
-      final result = await OpenFilex.open(
-        file.path,
-        type: 'application/vnd.android.package-archive',
-      );
-      if (!mounted) return;
-      if (result.type != ResultType.done) {
-        setState(() {
-          _downloading = false;
-          _error = 'Gagal membuka installer. Silakan coba lagi.';
-        });
-        return;
-      }
-      // A forced update stays up so the app cannot be used if the user backs
-      // out of the installer; they can simply tap the button again.
-      if (widget.info.forceUpdate) {
-        setState(() => _downloading = false);
+      if (info.installStatus == InstallStatus.downloaded) {
+        await InAppUpdate.completeFlexibleUpdate();
+      } else if (info.immediateUpdateAllowed) {
+        await InAppUpdate.performImmediateUpdate();
       } else {
-        Navigator.of(context).pop();
+        await _openPlayStore(info.packageName);
       }
     } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _downloading = false;
-        _error = 'Gagal mengunduh update. Periksa koneksi lalu coba lagi.';
-      });
+      await _openPlayStore(info.packageName);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openPlayStore(String packageName) async {
+    try {
+      await launchUrl(
+        Uri.parse('market://details?id=$packageName'),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      // Nothing else to try; the button stays available.
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: !widget.info.forceUpdate && !_downloading,
-      child: AlertDialog(
-        title: const Text('Update Tersedia'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Versi baru ${widget.info.version} sudah tersedia.'),
-            if (widget.info.forceUpdate) ...[
-              const SizedBox(height: 4),
-              const Text(
-                'Versi aplikasi kamu sudah tidak didukung, update untuk melanjutkan.',
-              ),
-            ],
-            if (widget.info.releaseNotes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(widget.info.releaseNotes),
-            ],
-            if (_downloading) ...[
-              const SizedBox(height: 16),
-              LinearProgressIndicator(value: _progress > 0 ? _progress : null),
-              const SizedBox(height: 4),
-              Text('${(_progress * 100).toStringAsFixed(0)}%'),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-            ],
-          ],
-        ),
-        actions: [
-          if (!widget.info.forceUpdate && !_downloading)
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Nanti'),
+      canPop: false,
+      child: Material(
+        color: Colors.white,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
+            child: Column(
+              children: [
+                const Spacer(),
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.system_update_rounded,
+                    size: 44,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Update Diperlukan',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.foreground,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.update.message ??
+                      'Versi aplikasi kamu sudah tidak didukung. '
+                          'Update dulu untuk melanjutkan.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: AppColors.mutedForeground,
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: _busy ? null : _update,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: _busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Update Sekarang',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                  ),
+                ),
+              ],
             ),
-          FilledButton(
-            onPressed: _downloading ? null : _startUpdate,
-            child: Text(_downloading ? 'Mengunduh...' : 'Update Sekarang'),
           ),
-        ],
+        ),
       ),
     );
   }

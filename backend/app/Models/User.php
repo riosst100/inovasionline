@@ -219,6 +219,12 @@ class User extends Authenticatable
         return $this->hasMany(DeviceToken::class);
     }
 
+    /** Numbers from this user's phone book, uploaded by the app. */
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(UserContact::class);
+    }
+
     public function loginLogs(): HasMany
     {
         return $this->hasMany(UserLoginLog::class);

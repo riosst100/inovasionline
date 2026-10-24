@@ -9,6 +9,8 @@ import '../services/banner_service.dart';
 import '../services/cart_service.dart';
 import '../services/catalog_service.dart';
 import '../services/checkout_service.dart';
+import '../services/contact_service.dart';
+import '../services/contact_sync.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
 import '../services/order_service.dart';
@@ -76,7 +78,7 @@ final postServiceProvider = Provider<PostService>(
 );
 
 final appUpdateServiceProvider = Provider<AppUpdateService>(
-  (ref) => AppUpdateService(),
+  (ref) => AppUpdateService(ref.watch(apiClientProvider)),
 );
 
 /// Installed version, e.g. for "Versi Aplikasi" on the account page.
@@ -91,4 +93,12 @@ final startupSettledProvider = StateProvider<bool>((ref) => false);
 
 final notificationServiceProvider = Provider<NotificationService>(
   (ref) => NotificationService(ref.watch(apiClientProvider)),
+);
+
+final contactServiceProvider = Provider<ContactService>(
+  (ref) => ContactService(ref.watch(apiClientProvider)),
+);
+
+final contactSyncProvider = Provider<ContactSync>(
+  (ref) => ContactSync(ref.watch(contactServiceProvider)),
 );

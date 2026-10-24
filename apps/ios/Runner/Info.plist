@@ -30,6 +30,8 @@
 		<string>Inovasi Online membutuhkan akses galeri untuk memilih foto postingan.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Lokasi dipakai untuk mengatur alamat pengiriman awal Anda.</string>
+		<key>NSContactsUsageDescription</key>
+		<string>Kontak disimpan oleh Inovasi Online untuk menyarankan postingan, chat, dan produk dari orang yang Anda kenal.</string>
 		<key>NSCameraUsageDescription</key>
 		<string>Inovasi Online membutuhkan akses kamera untuk mengambil foto postingan.</string>
 		<key>UIApplicationSceneManifest</key>

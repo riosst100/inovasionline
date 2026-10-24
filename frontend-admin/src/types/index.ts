@@ -567,6 +567,25 @@ export interface NavBadgeSettings {
   is_visible?: boolean;
 }
 
+export interface AppUpdateSettings {
+  /** Android builds below this must update from Google Play; 0 = no forced update */
+  min_build_number: number;
+  /** Shown on the app's blocking update screen; null = default text */
+  message: string | null;
+}
+
+export interface AppUpdateBuildStat {
+  build_number: number;
+  version: string | null;
+  installs: number;
+}
+
+/** GET /admin/app-update: settings plus active Android installs per build (read-only) */
+export interface AppUpdateOverview extends AppUpdateSettings {
+  active_days: number;
+  builds: AppUpdateBuildStat[];
+}
+
 export interface AdmobSettings {
   is_active: boolean;
   android_banner_id: string | null;

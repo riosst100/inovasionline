@@ -41,6 +41,12 @@ Future<void> bootstrap({required String envFile, required bool isDev}) async {
   // Install / online / checkout counts for the admin dashboard.
   unawaited(AppPresence(container.read(apiClientProvider), router).start());
 
+  // Re-uploads the phone book if it changed, once contact access was allowed
+  // (from the Postingan tab). Waits for start-up so it never slows it down.
+  container.listen<bool>(startupSettledProvider, (_, settled) {
+    if (settled) unawaited(container.read(contactSyncProvider).sync());
+  });
+
   // Firebase + push are not needed for the first frames, so they are set up
   // behind the intro; whatever uses FirebaseMessaging awaits firebaseReady.
   unawaited(() async {

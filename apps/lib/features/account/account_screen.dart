@@ -6,12 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:in_app_update/in_app_update.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/theme.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
-import '../shell/app_update_checker.dart';
 import '../home/welcome_message.dart';
 import '../../core/utils/formatters.dart';
 import '../orders/order_providers.dart';
@@ -33,10 +34,10 @@ class AccountScreen extends ConsumerWidget {
       );
 
     try {
-      final info = await ref.read(appUpdateServiceProvider).checkForUpdate();
+      final update = await ref.read(appUpdateServiceProvider).checkForUpdate();
       messenger.hideCurrentSnackBar();
       if (!context.mounted) return;
-      if (info == null) {
+      if (update == null) {
         messenger.showSnackBar(
           const SnackBar(
             content: Text('Aplikasi sudah versi terbaru.'),
@@ -45,13 +46,22 @@ class AccountScreen extends ConsumerWidget {
         );
         return;
       }
-      await showAppUpdateDialog(context, info);
+      // Asked for explicitly, so Play's full-screen update straight away.
+      final info = update.play;
+      if (info.immediateUpdateAllowed) {
+        await InAppUpdate.performImmediateUpdate();
+      } else {
+        await launchUrl(
+          Uri.parse('market://details?id=${info.packageName}'),
+          mode: LaunchMode.externalApplication,
+        );
+      }
     } catch (_) {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Gagal memeriksa update. Periksa koneksi lalu coba lagi.'),
+            content: Text('Gagal memeriksa update. Pastikan aplikasi diinstal dari Google Play dan coba lagi.'),
             behavior: SnackBarBehavior.floating,
           ),
         );

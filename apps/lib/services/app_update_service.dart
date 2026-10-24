@@ -1,78 +1,81 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
+import 'package:in_app_update/in_app_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../config/env.dart';
-import '../models/app_update_info.dart';
+import '../core/api/api_client.dart';
 
-/// Checks the release.json next to the APK on the /download page (both are
-/// published by CI via scripts/publish-apk.sh, with the same build number the
-/// APK was built with), so a release needs no backend change.
+/// An update Google Play offers this install, and whether admin requires it.
+class AvailableUpdate {
+  const AvailableUpdate({
+    required this.play,
+    required this.mandatory,
+    this.message,
+  });
+
+  final AppUpdateInfo play;
+
+  /// This build is below the minimum set in admin (Pengaturan → Update
+  /// Aplikasi), so the app may not be used until it is updated.
+  final bool mandatory;
+
+  /// Admin's text for the blocking screen; null = default text.
+  final String? message;
+}
+
+/// Google Play In-App Updates. Play downloads and installs the update itself,
+/// so the app needs no install permission. Only works for installs that came
+/// from Google Play; anywhere else (sideloaded / debug builds) the check
+/// throws.
 class AppUpdateService {
-  AppUpdateService();
+  AppUpdateService(this._apiClient);
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
+  final ApiClient _apiClient;
 
-  /// Only Android with a release URL configured (i.e. the prod flavor).
-  bool get isSupported => Platform.isAndroid && Env.releaseBaseUrl != null;
+  /// Android prod only: the dev flavor is not on Play.
+  bool get isSupported => Platform.isAndroid && !Env.isDev;
 
-  /// The newer release, or null when this build is already the latest.
-  Future<AppUpdateInfo?> checkForUpdate() async {
-    final baseUrl = Env.releaseBaseUrl;
-    if (!Platform.isAndroid || baseUrl == null) return null;
+  /// The update Play offers, or null when this build is already the latest.
+  ///
+  /// Only ever mandatory when Play really has an update for this device:
+  /// during a staged rollout, or when the minimum is set ahead of the
+  /// release, nobody gets stuck on a screen they cannot get past.
+  Future<AvailableUpdate?> checkForUpdate() async {
+    if (!isSupported) return null;
 
-    final response = await _dio.get<String>(
-      '$baseUrl/release.json',
-      // The web server / CDN may cache it; a stale copy would hide a release.
-      queryParameters: {'t': DateTime.now().millisecondsSinceEpoch},
-      options: Options(
-        responseType: ResponseType.plain,
-        headers: {'Cache-Control': 'no-cache'},
-      ),
+    final policyFuture = _fetchPolicy();
+    final play = await InAppUpdate.checkForUpdate();
+    final available = switch (play.updateAvailability) {
+      UpdateAvailability.updateAvailable ||
+      UpdateAvailability.developerTriggeredUpdateInProgress => true,
+      _ => false,
+    };
+    if (!available) return null;
+
+    final policy = await policyFuture;
+    final currentBuild =
+        int.tryParse((await PackageInfo.fromPlatform()).buildNumber) ?? 0;
+    return AvailableUpdate(
+      play: play,
+      mandatory: policy != null && currentBuild < policy.minBuildNumber,
+      message: policy?.message,
     );
-
-    final packageInfo = await PackageInfo.fromPlatform();
-    final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
-
-    final info = AppUpdateInfo.fromReleaseJson(
-      jsonDecode(response.data!) as Map<String, dynamic>,
-      baseUrl: baseUrl,
-      currentBuildNumber: currentBuildNumber,
-    );
-
-    if (info.buildNumber <= currentBuildNumber) return null;
-    return info;
   }
 
-  Future<File> downloadApk(
-    AppUpdateInfo info, {
-    void Function(double progress)? onProgress,
-    CancelToken? cancelToken,
-  }) async {
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/inovasionline-${info.buildNumber}.apk');
-
-    await _dio.download(
-      info.apkUrl,
-      file.path,
-      cancelToken: cancelToken,
-      // A large APK on a slow connection: only give up when nothing arrives.
-      options: Options(receiveTimeout: const Duration(minutes: 2)),
-      onReceiveProgress: (received, total) {
-        if (total > 0 && onProgress != null) {
-          onProgress(received / total);
-        }
-      },
-    );
-
-    return file;
+  /// Admin's minimum build; null when the backend cannot be reached, in which
+  /// case the update stays optional.
+  Future<({int minBuildNumber, String? message})?> _fetchPolicy() async {
+    try {
+      final response = await _apiClient.dio.get('/app-version');
+      final data = response.data['data'] as Map<String, dynamic>;
+      final message = (data['message'] as String?)?.trim();
+      return (
+        minBuildNumber: (data['min_build_number'] as num?)?.toInt() ?? 0,
+        message: message == null || message.isEmpty ? null : message,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }

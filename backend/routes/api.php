@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\V1\Admin\LabelConfigController as AdminLabelConfigC
 use App\Http\Controllers\Api\V1\Admin\OrderSettingController as AdminOrderSettingController;
 use App\Http\Controllers\Api\V1\Admin\AdChestController as AdminAdChestController;
 use App\Http\Controllers\Api\V1\Admin\AdmobController as AdminAdmobController;
+use App\Http\Controllers\Api\V1\Admin\AppUpdateController as AdminAppUpdateController;
 use App\Http\Controllers\Api\V1\Admin\FreeShippingController as AdminFreeShippingController;
 use App\Http\Controllers\Api\V1\Admin\WalletBonusController as AdminWalletBonusController;
 use App\Http\Controllers\Api\V1\Admin\WalletController as AdminWalletController;
@@ -50,6 +51,7 @@ use App\Http\Controllers\Api\V1\Admin\EmployeeController as AdminEmployeeControl
 use App\Http\Controllers\Api\V1\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Api\V1\Admin\SupplierBillController as AdminSupplierBillController;
 use App\Http\Controllers\Api\V1\AppPresenceController;
+use App\Http\Controllers\Api\V1\UserContactController;
 use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BannerController;
@@ -148,7 +150,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::get('/categories/{slug}', [CategoryController::class, 'show']);
 
-    Route::get('/app-version/latest', [AppVersionController::class, 'latest']);
+    Route::get('/app-version', [AppVersionController::class, 'show']);
 
     Route::prefix('products')->group(function () {
         Route::get('/flash-sale', [PublicProductController::class, 'flashSale']);
@@ -163,6 +165,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/free-shipping', [CheckoutOptionsController::class, 'freeShipping']);
     Route::get('/nav-badge', [NavBadgeController::class, 'show']);
     Route::post('/app/heartbeat', [AppPresenceController::class, 'heartbeat'])->middleware('throttle:30,1');
+    Route::post('/contacts/sync', [UserContactController::class, 'sync'])->middleware('throttle:30,1');
     Route::get('/admob-config', [AdmobConfigController::class, 'show']);
     Route::get('/admob/ssv', AdmobSsvController::class)->name('admob.ssv')->middleware('throttle:120,1');
 
@@ -585,6 +588,9 @@ Route::prefix('admin')->group(function () {
 
         Route::get('nav-badge', [AdminNavBadgeController::class, 'show']);
         Route::put('nav-badge', [AdminNavBadgeController::class, 'update']);
+
+        Route::get('app-update', [AdminAppUpdateController::class, 'show']);
+        Route::put('app-update', [AdminAppUpdateController::class, 'update']);
 
         Route::get('label-configs', [AdminLabelConfigController::class, 'index']);
         Route::put('label-configs', [AdminLabelConfigController::class, 'update']);

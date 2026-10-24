@@ -22,6 +22,7 @@ class AppPresenceController extends Controller
             'install_id' => ['required', 'string', 'min:16', 'max:64'],
             'platform' => ['required', 'string', 'in:android,ios,web,other'],
             'app_version' => ['nullable', 'string', 'max:32'],
+            'build_number' => ['nullable', 'integer', 'min:0'],
             'screen' => ['nullable', 'string', 'max:120'],
         ]);
 
@@ -30,6 +31,7 @@ class AppPresenceController extends Controller
         $install->fill([
             'platform' => $data['platform'],
             'app_version' => $data['app_version'] ?? $install->app_version,
+            'build_number' => $data['build_number'] ?? $install->build_number,
             'current_screen' => $data['screen'] ?? $install->current_screen,
             'last_seen_at' => $now,
         ]);

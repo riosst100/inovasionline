@@ -3,26 +3,18 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\AppUpdateSetting;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
 
+/**
+ * Update policy for the customer app. The update itself comes from Google Play;
+ * builds below min_build_number must update before they can be used.
+ */
 class AppVersionController extends Controller
 {
-    public function latest(): JsonResponse
+    public function show(): JsonResponse
     {
-        $config = config('app_version.android');
-
-        $apkExists = Storage::disk('public')->exists($config['apk_path']);
-
-        return ApiResponse::success([
-            'platform' => 'android',
-            'version' => $config['version'],
-            'build_number' => (int) $config['build_number'],
-            'min_supported_build_number' => (int) $config['min_supported_build_number'],
-            'force_update' => (bool) $config['force_update'],
-            'release_notes' => $config['release_notes'],
-            'apk_url' => $apkExists ? Storage::disk('public')->url($config['apk_path']) : null,
-        ], 'Latest app version retrieved successfully.');
+        return ApiResponse::success(AppUpdateSetting::current()->toPayload(), 'App update policy retrieved successfully.');
     }
 }

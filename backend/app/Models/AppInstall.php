@@ -18,6 +18,7 @@ class AppInstall extends Model
         'user_id',
         'platform',
         'app_version',
+        'build_number',
         'current_screen',
         'first_seen_at',
         'last_seen_at',

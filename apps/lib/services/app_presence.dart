@@ -1,13 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/widgets.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/api/api_client.dart';
+import '../core/storage/install_id.dart';
 
 /// Reports this install to the backend so the admin dashboard can count
 /// installs, users online and who is on the checkout screen. Pings on
@@ -20,17 +19,19 @@ class AppPresence with WidgetsBindingObserver {
   final GoRouter _router;
 
   static const _interval = Duration(minutes: 1);
-  static const _installIdKey = 'install_id';
 
   Timer? _timer;
   String? _installId;
   String? _appVersion;
+  int? _buildNumber;
   String? _lastScreen;
 
   Future<void> start() async {
     try {
-      _installId = await _readInstallId();
-      _appVersion = (await PackageInfo.fromPlatform()).version;
+      _installId = await InstallId.read();
+      final packageInfo = await PackageInfo.fromPlatform();
+      _appVersion = packageInfo.version;
+      _buildNumber = int.tryParse(packageInfo.buildNumber);
     } catch (_) {
       return;
     }
@@ -73,19 +74,10 @@ class AppPresence with WidgetsBindingObserver {
           'install_id': _installId,
           'platform': Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'other'),
           'app_version': _appVersion,
+          'build_number': _buildNumber,
           'screen': screen,
         },
       );
     } catch (_) {}
-  }
-
-  static Future<String> _readInstallId() async {
-    const storage = FlutterSecureStorage();
-    final existing = await storage.read(key: _installIdKey);
-    if (existing != null && existing.isNotEmpty) return existing;
-    final random = Random.secure();
-    final id = List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
-    await storage.write(key: _installIdKey, value: id);
-    return id;
   }
 }
