@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { CONTACT_EMAIL, SITE_NAME } from '@/lib/site';
 
 export const metadata: Metadata = {
@@ -90,9 +91,9 @@ export default function PrivacyPolicyPage() {
       <Section title="6. Hak Anda dan Penghapusan Data">
         <p>
           Anda berhak mengakses, memperbaiki, dan meminta penghapusan data pribadi Anda, serta menarik
-          izin yang telah diberikan melalui pengaturan perangkat. Untuk meminta penghapusan akun dan data,
-          hubungi kami di <a className="underline text-brand" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
-          Kami akan memprosesnya dalam waktu yang wajar, kecuali data wajib disimpan menurut hukum.
+          izin yang telah diberikan melalui pengaturan perangkat. Langkah meminta penghapusan akun dan data,
+          beserta data yang dihapus dan disimpan, dijelaskan di halaman{' '}
+          <Link className="underline text-brand" href="/hapus-akun">Hapus Akun</Link>.
         </p>
       </Section>
 

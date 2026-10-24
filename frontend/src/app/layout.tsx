@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="flex gap-4 text-sm text-slate-600">
               <Link href="/download" className="hover:text-brand">Download</Link>
               <Link href="/privacy-policy" className="hover:text-brand">Kebijakan Privasi</Link>
+              <Link href="/hapus-akun" className="hover:text-brand">Hapus Akun</Link>
             </nav>
           </div>
         </header>
