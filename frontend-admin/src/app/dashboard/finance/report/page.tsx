@@ -111,9 +111,6 @@ function FinanceReportContent() {
                     Isi harga modal di produk.
                   </p>
                 )}
-                <Link href="/dashboard/finance/profit" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline">
-                  Rincian keuntungan per produk / kategori / supplier / brand <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
               </section>
 
               <section className="space-y-4">
@@ -161,7 +158,7 @@ function FinanceReportContent() {
                   </div>
 
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="mb-3 font-semibold text-slate-800">Tagihan Supplier</h2>
+                    <h2 className="mb-3 font-semibold text-slate-800">Pembelian Barang</h2>
                     <dl className="space-y-2 text-sm">
                       <Line label="Tagihan masuk" value={report?.supplier_bills.billed} />
                       <Line label="Dibayar" value={report && -report.supplier_bills.paid} />

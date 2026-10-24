@@ -6,6 +6,8 @@ import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common.dart';
 import '../cod/cod_verification_screen.dart';
+import '../customers/customer_list_screen.dart';
+import '../delivery/delivery_schedule_screen.dart';
 import 'change_password_screen.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -49,20 +51,43 @@ class AccountScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
+                  leading: const Icon(Icons.people_outline),
+                  title: const Text('Pengguna'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () =>
+                      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const CustomerListScreen())),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.face_retouching_natural_outlined),
+                  title: const Text('Verifikasi Pengguna'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => const CodVerificationListScreen())),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.event_note_outlined),
+                  title: const Text('Jadwal Pengiriman'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => const DeliveryScheduleScreen())),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
                   leading: const Icon(Icons.lock_outline),
                   title: const Text('Ganti Kata Sandi'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () =>
                       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen())),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.face_retouching_natural_outlined),
-                  title: const Text('Verifikasi COD'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute<void>(builder: (_) => const CodVerificationListScreen())),
                 ),
                 const Divider(height: 1),
                 ListTile(

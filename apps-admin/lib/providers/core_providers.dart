@@ -7,7 +7,9 @@ import '../models/dashboard.dart';
 import '../services/auth_service.dart';
 import '../services/catalog_service.dart';
 import '../services/cod_verification_service.dart';
+import '../services/customer_service.dart';
 import '../services/dashboard_service.dart';
+import '../services/delivery_schedule_service.dart';
 import '../services/order_service.dart';
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
@@ -39,4 +41,10 @@ final warehousesProvider = FutureProvider.autoDispose<List<Warehouse>>(
 
 final codVerificationServiceProvider = Provider<CodVerificationService>(
   (ref) => CodVerificationService(ref.watch(apiClientProvider)),
+);
+
+final customerServiceProvider = Provider<CustomerService>((ref) => CustomerService(ref.watch(apiClientProvider)));
+
+final deliveryScheduleServiceProvider = Provider<DeliveryScheduleService>(
+  (ref) => DeliveryScheduleService(ref.watch(apiClientProvider)),
 );

@@ -9,7 +9,7 @@ import SearchableSelect from '../../../../components/ui/SearchableSelect';
 import { adminApi } from '../../../../lib/api';
 import { Brand, Supplier } from '../../../../types';
 import CostHint from '../CostHint';
-import { ArrowLeft, ImagePlus, Loader2, Pencil, Plus, Star, Trash2, Warehouse } from 'lucide-react';
+import { ArrowLeft, ImagePlus, Loader2, Pencil, Plus, Star, Trash2, Truck, Warehouse } from 'lucide-react';
 
 const STATUSES: Record<string, string> = {
   active: 'Aktif',
@@ -225,15 +225,6 @@ function EditProductPageContent() {
                 />
               </div>
               <div className="block text-xs font-semibold text-slate-600">
-                Supplier
-                <SearchableSelect
-                  value={String(form.supplier_id ?? '')}
-                  onChange={(v) => setField('supplier_id', v)}
-                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
-                  emptyLabel="- Tanpa supplier -"
-                />
-              </div>
-              <div className="block text-xs font-semibold text-slate-600">
                 Brand (opsional)
                 <SearchableSelect
                   value={String(form.brand_id ?? '')}
@@ -267,14 +258,6 @@ function EditProductPageContent() {
                 </div>
               </label>
               <label className="block text-xs font-semibold text-slate-600">
-                Harga Modal
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">Rp</span>
-                  <input inputMode="numeric" value={formatRupiah(form.cost_price)} onChange={(e) => setField('cost_price', toDigits(e.target.value))} className={`${inputCls} pl-9`} />
-                </div>
-                <CostHint price={form.sale_price || form.regular_price} cost={form.cost_price} />
-              </label>
-              <label className="block text-xs font-semibold text-slate-600">
                 SKU
                 <input value={form.sku} onChange={(e) => setField('sku', e.target.value)} className={inputCls} />
               </label>
@@ -291,7 +274,32 @@ function EditProductPageContent() {
 
             </div>
 
-            <section id="stok" className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+            <section id="supplier" className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+              <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                <Truck className="h-4 w-4 text-emerald-600" /> Supplier
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="block text-xs font-semibold text-slate-600">
+                  Supplier
+                  <SearchableSelect
+                    value={String(form.supplier_id ?? '')}
+                    onChange={(v) => setField('supplier_id', v)}
+                    options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                    emptyLabel="- Tanpa supplier -"
+                  />
+                </div>
+                <label className="block text-xs font-semibold text-slate-600">
+                  Harga Beli / Modal
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">Rp</span>
+                    <input inputMode="numeric" value={formatRupiah(form.cost_price)} onChange={(e) => setField('cost_price', toDigits(e.target.value))} className={`${inputCls} pl-9`} />
+                  </div>
+                  <CostHint price={form.sale_price || form.regular_price} cost={form.cost_price} />
+                </label>
+              </div>
+            </section>
+
+            <section id="stok"className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
                   <Warehouse className="h-4 w-4 text-emerald-600" /> Stok

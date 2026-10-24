@@ -19,9 +19,19 @@ const _stepLabels = {
   'color_check': 'Cek warna',
 };
 
-/// Face recordings customers submitted before their first COD order.
+/// Filters the event list to one customer.
+typedef VerificationUser = ({String id, String name, String? contact});
+
+/// Face-verification events (Verifikasi Pengguna): one row per recording, not per user.
+/// The user's single status lives on their account; revoking an event also revokes it.
 class CodVerificationListScreen extends ConsumerStatefulWidget {
-  const CodVerificationListScreen({super.key});
+  const CodVerificationListScreen({super.key, this.user, this.openEventId});
+
+  /// Start filtered to this customer.
+  final VerificationUser? user;
+
+  /// Open this event's review right away (e.g. from the Pengguna list).
+  final String? openEventId;
 
   @override
   ConsumerState<CodVerificationListScreen> createState() => _CodVerificationListScreenState();
@@ -31,24 +41,96 @@ class _CodVerificationListScreenState extends ConsumerState<CodVerificationListS
   final _listKey = GlobalKey<PagedListState<CodVerification>>();
   String _search = '';
   String? _status;
+  late VerificationUser? _user = widget.user;
+
+  @override
+  void initState() {
+    super.initState();
+    final eventId = widget.openEventId;
+    if (eventId != null) WidgetsBinding.instance.addPostFrameCallback((_) => _openEvent(eventId));
+  }
 
   void _restart() => _listKey.currentState?.refresh();
 
+  void _filterUser(VerificationUser? user) {
+    setState(() => _user = user);
+    _restart();
+  }
+
+  Future<void> _openEvent(String id) async {
+    try {
+      final item = await ref.read(codVerificationServiceProvider).find(id);
+      if (!mounted) return;
+      if (item == null) {
+        showMessage(context, 'Event verifikasi tidak ditemukan.', error: true);
+        return;
+      }
+      await _review(item);
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
+  Future<void> _review(CodVerification item) async {
+    final updated = await Navigator.of(context).push<CodVerification>(
+      MaterialPageRoute(
+        builder: (_) => CodVerificationDetailScreen(
+          item: item,
+          onShowUser: _user == null && item.userId != null
+              ? () => _filterUser((id: item.userId!, name: item.userName ?? '-', contact: item.userContact))
+              : null,
+        ),
+      ),
+    );
+    if (updated != null) _listKey.currentState?.replaceWhere((e) => e.id == updated.id, updated);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = _user;
     return Scaffold(
-      appBar: AppBar(title: const Text('Verifikasi COD')),
+      appBar: AppBar(title: const Text('Verifikasi Pengguna')),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: SearchField(
-              hint: 'Cari nama, email, atau no. HP',
-              onChanged: (value) {
-                _search = value;
-                _restart();
-              },
-            ),
+            child: user != null
+                ? Container(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.filter_alt_outlined, size: 18, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(user.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              if (user.contact != null)
+                                Text(user.contact!, style: const TextStyle(fontSize: 12, color: AppColors.mutedForeground)),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Hapus filter pengguna',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => _filterUser(null),
+                        ),
+                      ],
+                    ),
+                  )
+                : SearchField(
+                    hint: 'Cari nama, email, atau no. HP',
+                    onChanged: (value) {
+                      _search = value;
+                      _restart();
+                    },
+                  ),
           ),
           SizedBox(
             height: 44,
@@ -75,18 +157,11 @@ class _CodVerificationListScreenState extends ConsumerState<CodVerificationListS
             child: PagedList<CodVerification>(
               key: _listKey,
               emptyIcon: Icons.face_retouching_off_outlined,
-              emptyText: 'Belum ada verifikasi COD.',
-              fetch: (page) =>
-                  ref.read(codVerificationServiceProvider).list(page: page, status: _status, search: _search),
-              itemBuilder: (context, item) => _VerificationTile(
-                item: item,
-                onTap: () async {
-                  final updated = await Navigator.of(
-                    context,
-                  ).push<CodVerification>(MaterialPageRoute(builder: (_) => CodVerificationDetailScreen(item: item)));
-                  if (updated != null) _listKey.currentState?.replaceWhere((e) => e.id == updated.id, updated);
-                },
-              ),
+              emptyText: 'Belum ada verifikasi pengguna.',
+              fetch: (page) => ref
+                  .read(codVerificationServiceProvider)
+                  .list(page: page, status: _status, search: _search, userId: _user?.id),
+              itemBuilder: (context, item) => _VerificationTile(item: item, onTap: () => _review(item)),
             ),
           ),
         ],
@@ -123,9 +198,12 @@ class _VerificationTile extends StatelessWidget {
 }
 
 class CodVerificationDetailScreen extends ConsumerStatefulWidget {
-  const CodVerificationDetailScreen({super.key, required this.item});
+  const CodVerificationDetailScreen({super.key, required this.item, this.onShowUser});
 
   final CodVerification item;
+
+  /// Filters the list to this event's customer (the screen pops itself first).
+  final VoidCallback? onShowUser;
 
   @override
   ConsumerState<CodVerificationDetailScreen> createState() => _CodVerificationDetailScreenState();
@@ -194,7 +272,7 @@ class _CodVerificationDetailScreenState extends ConsumerState<CodVerificationDet
       final updated = await ref.read(codVerificationServiceProvider).revoke(_item.id, reason);
       if (!mounted) return;
       setState(() => _item = updated);
-      _snack('Verifikasi dicabut. Customer harus mengulang.');
+      _snack('Verifikasi dicabut. Pengguna harus mengulang.');
     } catch (e) {
       if (mounted) _snack(errorMessage(e));
     } finally {
@@ -210,7 +288,7 @@ class _CodVerificationDetailScreenState extends ConsumerState<CodVerificationDet
         if (!didPop) Navigator.of(context).pop(_item);
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(_item.userName ?? 'Verifikasi COD')),
+        appBar: AppBar(title: Text(_item.userName ?? 'Verifikasi Pengguna')),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -226,6 +304,19 @@ class _CodVerificationDetailScreenState extends ConsumerState<CodVerificationDet
                 ),
               ],
             ),
+            if (widget.onShowUser != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                  onPressed: () {
+                    Navigator.of(context).pop(_item);
+                    widget.onShowUser!();
+                  },
+                  icon: const Icon(Icons.filter_alt_outlined, size: 18),
+                  label: const Text('Lihat semua verifikasi pengguna ini'),
+                ),
+              ),
             const SizedBox(height: 12),
             if (_item.createdAt != null) _row('Direkam', formatDateTime(_item.createdAt!)),
             _row('Perangkat', _item.device ?? '-'),
@@ -249,7 +340,7 @@ class _CodVerificationDetailScreenState extends ConsumerState<CodVerificationDet
                   ),
                 ),
               )
-            else
+            else ...[
               FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: AppColors.destructive),
                 onPressed: _busy ? null : _revoke,
@@ -258,6 +349,13 @@ class _CodVerificationDetailScreenState extends ConsumerState<CodVerificationDet
                     : const Icon(Icons.gpp_bad_outlined),
                 label: const Text('Cabut Verifikasi'),
               ),
+              const SizedBox(height: 8),
+              const Text(
+                'Status verifikasi pengguna ikut dicabut dan merujuk ke event ini. Pengguna harus mengulang '
+                'verifikasi wajah sebelum memakai COD/Paylater lagi.',
+                style: TextStyle(fontSize: 12, color: AppColors.mutedForeground),
+              ),
+            ],
           ],
         ),
       ),

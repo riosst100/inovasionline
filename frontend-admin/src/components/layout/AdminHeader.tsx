@@ -21,7 +21,7 @@ const LABELS: Record<string, string> = {
   wallets: 'Saldo Pengguna',
   report: 'Laporan Keuangan',
   profit: 'Keuntungan',
-  bills: 'Tagihan Supplier',
+  bills: 'Pembelian Barang',
   'shipping-methods': 'Metode Pengiriman',
   roles: 'Hak Akses & Role',
   users: 'User Admin & Staff',

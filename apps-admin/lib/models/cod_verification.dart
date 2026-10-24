@@ -5,6 +5,7 @@ class CodVerification {
     required this.status,
     required this.steps,
     required this.createdAt,
+    this.userId,
     this.userName,
     this.userContact,
     this.device,
@@ -21,6 +22,7 @@ class CodVerification {
       status: json['status'] as String? ?? 'verified',
       steps: (json['steps'] as List? ?? []).map((e) => e.toString()).toList(),
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal(),
+      userId: (json['user_id'] ?? user?['id']) as String?,
       userName: user?['name'] as String?,
       userContact: (user?['email'] ?? user?['phone']) as String?,
       device: json['device'] as String?,
@@ -37,6 +39,7 @@ class CodVerification {
   final String status;
   final List<String> steps;
   final DateTime? createdAt;
+  final String? userId;
   final String? userName;
   final String? userContact;
   final String? device;

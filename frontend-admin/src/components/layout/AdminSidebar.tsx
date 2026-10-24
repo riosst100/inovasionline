@@ -52,7 +52,6 @@ import {
   Landmark,
   ReceiptText,
   Scale,
-  TrendingUp,
   Code,
   X,
 } from 'lucide-react';
@@ -172,6 +171,7 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
       title: 'Perusahaan',
       items: [
         { name: 'Karyawan', href: '/dashboard/employees', icon: IdCard },
+        { name: 'Pembelian Barang', href: '/dashboard/finance/bills', icon: ReceiptText },
         {
           name: 'Keuangan',
           href: '/dashboard/finance',
@@ -179,8 +179,6 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
           children: [
             { name: 'Cashflow', href: '/dashboard/finance/cashflow', icon: Scale },
             { name: 'Laporan Keuangan', href: '/dashboard/finance/report', icon: FileBarChart },
-            { name: 'Keuntungan', href: '/dashboard/finance/profit', icon: TrendingUp },
-            { name: 'Tagihan Supplier', href: '/dashboard/finance/bills', icon: ReceiptText },
           ],
         },
       ],
