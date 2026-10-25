@@ -11,7 +11,6 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/skeleton.dart';
 import '../ads/admob.dart';
 import '../ads/native_feed_ad.dart';
-import 'contact_connect_card.dart';
 import 'create_post_screen.dart';
 import 'post_comments_sheet.dart';
 import 'post_providers.dart';
@@ -125,7 +124,6 @@ class _PostsScreenState extends ConsumerState<PostsScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   _PostComposer(onTap: _openCreatePost),
-                  const ContactConnectCard(),
                   const SizedBox(height: 120),
                   const Icon(
                     Icons.dynamic_feed_outlined,
@@ -153,7 +151,6 @@ class _PostsScreenState extends ConsumerState<PostsScreen> {
                     return Column(
                       children: [
                         _PostComposer(onTap: _openCreatePost),
-                        const ContactConnectCard(),
                       ],
                     );
                   }

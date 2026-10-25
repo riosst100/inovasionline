@@ -1,6 +1,7 @@
 import '../core/api/api_client.dart';
 import '../core/api/paginated.dart';
 import '../models/order.dart';
+import '../models/order_queue.dart';
 
 class OrderService {
   OrderService(this._api);
@@ -20,6 +21,18 @@ class OrderService {
     final res = await _api.dio.get('/admin/orders/counts', queryParameters: {if (search.isNotEmpty) 'search': search});
     final data = res.data['data'] as Map<String, dynamic>? ?? {};
     return data.map((k, v) => MapEntry(k, (v as num?)?.toInt() ?? 0));
+  }
+
+  /// Instant orders not yet shipped, longest waiting first.
+  Future<InstantOrderQueue> instant() async {
+    final res = await _api.dio.get('/admin/orders/instant');
+    return InstantOrderQueue.fromJson(res.data['data'] as Map<String, dynamic>);
+  }
+
+  /// Scheduled orders of one delivery [date] (WIB, yyyy-MM-dd).
+  Future<ScheduledOrders> scheduled(String date) async {
+    final res = await _api.dio.get('/admin/orders/scheduled', queryParameters: {'date': date});
+    return ScheduledOrders.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 
   Future<Order> detail(String id) async {

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { formatDateTime } from '../../lib/date';
+import React from 'react';
+import { formatDateTime, useNow } from '../../lib/date';
 
 /** Seen within this window counts as online (the app sends a heartbeat while in the foreground). */
 const ONLINE_MS = 5 * 60 * 1000;
@@ -18,13 +18,13 @@ function relative(ms: number): string {
 
 /** "Online" / "5 menit lalu" / a date, from the customer's last_seen_at (app heartbeat or API use). */
 export default function LastSeen({ at }: { at: string | null | undefined }) {
-  // Read the clock once per mount; the list reloads often enough for "x menit lalu".
-  const [now] = useState(() => Date.now());
+  // Shared clock, refreshed every minute; 0 until mounted (then only the full date shows).
+  const now = useNow(60_000);
 
   if (!at) return <span className="text-xs text-slate-400">Belum pernah</span>;
 
   const date = new Date(at);
-  const ago = now - date.getTime();
+  const ago = now ? now - date.getTime() : Infinity;
   const full = formatDateTime(date);
 
   if (ago < ONLINE_MS) {

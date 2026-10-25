@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 /**
  * The one place the admin panel formats and parses dates. Everything is shown and entered in WIB
  * (Asia/Jakarta, UTC+7) whatever the viewer's device timezone, matching the backend's day
@@ -79,6 +81,63 @@ export function fromWib(date: string, time = '00:00'): string {
 /** Today (or today + offsetDays) in WIB as YYYY-MM-DD, matching the backend's date filters. */
 export function todayWib(offsetDays = 0): string {
   return wibParts(Date.now() + offsetDays * 86_400_000).date;
+}
+
+/**
+ * One shared ticking clock per interval. `subscribe` / `snapshot` are created once per clock so
+ * useSyncExternalStore sees stable functions (a new subscribe each render would resubscribe, re-read
+ * the clock and render again, forever).
+ */
+type Clock = {
+  now: number;
+  listeners: Set<() => void>;
+  timer: ReturnType<typeof setInterval> | null;
+  subscribe: (listener: () => void) => () => void;
+  snapshot: () => number;
+};
+const clocks = new Map<number, Clock>();
+const serverNow = () => 0;
+
+function clockFor(ms: number): Clock {
+  const existing = clocks.get(ms);
+  if (existing) return existing;
+
+  const c: Clock = {
+    now: 0,
+    listeners: new Set(),
+    timer: null,
+    subscribe: (listener) => {
+      c.listeners.add(listener);
+      if (!c.timer) {
+        c.now = Date.now();
+        c.timer = setInterval(() => {
+          c.now = Date.now();
+          c.listeners.forEach((l) => l());
+        }, ms);
+        // React re-reads the snapshot right after subscribing, so the new time shows without a notify here.
+      }
+      return () => {
+        c.listeners.delete(listener);
+        if (c.listeners.size === 0 && c.timer) {
+          clearInterval(c.timer);
+          c.timer = null;
+        }
+      };
+    },
+    snapshot: () => c.now,
+  };
+  clocks.set(ms, c);
+  return c;
+}
+
+/**
+ * Current time (epoch ms), re-rendering every `ms`; one shared interval per `ms`. It is 0 during
+ * prerender and the very first render (Next.js must not bake a clock reading into the page), so
+ * treat 0 as "not known yet".
+ */
+export function useNow(ms = 1000): number {
+  const clock = clockFor(ms);
+  return useSyncExternalStore(clock.subscribe, clock.snapshot, serverNow);
 }
 
 /** Whether two moments fall on the same WIB calendar day. */

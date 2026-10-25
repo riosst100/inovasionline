@@ -86,13 +86,16 @@ export function onAdminChange(channel: AdminChannel, onChange: () => void): () =
 
 /** Whether the WebSocket is connected; while it isn't, pages fall back to periodic refresh. */
 export function useRealtimeConnected(): boolean {
-  return useSyncExternalStore(
-    (listener) => {
-      connection();
-      statusListeners.add(listener);
-      return () => statusListeners.delete(listener);
-    },
-    () => connected,
-    () => false,
-  );
+  return useSyncExternalStore(subscribeStatus, statusSnapshot, statusServerSnapshot);
 }
+
+// Module-level so useSyncExternalStore gets stable functions and doesn't resubscribe every render.
+function subscribeStatus(listener: () => void): () => void {
+  connection();
+  statusListeners.add(listener);
+  return () => {
+    statusListeners.delete(listener);
+  };
+}
+const statusSnapshot = () => connected;
+const statusServerSnapshot = () => false;

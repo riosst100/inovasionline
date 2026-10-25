@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { apiRequest } from './api';
 import { onAdminChange } from './realtime';
 import { InstantOrderQueue } from '../types';
@@ -169,14 +169,4 @@ export function urgency(deadlineAt: string, dispatchMinutes: number, now: number
   const left = Date.parse(deadlineAt) - now;
   if (left < 0) return 'late';
   return left <= (dispatchMinutes * 60_000) / 2 ? 'soon' : 'ok';
-}
-
-/** Current time, re-rendering every `ms` for running timers. */
-export function useNow(ms = 1000): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(t);
-  }, [ms]);
-  return now;
 }

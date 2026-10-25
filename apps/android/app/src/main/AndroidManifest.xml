@@ -5,7 +5,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <uses-permission android:name="android.permission.READ_CONTACTS" tools:node="remove"/>
     <!-- The location/geolocator plugins ship a location foreground service for background
          tracking. This app only reads a one-off position and asks to turn GPS on, so drop the
          permission; otherwise Play requires a foreground-service declaration. Keep the services
@@ -21,6 +21,7 @@
              ad click the launcher icon brings back the browser instead of the app. -->
         <activity
             android:name=".MainActivity"
+            android:screenOrientation="portrait"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"

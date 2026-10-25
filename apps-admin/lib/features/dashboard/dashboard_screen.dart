@@ -12,6 +12,7 @@ import '../../models/order.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/common.dart';
 import '../orders/order_style.dart';
+import 'order_queue_panels.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -29,8 +30,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     // "Online" and "sedang checkout" are live numbers, so keep them fresh.
-    _timer = Timer.periodic(_refreshEvery, (_) => ref.invalidate(dashboardProvider));
+    _timer = Timer.periodic(_refreshEvery, (_) => _invalidate());
   }
+
+  void _invalidate() {
+    ref.invalidate(dashboardProvider);
+    ref.invalidate(shippingMethodsProvider);
+    ref.invalidate(instantOrdersProvider);
+    ref.invalidate(scheduledOrdersProvider);
+  }
+
+  Future<void> _refresh() => Future.wait<Object>([
+    ref.refresh(dashboardProvider.future),
+    ref.refresh(shippingMethodsProvider.future),
+    ref.refresh(instantOrdersProvider.future),
+  ]).whenComplete(() => ref.invalidate(scheduledOrdersProvider));
 
   @override
   void dispose() {
@@ -48,22 +62,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         actions: [
           IconButton(
             tooltip: 'Muat ulang',
-            onPressed: () => ref.invalidate(dashboardProvider),
+            onPressed: _invalidate,
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(dashboardProvider.future),
-        child: stats.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => ListView(
-            children: [
-              const SizedBox(height: 80),
-              ErrorView(message: errorMessage(e), onRetry: () => ref.invalidate(dashboardProvider)),
-            ],
-          ),
-          data: (data) => _DashboardBody(stats: data),
+        onRefresh: _refresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            // Shipping on/off first, then the dispatch queues (same order as the web dashboard), then the stats.
+            const SizedBox(height: 10),
+            const ShippingMethodsPanel(),
+            const SizedBox(height: 12),
+            const InstantOrdersPanel(),
+            const SizedBox(height: 12),
+            const ScheduledOrdersPanel(),
+            stats.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.only(top: 40),
+                child: ErrorView(message: errorMessage(e), onRetry: () => ref.invalidate(dashboardProvider)),
+              ),
+              data: (data) => _DashboardBody(stats: data),
+            ),
+          ],
         ),
       ),
     );
@@ -77,8 +104,8 @@ class _DashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _SectionTitle('Pesanan'),
         _StatGrid(

@@ -5,9 +5,9 @@ import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi, apiRequest, apiRequestFull } from '../../../lib/api';
 import OrderDetailModal from './OrderDetailModal';
 import { useOrderTabs, rupiah } from './orderShared';
-import { formatDate, formatDateTime, todayWib } from '../../../lib/date';
+import { formatDate, formatDateTime, useNow, wibParts } from '../../../lib/date';
 import { WaitTimer } from '../../../components/orders/InstantOrders';
-import { useInstantOrders, useNow } from '../../../lib/instantOrders';
+import { useInstantOrders } from '../../../lib/instantOrders';
 import { onAdminChange } from '../../../lib/realtime';
 import { ShippingMethod } from '../../../types';
 import { ShoppingBag, Loader2, PackageCheck, Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -123,6 +123,8 @@ export default function AdminOrdersPage() {
   const { queue } = useInstantOrders();
   const dispatchMinutes = queue?.dispatch_minutes ?? null;
   const now = useNow();
+  // Latest selectable order date; unknown (no limit) until the clock is read after mount.
+  const today = now ? wibParts(now).date : undefined;
 
   const selectTab = (value: string) => {
     setStatus(value);
@@ -161,7 +163,7 @@ export default function AdminOrdersPage() {
                   <input
                     type="date"
                     value={filters.date_from}
-                    max={filters.date_to || todayWib()}
+                    max={filters.date_to || today}
                     onChange={(e) => setFilter('date_from', e.target.value)}
                     aria-label="Tanggal pesanan dari"
                     className={filterInput}
@@ -171,7 +173,7 @@ export default function AdminOrdersPage() {
                     type="date"
                     value={filters.date_to}
                     min={filters.date_from || undefined}
-                    max={todayWib()}
+                    max={today}
                     onChange={(e) => setFilter('date_to', e.target.value)}
                     aria-label="Tanggal pesanan sampai"
                     className={filterInput}

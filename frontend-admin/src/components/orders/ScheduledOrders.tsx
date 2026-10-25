@@ -6,9 +6,8 @@ import { CalendarClock, ExternalLink } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { useLabels } from '../../lib/labels';
 import { onAdminChange } from '../../lib/realtime';
-import { useNow } from '../../lib/instantOrders';
 import { rupiah } from '../../lib/wallet';
-import { todayWib, wibParts } from '../../lib/date';
+import { useNow, wibParts } from '../../lib/date';
 import { ScheduledOrders } from '../../types';
 
 const DAYS = [
@@ -27,8 +26,10 @@ export function ScheduledOrdersPanel() {
   const [slot, setSlot] = useState<string>('all');
   const [data, setData] = useState<ScheduledOrders | null>(null);
 
-  const date = todayWib(offset);
+  // Delivery date in WIB; empty until the clock is read after mount.
+  const date = now ? wibParts(now + offset * 86_400_000).date : '';
   const load = useCallback(() => {
+    if (!date) return;
     apiRequest<ScheduledOrders>(`/admin/orders/scheduled?date=${date}`)
       .then(setData)
       .catch(() => setData((d) => d ?? { date, count: 0, slots: [], orders: [] }));

@@ -2,6 +2,7 @@ import 'package:intl/intl.dart';
 
 import '../core/api/api_client.dart';
 import '../models/delivery_schedule.dart';
+import '../models/shipping_method.dart';
 
 class DeliveryScheduleInput {
   DeliveryScheduleInput({
@@ -40,6 +41,17 @@ class DeliveryScheduleService {
 
   List<Map<String, dynamic>> _list(dynamic body) =>
       (body['data'] as List? ?? []).cast<Map<String, dynamic>>();
+
+  Future<List<ShippingMethod>> shippingMethods() async {
+    final res = await _api.dio.get('/admin/shipping-methods', queryParameters: {'per_page': 100});
+    return _list(res.data).map(ShippingMethod.fromJson).toList();
+  }
+
+  /// Flips is_enabled; a disabled method no longer shows at checkout.
+  Future<ShippingMethod> toggleShippingMethod(String id) async {
+    final res = await _api.dio.post('/admin/shipping-methods/$id/toggle');
+    return ShippingMethod.fromJson(res.data['data'] as Map<String, dynamic>);
+  }
 
   Future<List<ScheduledShippingMethod>> scheduledMethods() async {
     final res = await _api.dio.get('/admin/shipping-methods', queryParameters: {'per_page': 100});

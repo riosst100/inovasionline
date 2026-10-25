@@ -103,7 +103,7 @@ class _FaceVerificationScreenState extends ConsumerState<FaceVerificationScreen>
       // Disposing mid-recording drops the file, which is what we want on cancel.
       camera.dispose();
     }
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
 

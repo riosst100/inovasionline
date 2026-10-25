@@ -12,8 +12,8 @@ import {
   urgency,
   Urgency,
   useInstantOrders,
-  useNow,
 } from '../../lib/instantOrders';
+import { useNow } from '../../lib/date';
 import { InstantOrderQueue } from '../../types';
 
 const TONE: Record<Urgency, { row: string; badge: string }> = {

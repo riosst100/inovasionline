@@ -78,6 +78,14 @@ android {
     }
 
     buildTypes {
+        // Non-release builds are labelled "IO Testing" (build-type resValue overrides the flavor's) and use
+        // the badged launcher icon in src/{debug,profile}/res (scripts/generate-debug-icon.ps1).
+        getByName("debug") {
+            resValue("string", "app_name", "IO Testing")
+        }
+        getByName("profile") {
+            resValue("string", "app_name", "IO Testing")
+        }
         release {
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
