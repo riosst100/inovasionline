@@ -1,6 +1,6 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionGroups, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
 export class ApiError extends Error {
   errors?: Record<string, string[]>;
@@ -165,8 +165,8 @@ export const adminApi = {
     return apiRequest<Role[]>('/admin/roles');
   },
 
-  async getAvailablePermissions(): Promise<PermissionGroups> {
-    return apiRequest<PermissionGroups>('/admin/roles/permissions');
+  async getAvailablePermissions(): Promise<PermissionCatalog> {
+    return apiRequest<PermissionCatalog>('/admin/roles/permissions');
   },
 
   async createRole(data: { name: string; slug?: string; description?: string; permissions: string[] }): Promise<Role> {

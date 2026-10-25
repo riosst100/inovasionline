@@ -13,7 +13,8 @@ use InvalidArgumentException;
 class DataTransferRegistry
 {
     /**
-     * Resource key => handler class.
+     * Resource key => handler class. The key, with dashes as underscores, is also the admin menu
+     * (AdminMenu) whose view/manage permission allows exporting/importing it.
      *
      * @var array<string, class-string<TransferHandler>>
      */
@@ -30,6 +31,12 @@ class DataTransferRegistry
     public static function resources(): array
     {
         return array_keys(self::HANDLERS);
+    }
+
+    /** Admin menu key guarding this resource. */
+    public static function menu(string $resource): string
+    {
+        return str_replace('-', '_', $resource);
     }
 
     public static function handler(string $resource): TransferHandler

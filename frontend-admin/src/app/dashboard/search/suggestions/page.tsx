@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatDateTime } from '../../../../lib/date';
 import AdminLayout from '../../../../components/layout/AdminLayout';
 import { adminApi, ApiError } from '../../../../lib/api';
 import { SearchSuggestion } from '../../../../types';
@@ -171,7 +172,7 @@ export default function SearchSuggestionsPage() {
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{item.search_count.toLocaleString('id-ID')}</td>
                     <td className="px-4 py-3 text-slate-500">
-                      {item.last_searched_at ? new Date(item.last_searched_at).toLocaleString('id-ID') : '-'}
+                      {formatDateTime(item.last_searched_at)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

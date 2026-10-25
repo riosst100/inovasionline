@@ -91,7 +91,7 @@ class AppUpdateSettingTest extends TestCase
             'email' => 'admin@example.com',
             'password' => 'secret123',
             'is_active' => true,
-            'role_id' => Role::create(['name' => 'Super Admin', 'slug' => 'super-admin', 'is_system' => true])->id,
+            'role_id' => Role::create(['name' => 'Super Admin', 'slug' => 'super_admin', 'is_system' => true])->id,
         ]);
     }
 }

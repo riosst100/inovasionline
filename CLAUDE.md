@@ -27,4 +27,29 @@ resource — plug into this one so every page looks and behaves the same.
    `IMPORT_HINT` lists the columns (required ones in bold) and how existing rows are matched/updated.
 
 When you add a column to a model that has a handler, add it to the handler's headers/export/import and to the
-page's `IMPORT_HINT` too.
+page's `IMPORT_HINT` too. A handler's resource key (dashes → underscores) must be an `AdminMenu` key: export needs
+view and import needs manage on that menu.
+
+## Dates in the admin panel (WIB)
+
+Format and parse every date through `frontend-admin/src/lib/date.ts` (`formatDate`, `formatDateTime`, `formatTime`,
+`todayWib`, `wibParts` / `fromWib` for date/time inputs). They always use Asia/Jakarta (UTC+7), whatever the viewer's
+device timezone. Don't call `toLocaleDateString` / `toLocaleString` / `getHours` etc. on a Date directly.
+
+## Admin role access (per menu)
+
+Roles grant `{menu}.view` (menu shows, page opens, GET works) and `{menu}.manage` (writes; implies view) per
+sidebar menu. When you add an admin page:
+1. Backend: add the menu to `app/Support/Permissions/AdminMenu.php` and guard its routes with
+   `->middleware('menu:<key>')`. Add other menus that read it as a lookup after the owner
+   (`menu:suppliers,products,purchases`: Produk and Pembelian may GET suppliers, only Supplier may write).
+2. Frontend: give the sidebar link `perm: '<key>'` in `components/layout/AdminSidebar.tsx`; that also guards the
+   page URL (`menuForPath` in `AdminLayout`).
+
+## Realtime admin panel (Reverb)
+
+The dashboard, instant-order alerts and the Pesanan menu badge update over WebSocket. Model saves call
+`AdminDataChanged::signal()` (listeners in `AppServiceProvider::boot`), which broadcasts only a topic on the private
+channels `admin.dashboard` / `admin.orders`; the frontend (`lib/realtime.ts` → `onAdminChange`) refetches through the
+normal permission-checked endpoints. When the dashboard shows data from a new model, add that model to the list in
+`AppServiceProvider`. Broadcasts are queued, so the `queue` and `reverb` containers must be running.

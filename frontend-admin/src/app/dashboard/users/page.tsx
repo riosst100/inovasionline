@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { formatDate } from '../../../lib/date';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { useAuth } from '../../../context/AuthContext';
 import { adminApi } from '../../../lib/api';
@@ -299,11 +300,7 @@ export default function AdminUsersPage() {
                           </span>
                         </td>
                         <td className="py-4 px-5 text-xs text-slate-500">
-                          {new Date(u.created_at).toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
+                          {formatDate(u.created_at)}
                         </td>
                         <td className="py-4 px-5 text-right">
                           <div className="flex items-center justify-end gap-1.5">

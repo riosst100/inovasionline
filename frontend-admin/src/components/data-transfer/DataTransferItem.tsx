@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Download, FileDown, FileUp, Loader2, Trash2, X } from 'lucide-react';
 import { DataTransfer } from '../../types';
-import { dataTransferApi, formatDateTime, isActiveTransfer, RESOURCE_LABELS, STATUS_META } from '../../lib/dataTransfer';
+import { dataTransferApi, isActiveTransfer, RESOURCE_LABELS, STATUS_META } from '../../lib/dataTransfer';
+import { formatDateTime } from '../../lib/date';
 
 type Props = {
   transfer: DataTransfer;

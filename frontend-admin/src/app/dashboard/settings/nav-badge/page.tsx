@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { fromWib, wibParts } from '../../../../lib/date';
 import AdminLayout from '../../../../components/layout/AdminLayout';
 import { adminApi, ApiError } from '../../../../lib/api';
 import { NavBadgeSettings } from '../../../../types';
@@ -13,15 +14,14 @@ const DEFAULTS: NavBadgeSettings = {
   ends_at: null,
 };
 
-/** ISO string -> value for <input type="datetime-local"> in the admin's local time. */
+/** ISO string -> value for <input type="datetime-local">, in WIB. */
 function toLocalInput(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const { date, time } = wibParts(iso);
+  return date ? `${date}T${time}` : '';
 }
 
-const fromLocalInput = (v: string): string | null => (v ? new Date(v).toISOString() : null);
+/** <input type="datetime-local"> value (WIB) -> ISO string. */
+const fromLocalInput = (v: string): string | null => (v ? fromWib(v.slice(0, 10), v.slice(11, 16)) : null);
 
 function strip(s: NavBadgeSettings): NavBadgeSettings {
   const { is_visible: _ignored, ...rest } = s;

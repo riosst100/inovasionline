@@ -31,7 +31,7 @@ class SalesReportController extends Controller
 
     private const UNIT_COST = SoldItems::UNIT_COST;
 
-    private const OPEN_STATUSES = [
+    public const OPEN_STATUSES = [
         OrderStatus::PENDING,
         OrderStatus::PROCESSING,
         OrderStatus::READY,

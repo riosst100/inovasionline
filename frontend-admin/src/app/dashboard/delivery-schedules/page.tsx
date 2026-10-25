@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import { formatDate as formatWibDate } from '../../../lib/date';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AdminLayout from '../../../components/layout/AdminLayout';
@@ -51,13 +52,7 @@ const cutoffText = (minutes: number) => {
   return `${minutes} menit sebelum`;
 };
 
-const formatDate = (ymd: string) =>
-  new Date(`${ymd}T00:00:00`).toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+const formatDate = (ymd: string) => formatWibDate(ymd, 'full');
 
 const errorText = (err: unknown, fallback: string) => {
   const first = err instanceof ApiError && err.errors ? Object.values(err.errors)[0]?.[0] : null;

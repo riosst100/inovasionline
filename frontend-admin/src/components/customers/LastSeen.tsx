@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { formatDateTime } from '../../lib/date';
 
 /** Seen within this window counts as online (the app sends a heartbeat while in the foreground). */
 const ONLINE_MS = 5 * 60 * 1000;
@@ -24,7 +25,7 @@ export default function LastSeen({ at }: { at: string | null | undefined }) {
 
   const date = new Date(at);
   const ago = now - date.getTime();
-  const full = date.toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const full = formatDateTime(date);
 
   if (ago < ONLINE_MS) {
     return (

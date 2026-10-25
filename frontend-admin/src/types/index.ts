@@ -144,17 +144,20 @@ export interface CustomerDetail {
   }[];
 }
 
-export interface PermissionItem {
+/** One admin menu a role can be granted (backend AdminMenu); `manage` is false for read-only pages. */
+export interface PermissionMenu {
   key: string;
   label: string;
+  /** Sidebar dropdown the menu sits in (e.g. "Master Data"), null for top-level links. */
+  group: string | null;
+  manage: boolean;
 }
 
-export interface PermissionGroup {
-  title: string;
-  items: PermissionItem[];
+export interface PermissionCatalog {
+  sections: { title: string; menus: PermissionMenu[] }[];
+  /** Permissions that are not a menu (driver app, broadcast). */
+  extras: { key: string; label: string }[];
 }
-
-export type PermissionGroups = Record<string, PermissionGroup>;
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -513,6 +516,14 @@ export interface SalesSummary {
   new_customers: number;
 }
 
+/** GET /admin/dashboard/overview: cards per sidebar section, only for menus the admin may view. */
+export interface DashboardOverview {
+  sections: {
+    title: string;
+    cards: { menu: string; label: string; value: number; money: boolean; hint: string | null; alert: boolean }[];
+  }[];
+}
+
 export interface SalesReport {
   period: { date_from: string; date_to: string; days: number; summary: SalesSummary };
   previous: { date_from: string; date_to: string; summary: SalesSummary };
@@ -555,6 +566,44 @@ export interface OrderSettings {
   paylater_min_transactions: number;
   /** Days a customer has to settle a Paylater order */
   paylater_due_days: number;
+  /** Instant orders (no delivery schedule) must be shipped within this many minutes */
+  instant_dispatch_minutes: number;
+}
+
+/** GET /admin/orders/scheduled?date=: scheduled (non-cancelled) orders of one delivery date, per time slot. */
+export interface ScheduledOrders {
+  date: string;
+  count: number;
+  slots: { id: string; label: string; time_range: string; shipping_method: string | null; quota: number | null; count: number }[];
+  orders: {
+    id: string;
+    order_number: string;
+    customer: string | null;
+    grand_total: number;
+    status: string;
+    delivery_schedule_id: string | null;
+    created_at: string;
+  }[];
+}
+
+/** GET /admin/orders/instant: instant orders not yet shipped, longest waiting first. */
+export interface InstantOrderQueue {
+  dispatch_minutes: number;
+  count: number;
+  /** Still `pending`: nobody has started packing them (counted over all, not only the listed ones) */
+  unpacked: number;
+  /** Every unfinished order (scheduled and on delivery too), for the Pesanan menu badge */
+  open: number;
+  orders: {
+    id: string;
+    order_number: string;
+    customer: string | null;
+    grand_total: number;
+    status: string;
+    created_at: string;
+    /** created_at + dispatch_minutes */
+    deadline_at: string;
+  }[];
 }
 
 export interface NavBadgeSettings {

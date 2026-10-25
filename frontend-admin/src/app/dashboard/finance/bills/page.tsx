@@ -6,7 +6,8 @@ import AdminLayout from '../../../../components/layout/AdminLayout';
 import SearchableSelect from '../../../../components/ui/SearchableSelect';
 import Stat from '../../../../components/finance/Stat';
 import { adminApi, apiRequest, apiRequestFull, ApiError } from '../../../../lib/api';
-import { rupiah, todayWib } from '../../../../lib/wallet';
+import { rupiah } from '../../../../lib/wallet';
+import { formatDate, todayWib } from '../../../../lib/date';
 import { PaginationMeta, Supplier, SupplierBill, SupplierBillStatus, SupplierBillSummary } from '../../../../types';
 import {
   AlertCircle,
@@ -29,9 +30,6 @@ const STATUS: Record<SupplierBillStatus, { label: string; badge: string }> = {
   overdue: { label: 'Lewat jatuh tempo', badge: 'bg-rose-50 text-rose-700 ring-rose-200' },
   paid: { label: 'Lunas', badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
 };
-
-const formatDate = (d: string | null) =>
-  d ? new Date(`${d.slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 type FormState = { supplier_id: string; bill_number: string; bill_date: string; due_date: string; amount: string; notes: string };
 
@@ -143,7 +141,7 @@ function SupplierBillsContent() {
           <div>
             <div className="flex items-center gap-2">
               <ReceiptText className="h-6 w-6 text-emerald-600" />
-              <h1 className="text-2xl font-bold text-slate-900">Pembelian Barang</h1>
+              <h1 className="text-2xl font-bold text-slate-900">Pembelian</h1>
             </div>
             <p className="mt-1 text-sm text-slate-500">Hutang platform ke supplier: catat tagihan, pantau jatuh tempo, dan tandai lunas.</p>
           </div>

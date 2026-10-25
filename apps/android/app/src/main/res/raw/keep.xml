@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resources looked up only by name at runtime, which the release resource shrinker would
+     otherwise strip. google_sign_in reads default_web_client_id (generated from
+     google-services.json) via getIdentifier; without it Google login returns no idToken. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@string/default_web_client_id" />

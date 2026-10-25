@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { io } from 'next/cache';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { apiRequestFull, ApiError } from '../../../lib/api';
-import { formatDateTime, rupiah, todayWib, TRANSACTION_TYPE_LABEL } from '../../../lib/wallet';
+import { rupiah, TRANSACTION_TYPE_LABEL } from '../../../lib/wallet';
+import { formatDateTime, todayWib } from '../../../lib/date';
 import { PaginationMeta, WalletReport, WalletTransactionRow } from '../../../types';
 import {
   AlertCircle,

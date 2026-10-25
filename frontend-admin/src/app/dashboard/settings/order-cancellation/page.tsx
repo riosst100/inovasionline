@@ -6,7 +6,12 @@ import { adminApi, ApiError } from '../../../../lib/api';
 import { OrderSettings } from '../../../../types';
 import { AlertCircle, CheckCircle2, Loader2, Save } from 'lucide-react';
 
-const DEFAULTS: OrderSettings = { buyer_cancel_window_seconds: 60, paylater_min_transactions: 3, paylater_due_days: 7 };
+const DEFAULTS: OrderSettings = {
+  buyer_cancel_window_seconds: 60,
+  paylater_min_transactions: 3,
+  paylater_due_days: 7,
+  instant_dispatch_minutes: 30,
+};
 
 /** e.g. 90 -> "1 menit 30 detik" */
 function describe(seconds: number): string {
@@ -47,7 +52,9 @@ export default function OrderCancellationPage() {
   const dueDays = form.paylater_due_days;
   const validTx = Number.isInteger(minTx) && minTx >= 0 && minTx <= 1000;
   const validDue = Number.isInteger(dueDays) && dueDays >= 1 && dueDays <= 90;
-  const valid = Number.isInteger(seconds) && seconds >= 0 && seconds <= 86400 && validTx && validDue;
+  const dispatch = form.instant_dispatch_minutes;
+  const validDispatch = Number.isInteger(dispatch) && dispatch >= 5 && dispatch <= 1440;
+  const valid = Number.isInteger(seconds) && seconds >= 0 && seconds <= 86400 && validTx && validDue && validDispatch;
   const dirty = JSON.stringify(form) !== initial;
 
   const save = async () => {
@@ -138,6 +145,38 @@ export default function OrderCancellationPage() {
               <li>Pesanan yang sudah dibayar dikembalikan penuh ke Saldo Belanja pembeli sesuai total yang dibayar.</li>
               <li>Isi 0 untuk menutup pembatalan oleh pembeli begitu pesanan mulai disiapkan.</li>
             </ul>
+          </section>
+        )}
+
+        {!loading && (
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Pesanan Instant</h2>
+              <p className="text-xs text-slate-500">
+                Pesanan tanpa jadwal pengiriman harus dikirim dalam batas waktu ini sejak pesanan dibuat. Panel admin
+                menghitung mundur, memberi peringatan saat waktunya hampir habis, dan berbunyi bila terlambat.
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Batas waktu kirim (menit)</label>
+              <input
+                type="number"
+                min={5}
+                max={1440}
+                step={1}
+                className={input}
+                value={Number.isNaN(dispatch) ? '' : dispatch}
+                onChange={(e) => {
+                  setSuccess(null);
+                  setForm({ ...form, instant_dispatch_minutes: e.target.value === '' ? NaN : Number(e.target.value) });
+                }}
+              />
+              <p className={`mt-1 text-xs ${validDispatch ? 'text-slate-500' : 'text-rose-600'}`}>
+                {validDispatch
+                  ? `Pesanan instan harus dikirim maksimal ${dispatch} menit setelah dibuat.`
+                  : 'Isi angka bulat 5 – 1440 menit.'}
+              </p>
+            </div>
           </section>
         )}
 

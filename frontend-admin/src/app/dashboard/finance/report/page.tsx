@@ -158,7 +158,7 @@ function FinanceReportContent() {
                   </div>
 
                   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="mb-3 font-semibold text-slate-800">Pembelian Barang</h2>
+                    <h2 className="mb-3 font-semibold text-slate-800">Pembelian</h2>
                     <dl className="space-y-2 text-sm">
                       <Line label="Tagihan masuk" value={report?.supplier_bills.billed} />
                       <Line label="Dibayar" value={report && -report.supplier_bills.paid} />

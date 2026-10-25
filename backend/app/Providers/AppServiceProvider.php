@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Events\AdminDataChanged;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -28,6 +29,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Live admin panel (dashboard, instant-order alerts, menu badges): signal which data changed.
+        $topics = [
+            \App\Models\Order::class => AdminDataChanged::ORDERS,
+            \App\Models\WalletTopup::class => AdminDataChanged::DASHBOARD,
+            \App\Models\User::class => AdminDataChanged::DASHBOARD,
+            \App\Models\SupplierBill::class => AdminDataChanged::DASHBOARD,
+            \App\Models\CompanyTransaction::class => AdminDataChanged::DASHBOARD,
+            \App\Models\Product::class => AdminDataChanged::DASHBOARD,
+            \App\Models\Promotion::class => AdminDataChanged::DASHBOARD,
+            \App\Models\Employee::class => AdminDataChanged::DASHBOARD,
+        ];
+        foreach ($topics as $model => $topic) {
+            $model::saved(fn () => AdminDataChanged::signal($topic));
+            $model::deleted(fn () => AdminDataChanged::signal($topic));
+        }
     }
 }

@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { apiRequest, apiRequestFull, ApiError } from '../../../lib/api';
-import { formatDateTime, rupiah, TOPUP_STATUS } from '../../../lib/wallet';
+import { rupiah, TOPUP_STATUS } from '../../../lib/wallet';
+import { formatDateTime } from '../../../lib/date';
 import { PaginationMeta, WalletTopupDetail, WalletTopupRow, WalletTopupStatus, WalletTopupSummary } from '../../../types';
 import {
   AlertCircle,

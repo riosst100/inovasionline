@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../../components/layout/AdminLayout';
+import { formatDate, formatTime, fromWib, sameWibDay, todayWib, wibParts } from '../../../../lib/date';
 import { adminApi, ApiError } from '../../../../lib/api';
 import { FlashSale, FlashSaleStatus, PaginationMeta } from '../../../../types';
 import {
@@ -36,28 +37,10 @@ const FILTERS: { value: '' | FlashSaleStatus; label: string }[] = [
   { value: 'inactive', label: 'Nonaktif' },
 ];
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-/** ISO -> { date: 'YYYY-MM-DD', time: 'HH:mm' } in the admin's local time. */
-function splitLocal(iso: string): { date: string; time: string } {
-  const d = new Date(iso);
-  return {
-    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
-  };
-}
-
-const joinLocal = (date: string, time: string): string => new Date(`${date}T${time}`).toISOString();
-
-const formatSchedule = (startsAt: string, endsAt: string) => {
-  const s = new Date(startsAt);
-  const e = new Date(endsAt);
-  const day = (d: Date) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-  const time = (d: Date) => d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  return s.toDateString() === e.toDateString()
-    ? `${day(s)}, ${time(s)} – ${time(e)}`
-    : `${day(s)} ${time(s)} – ${day(e)} ${time(e)}`;
-};
+const formatSchedule = (startsAt: string, endsAt: string) =>
+  sameWibDay(startsAt, endsAt)
+    ? `${formatDate(startsAt)}, ${formatTime(startsAt)} – ${formatTime(endsAt)}`
+    : `${formatDate(startsAt)} ${formatTime(startsAt)} – ${formatDate(endsAt)} ${formatTime(endsAt)}`;
 
 /** Row from /admin/products used by the picker. */
 type ProductOption = {
@@ -100,7 +83,7 @@ const blankForm: FormState = {
 
 /** Reads the clock, so only call it from event handlers (not during render/prerender). */
 function emptyForm(): FormState {
-  const today = splitLocal(new Date().toISOString()).date;
+  const today = todayWib();
   return {
     name: '',
     start_date: today,
@@ -186,8 +169,8 @@ export default function FlashSalesPage() {
     setLoadingDetail(true);
     try {
       const detail = await adminApi.getFlashSale(item.id);
-      const start = splitLocal(detail.starts_at);
-      const end = splitLocal(detail.ends_at);
+      const start = wibParts(detail.starts_at);
+      const end = wibParts(detail.ends_at);
       setForm({
         name: detail.name,
         start_date: start.date,
@@ -246,8 +229,8 @@ export default function FlashSalesPage() {
     const invalid = form.products.find((p) => p.flash_sale_price === '' || Number(p.flash_sale_price) >= p.regular_price);
     if (invalid) return setFormError(`Harga flash sale ${invalid.name} wajib diisi dan harus lebih murah dari harga normal.`);
 
-    const startsAt = joinLocal(form.start_date, form.start_time);
-    const endsAt = joinLocal(form.end_date, form.end_time);
+    const startsAt = fromWib(form.start_date, form.start_time);
+    const endsAt = fromWib(form.end_date, form.end_time);
     if (new Date(endsAt) <= new Date(startsAt)) return setFormError('Waktu selesai harus setelah waktu mulai.');
 
     setSaving(true);

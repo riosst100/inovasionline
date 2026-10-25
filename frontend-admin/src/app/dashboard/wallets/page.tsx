@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { apiRequest, apiRequestFull, ApiError } from '../../../lib/api';
 import { WalletDetail, WalletRow } from '../../../types';
-import { formatDateTime as formatDate, rupiah, TRANSACTION_TYPE_LABEL as TYPE_LABEL } from '../../../lib/wallet';
+import { rupiah, TRANSACTION_TYPE_LABEL as TYPE_LABEL } from '../../../lib/wallet';
+import { formatDateTime as formatDate } from '../../../lib/date';
 import { AlertCircle, Loader2, Search, Wallet, X } from 'lucide-react';
 
 export default function WalletsPage() {

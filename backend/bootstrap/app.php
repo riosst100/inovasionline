@@ -58,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'not.blocked' => \App\Http\Middleware\EnsureUserNotBlocked::class,
             'admin' =>\App\Http\Middleware\EnsureUserIsAdmin::class,
             'admin.auth' => \App\Http\Middleware\EnsureAdminAuthenticated::class,
+            'menu' => \App\Http\Middleware\EnsureMenuPermission::class,
             'photographer' => \App\Http\Middleware\EnsureUserIsPhotographer::class,
         ]);
     })

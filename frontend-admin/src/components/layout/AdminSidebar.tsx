@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { useInstantOrders } from '../../lib/instantOrders';
 import {
   LayoutDashboard,
   ShieldCheck,
@@ -14,7 +15,6 @@ import {
   FolderTree,
   ShoppingBag,
   ListChecks,
-  LogOut,
   Truck,
   Package,
   Warehouse,
@@ -61,143 +61,193 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-type NavItem = {
-  name: string;
-  href: string;
-  icon: React.ElementType;
+type NavLink = { name: string; href: string; icon: React.ElementType; perm?: string };
+
+type NavItem = NavLink & {
   badge?: string;
-  children?: { name: string; href: string; icon: React.ElementType }[];
+  children?: NavLink[];
 };
 
 type NavSection = { title: string; items: NavItem[] };
 
+/** `perm` is the menu key in the backend's AdminMenu; its view permission shows the link and opens the page. */
+export const NAV_SECTIONS: NavSection[] = [
+  {
+    title: 'Utama',
+    items: [
+      { name: 'Ringkasan Dashboard', href: '/dashboard', icon: LayoutDashboard, perm: 'dashboard' },
+      { name: 'Pesanan', href: '/dashboard/orders', icon: ShoppingBag, perm: 'orders' },
+      { name: 'Jadwal Pengiriman', href: '/dashboard/delivery-schedules', icon: CalendarClock, perm: 'delivery_schedules' },
+      { name: 'Verifikasi Pengguna', href: '/dashboard/cod-verifications', icon: ScanFace, perm: 'cod_verifications' },
+    ],
+  },
+  {
+    title: 'Operasional',
+    items: [
+      { name: 'Pengguna', href: '/dashboard/customers', icon: Users2, perm: 'customers' },
+      {
+        name: 'Saldo Belanja',
+        href: '/dashboard/wallet',
+        icon: Wallet,
+        children: [
+          { name: 'Saldo Pengguna', href: '/dashboard/wallets', icon: Coins, perm: 'wallets' },
+          { name: 'Top Up Saldo', href: '/dashboard/wallet-topups', icon: ArrowUpCircle, perm: 'wallet_topups' },
+        ],
+      },
+      {
+        name: 'Master Data',
+        href: '/dashboard/master-data',
+        icon: Database,
+        children: [
+          { name: 'Produk', href: '/dashboard/products', icon: Package, perm: 'products' },
+          { name: 'Kategori', href: '/dashboard/categories', icon: FolderTree, perm: 'categories' },
+          { name: 'Atribut Produk', href: '/dashboard/attributes', icon: SlidersHorizontal, perm: 'attributes' },
+          { name: 'Supplier', href: '/dashboard/master-data/suppliers', icon: Building2, perm: 'suppliers' },
+          { name: 'Brand', href: '/dashboard/master-data/brands', icon: Award, perm: 'brands' },
+          { name: 'Gudang', href: '/dashboard/warehouses', icon: Warehouse, perm: 'warehouses' },
+          { name: 'Kurir', href: '/dashboard/drivers', icon: Bike, perm: 'drivers' },
+        ],
+      },
+      {
+        name: 'Laporan',
+        href: '/dashboard/reports',
+        icon: FileBarChart,
+        children: [
+          { name: 'Stok Produk', href: '/dashboard/product-stocks', icon: PackageSearch, perm: 'product_stocks' },
+          { name: 'Kueri Pencarian', href: '/dashboard/search/suggestions', icon: TextSearch, perm: 'search_suggestions' },
+          { name: 'Laporan Saldo Belanja', href: '/dashboard/wallet-report', icon: Wallet, perm: 'wallet_report' },
+        ],
+      },
+      {
+        name: 'Tampilan',
+        href: '/dashboard/display',
+        icon: LayoutTemplate,
+        children: [{ name: 'Banner', href: '/dashboard/banners', icon: ImageIcon, perm: 'banners' }],
+      },
+      {
+        name: 'Promosi',
+        href: '/dashboard/promotions',
+        icon: Megaphone,
+        children: [
+          { name: 'Voucher', href: '/dashboard/promotions/vouchers', icon: Ticket, perm: 'vouchers' },
+          { name: 'Diskon', href: '/dashboard/promotions/discounts', icon: Percent, perm: 'discounts' },
+          { name: 'Flash Sale', href: '/dashboard/promotions/flash-sales', icon: Zap, perm: 'flash_sales' },
+          { name: 'Gratis Ongkir', href: '/dashboard/promotions/free-shipping', icon: Truck, perm: 'free_shipping' },
+          { name: 'Bonus Saldo Belanja', href: '/dashboard/promotions/wallet-bonus', icon: Gift, perm: 'wallet_bonus' },
+        ],
+      },
+      {
+        name: 'Iklan',
+        href: '/dashboard/ads',
+        icon: BadgeDollarSign,
+        children: [
+          { name: 'Iklan Produk', href: '/dashboard/ads/products', icon: PackageOpen, perm: 'product_ads' },
+          { name: 'Adsense / Admob', href: '/dashboard/ads/adsense', icon: Code, perm: 'admob' },
+          { name: 'Peti Hadiah', href: '/dashboard/ads/reward-chest', icon: Gift, perm: 'reward_chest' },
+        ],
+      },
+      {
+        name: 'Pengaturan',
+        href: '/dashboard/settings',
+        icon: Settings,
+        children: [
+          { name: 'Cakupan Kota', href: '/dashboard/settings/service-cities', icon: MapPinned, perm: 'service_cities' },
+          { name: 'Biaya Layanan', href: '/dashboard/settings/service-fee', icon: Receipt, perm: 'service_fee' },
+          { name: 'Badge Menu', href: '/dashboard/settings/nav-badge', icon: Tag, perm: 'nav_badge' },
+          { name: 'Update Aplikasi', href: '/dashboard/settings/app-update', icon: Smartphone, perm: 'app_update' },
+          { name: 'Status Pesanan', href: '/dashboard/order-statuses', icon: ListChecks, perm: 'order_statuses' },
+          { name: 'Metode Pengiriman', href: '/dashboard/shipping-methods', icon: PackageCheck, perm: 'shipping_methods' },
+          { name: 'Pembatalan Pesanan', href: '/dashboard/settings/order-cancellation', icon: Timer, perm: 'order_cancellation' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Perusahaan',
+    items: [
+      { name: 'Karyawan', href: '/dashboard/employees', icon: IdCard, perm: 'employees' },
+      { name: 'Pembelian', href: '/dashboard/finance/bills', icon: ReceiptText, perm: 'purchases' },
+      {
+        name: 'Keuangan',
+        href: '/dashboard/finance',
+        icon: Landmark,
+        children: [
+          { name: 'Cashflow', href: '/dashboard/finance/cashflow', icon: Scale, perm: 'cashflow' },
+          { name: 'Laporan Keuangan', href: '/dashboard/finance/report', icon: FileBarChart, perm: 'finance_report' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Admin',
+    items: [
+      { name: 'User', href: '/dashboard/users', icon: UserCog, perm: 'users' },
+      { name: 'Hak Akses & Role', href: '/dashboard/roles', icon: ShieldCheck, perm: 'roles' },
+      { name: 'Sesi & Perangkat', href: '/dashboard/sessions', icon: MonitorSmartphone },
+    ],
+  },
+  {
+    title: 'Data',
+    items: [{ name: 'Import / Export', href: '/dashboard/data-transfers', icon: ArrowDownUp, perm: 'data_transfers' }],
+  },
+];
+
+const isLinkActive = (pathname: string, href: string) =>
+  href === '/dashboard' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+
+const NAV_LINKS: NavLink[] = NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => i.children ?? [i]));
+
+/** Menu key guarding a dashboard URL (most specific link wins), or null when the page needs no menu permission. */
+export function menuForPath(pathname: string): string | null {
+  const match = NAV_LINKS.filter((l) => l.perm && isLinkActive(pathname, l.href)).sort(
+    (a, b) => b.href.length - a.href.length,
+  )[0];
+  return match?.perm ?? null;
+}
+
+/** Sidebar URL of a menu key. */
+export function hrefForMenu(menu: string): string | null {
+  return NAV_LINKS.find((l) => l.perm === menu)?.href ?? null;
+}
+
+/** First page the user may open, used when they land on one they can't. */
+export function firstAllowedHref(canView: (menu: string) => boolean): string | null {
+  return NAV_LINKS.find((l) => l.perm && canView(l.perm))?.href ?? null;
+}
+
+/** Live count of unfinished orders on the Pesanan link (only rendered for roles that see Pesanan). */
+function OpenOrdersBadge() {
+  const { queue } = useInstantOrders();
+  if (!queue || queue.open === 0) return null;
+  const urgent = queue.unpacked > 0;
+
+  return (
+    <span
+      title={`${queue.open} pesanan belum selesai`}
+      className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums ${
+        urgent ? 'animate-pulse bg-rose-500 text-white' : 'bg-amber-400 text-slate-950'
+      }`}
+    >
+      {queue.open > 99 ? '99+' : queue.open}
+    </span>
+  );
+}
+
+function visibleSections(canView: (menu: string) => boolean): NavSection[] {
+  const allowed = (l: NavLink) => !l.perm || canView(l.perm);
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items
+      .map((item) => (item.children ? { ...item, children: item.children.filter(allowed) } : item))
+      .filter((item) => (item.children ? item.children.length > 0 : allowed(item))),
+  })).filter((section) => section.items.length > 0);
+}
+
 export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user, isSuperAdmin, logout } = useAuth();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-
-  const sections: NavSection[] = [
-    {
-      title: 'Utama',
-      items: [
-        { name: 'Ringkasan Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Pesanan', href: '/dashboard/orders', icon: ShoppingBag },
-        { name: 'Jadwal Pengiriman', href: '/dashboard/delivery-schedules', icon: CalendarClock },
-        { name: 'Verifikasi Pengguna', href: '/dashboard/cod-verifications', icon: ScanFace },
-      ],
-    },
-    {
-      title: 'Operasional',
-      items: [
-        { name: 'Pengguna', href: '/dashboard/customers', icon: Users2 },
-        {
-          name: 'Saldo Belanja',
-          href: '/dashboard/wallet',
-          icon: Wallet,
-          children: [
-            { name: 'Saldo Pengguna', href: '/dashboard/wallets', icon: Coins },
-            { name: 'Top Up Saldo', href: '/dashboard/wallet-topups', icon: ArrowUpCircle },
-          ],
-        },
-        {
-          name: 'Master Data',
-          href: '/dashboard/master-data',
-          icon: Database,
-          children: [
-            { name: 'Produk', href: '/dashboard/products', icon: Package },
-            { name: 'Kategori', href: '/dashboard/categories', icon: FolderTree },
-            { name: 'Atribut Produk', href: '/dashboard/attributes', icon: SlidersHorizontal },
-            { name: 'Supplier', href: '/dashboard/master-data/suppliers', icon: Building2 },
-            { name: 'Brand', href: '/dashboard/master-data/brands', icon: Award },
-            { name: 'Gudang', href: '/dashboard/warehouses', icon: Warehouse },
-            { name: 'Kurir', href: '/dashboard/drivers', icon: Bike },
-          ],
-        },
-        {
-          name: 'Laporan',
-          href: '/dashboard/reports',
-          icon: FileBarChart,
-          children: [
-            { name: 'Stok Produk', href: '/dashboard/product-stocks', icon: PackageSearch },
-            { name: 'Kueri Pencarian', href: '/dashboard/search/suggestions', icon: TextSearch },
-            { name: 'Laporan Saldo Belanja', href: '/dashboard/wallet-report', icon: Wallet },
-          ],
-        },
-        {
-          name: 'Tampilan',
-          href: '/dashboard/display',
-          icon: LayoutTemplate,
-          children: [{ name: 'Banner', href: '/dashboard/banners', icon: ImageIcon }],
-        },
-        {
-          name: 'Promosi',
-          href: '/dashboard/promotions',
-          icon: Megaphone,
-          children: [
-            { name: 'Voucher', href: '/dashboard/promotions/vouchers', icon: Ticket },
-            { name: 'Diskon', href: '/dashboard/promotions/discounts', icon: Percent },
-            { name: 'Flash Sale', href: '/dashboard/promotions/flash-sales', icon: Zap },
-            { name: 'Gratis Ongkir', href: '/dashboard/promotions/free-shipping', icon: Truck },
-            { name: 'Bonus Saldo Belanja', href: '/dashboard/promotions/wallet-bonus', icon: Gift },
-          ],
-        },
-        {
-          name: 'Iklan',
-          href: '/dashboard/ads',
-          icon: BadgeDollarSign,
-          children: [
-            { name: 'Iklan Produk', href: '/dashboard/ads/products', icon: PackageOpen },
-            { name: 'Adsense / Admob', href: '/dashboard/ads/adsense', icon: Code },
-            { name: 'Peti Hadiah', href: '/dashboard/ads/reward-chest', icon: Gift },
-          ],
-        },
-        {
-          name: 'Pengaturan',
-          href: '/dashboard/settings',
-          icon: Settings,
-          children: [
-            { name: 'Cakupan Kota', href: '/dashboard/settings/service-cities', icon: MapPinned },
-            { name: 'Biaya Layanan', href: '/dashboard/settings/service-fee', icon: Receipt },
-            { name: 'Badge Menu', href: '/dashboard/settings/nav-badge', icon: Tag },
-            { name: 'Update Aplikasi', href: '/dashboard/settings/app-update', icon: Smartphone },
-            { name: 'Status Pesanan', href: '/dashboard/order-statuses', icon: ListChecks },
-            { name: 'Metode Pengiriman', href: '/dashboard/shipping-methods', icon: PackageCheck },
-            { name: 'Pembatalan Pesanan', href: '/dashboard/settings/order-cancellation', icon: Timer },
-          ],
-        },
-      ],
-    },
-    {
-      title: 'Perusahaan',
-      items: [
-        { name: 'Karyawan', href: '/dashboard/employees', icon: IdCard },
-        { name: 'Pembelian Barang', href: '/dashboard/finance/bills', icon: ReceiptText },
-        {
-          name: 'Keuangan',
-          href: '/dashboard/finance',
-          icon: Landmark,
-          children: [
-            { name: 'Cashflow', href: '/dashboard/finance/cashflow', icon: Scale },
-            { name: 'Laporan Keuangan', href: '/dashboard/finance/report', icon: FileBarChart },
-          ],
-        },
-      ],
-    },
-    {
-      title: 'Admin',
-      items: [
-        { name: 'User', href: '/dashboard/users', icon: UserCog },
-        { name: 'Hak Akses & Role', href: '/dashboard/roles', icon: ShieldCheck },
-        { name: 'Sesi & Perangkat', href: '/dashboard/sessions', icon: MonitorSmartphone },
-      ],
-    },
-    {
-      title: 'Data',
-      items: [{ name: 'Import / Export', href: '/dashboard/data-transfers', icon: ArrowDownUp }],
-    },
-  ];
-
-  const roleName = user?.role?.name || (isSuperAdmin ? 'Super Admin' : 'Staff');
+  const { canView } = useAuth();
+  const sections = visibleSections(canView);
 
   return (
     <>
@@ -326,10 +376,14 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
                         />
                         <span>{item.name}</span>
                       </div>
-                      {item.badge && (
-                        <span className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                          {item.badge}
-                        </span>
+                      {item.perm === 'orders' ? (
+                        <OpenOrdersBadge />
+                      ) : (
+                        item.badge && (
+                          <span className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                            {item.badge}
+                          </span>
+                        )
                       )}
                     </Link>
                   );
@@ -337,32 +391,6 @@ export default function AdminSidebar({ isOpen, onClose }: SidebarProps) {
               </nav>
             </div>
           ))}
-        </div>
-
-        {/* User */}
-        <div className="relative shrink-0 border-t border-white/5 p-3">
-          <div className="flex items-center justify-between gap-3 rounded-xl bg-white/5 p-2.5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-xs font-bold text-white">
-                {user?.name?.slice(0, 2).toUpperCase() || 'SA'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-white">{user?.name || 'Super Admin'}</p>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  <span className="truncate text-[11px] text-slate-400">{roleName}</span>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => logout()}
-              title="Keluar dari akun admin"
-              aria-label="Keluar"
-              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-rose-500/15 hover:text-rose-400"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
         </div>
       </aside>
     </>

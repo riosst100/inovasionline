@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { useAuth } from '../../../context/AuthContext';
 import { adminApi } from '../../../lib/api';
-import { Role, PermissionGroups } from '../../../types';
+import { Role, PermissionCatalog, PermissionMenu } from '../../../types';
 import {
   ShieldCheck,
   Plus,
@@ -17,13 +17,23 @@ import {
   Lock,
   Layers,
   Sparkles,
-  Info
 } from 'lucide-react';
 
+const EMPTY_CATALOG: PermissionCatalog = { sections: [], extras: [] };
+
+/** Every grantable key, used to expand "*" when a full-access role is narrowed down. */
+function allKeys(catalog: PermissionCatalog): string[] {
+  return [
+    ...catalog.sections.flatMap((s) => s.menus.flatMap((m) => (m.manage ? [`${m.key}.view`, `${m.key}.manage`] : [`${m.key}.view`]))),
+    ...catalog.extras.map((e) => e.key),
+  ];
+}
+
 export default function RolesManagementPage() {
-  const { isSuperAdmin } = useAuth();
+  const { canManage } = useAuth();
+  const editable = canManage('roles');
   const [roles, setRoles] = useState<Role[]>([]);
-  const [permissionGroups, setPermissionGroups] = useState<PermissionGroups>({});
+  const [catalog, setCatalog] = useState<PermissionCatalog>(EMPTY_CATALOG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -50,7 +60,7 @@ export default function RolesManagementPage() {
         adminApi.getAvailablePermissions(),
       ]);
       setRoles(rolesRes);
-      setPermissionGroups(permsRes);
+      setCatalog(permsRes);
     } catch (err: any) {
       setError(err?.message || 'Gagal memuat data role.');
     } finally {
@@ -84,29 +94,57 @@ export default function RolesManagementPage() {
     setIsModalOpen(true);
   };
 
-  const handleTogglePermission = (permKey: string) => {
+  const fullAccess = formData.permissions.includes('*');
+  const has = (key: string) => fullAccess || formData.permissions.includes(key);
+  const viewing = (menu: string) => has(`${menu}.view`) || has(`${menu}.manage`);
+
+  /** Applies a change to the permission list, expanding "*" first so narrowing a full-access role keeps the rest. */
+  const updatePermissions = (change: (perms: Set<string>) => void) => {
     setFormData((prev) => {
-      const exists = prev.permissions.includes(permKey);
-      const updated = exists
-        ? prev.permissions.filter((k) => k !== permKey && k !== '*')
-        : [...prev.permissions.filter((k) => k !== '*'), permKey];
-      return { ...prev, permissions: updated };
+      const perms = new Set(prev.permissions.includes('*') ? allKeys(catalog) : prev.permissions);
+      change(perms);
+      return { ...prev, permissions: Array.from(perms) };
     });
   };
 
-  const handleToggleGroup = (groupKeys: string[]) => {
-    setFormData((prev) => {
-      const allSelected = groupKeys.every((k) => prev.permissions.includes(k) || prev.permissions.includes('*'));
-      let updated: string[];
-      if (allSelected) {
-        updated = prev.permissions.filter((k) => !groupKeys.includes(k) && k !== '*');
+  // Lihat off also drops Kelola; Kelola on also grants Lihat.
+  const toggleView = (menu: string) =>
+    updatePermissions((perms) => {
+      if (viewing(menu)) {
+        perms.delete(`${menu}.view`);
+        perms.delete(`${menu}.manage`);
       } else {
-        const set = new Set([...prev.permissions.filter((k) => k !== '*'), ...groupKeys]);
-        updated = Array.from(set);
+        perms.add(`${menu}.view`);
       }
-      return { ...prev, permissions: updated };
     });
+
+  const toggleManage = (menu: string) =>
+    updatePermissions((perms) => {
+      if (has(`${menu}.manage`)) {
+        perms.delete(`${menu}.manage`);
+      } else {
+        perms.add(`${menu}.view`);
+        perms.add(`${menu}.manage`);
+      }
+    });
+
+  const toggleExtra = (key: string) =>
+    updatePermissions((perms) => (has(key) ? perms.delete(key) : perms.add(key)));
+
+  const sectionKeys = (menus: PermissionMenu[]) =>
+    menus.flatMap((m) => (m.manage ? [`${m.key}.view`, `${m.key}.manage`] : [`${m.key}.view`]));
+
+  const toggleSection = (menus: PermissionMenu[]) => {
+    const keys = sectionKeys(menus);
+    const all = keys.every(has);
+    updatePermissions((perms) => keys.forEach((k) => (all ? perms.delete(k) : perms.add(k))));
   };
+
+  /** Menus a saved role can open, for the table. */
+  const menuCount = (perms: string[]) =>
+    catalog.sections
+      .flatMap((s) => s.menus)
+      .filter((m) => perms.includes(`${m.key}.view`) || perms.includes(`${m.key}.manage`)).length;
 
   const handleSelectAllPermissions = () => {
     if (formData.permissions.includes('*')) {
@@ -179,13 +217,15 @@ export default function RolesManagementPage() {
             </p>
           </div>
 
-          <button
-            onClick={openCreateModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Tambah Role Baru</span>
-          </button>
+          {editable && (
+            <button
+              onClick={openCreateModal}
+              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Tambah Role Baru</span>
+            </button>
+          )}
         </div>
 
         {/* Alerts */}
@@ -269,7 +309,7 @@ export default function RolesManagementPage() {
                           </span>
                         ) : (
                           <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                            {role.permissions?.length || 0} hak akses
+                            {menuCount(role.permissions || [])} menu
                           </span>
                         )}
                       </td>
@@ -288,7 +328,7 @@ export default function RolesManagementPage() {
                         )}
                       </td>
                       <td className="py-4 px-5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        {editable && <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => openEditModal(role)}
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
@@ -306,7 +346,7 @@ export default function RolesManagementPage() {
                               <Trash2 className="h-4 w-4" />
                             </button>
                           )}
-                        </div>
+                        </div>}
                       </td>
                     </tr>
                   ))
@@ -386,10 +426,10 @@ export default function RolesManagementPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-bold text-slate-900">
-                        Matriks Hak Akses (Permissions)
+                        Hak Akses per Menu
                       </h4>
                       <p className="text-xs text-slate-500">
-                        Centang fitur yang boleh diakses oleh pengguna dengan role ini
+                        <b>Lihat</b>: menu tampil & halaman bisa dibuka. <b>Kelola</b>: bisa tambah, ubah, dan hapus.
                       </p>
                     </div>
 
@@ -409,63 +449,85 @@ export default function RolesManagementPage() {
                     </div>
                   )}
 
-                  <div className="space-y-4 max-h-72 overflow-y-auto pr-2 divide-y divide-slate-100">
-                    {Object.entries(permissionGroups).map(([moduleKey, group]) => {
-                      const groupKeys = group.items.map((i) => i.key);
-                      const isGroupAllSelected = groupKeys.every(
-                        (k) => formData.permissions.includes(k) || formData.permissions.includes('*')
-                      );
-
-                      return (
-                        <div key={moduleKey} className="pt-3 first:pt-0 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-800">
-                              {group.title}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleGroup(groupKeys)}
-                              className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700"
-                            >
-                              {isGroupAllSelected ? 'Batal Semua' : 'Pilih Grup Ini'}
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {group.items.map((item) => {
-                              const checked =
-                                formData.permissions.includes(item.key) ||
-                                formData.permissions.includes('*');
-
-                              return (
-                                <label
-                                  key={item.key}
-                                  className={`flex items-start gap-2.5 rounded-xl border p-2.5 text-xs cursor-pointer transition-all ${
-                                    checked
-                                      ? 'border-emerald-300 bg-emerald-50/40 text-emerald-950 font-medium'
-                                      : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:border-slate-300'
-                                  }`}
-                                >
+                  <div className="max-h-[26rem] overflow-y-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-left text-xs">
+                      <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        <tr>
+                          <th className="py-2.5 px-3">Menu</th>
+                          <th className="w-20 py-2.5 px-3 text-center">Lihat</th>
+                          <th className="w-20 py-2.5 px-3 text-center">Kelola</th>
+                        </tr>
+                      </thead>
+                      {catalog.sections.map((section) => {
+                        const allSelected = sectionKeys(section.menus).every(has);
+                        return (
+                          <tbody key={section.title} className="divide-y divide-slate-100 border-t border-slate-200">
+                            <tr className="bg-slate-50/60">
+                              <td colSpan={3} className="py-2 px-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-800">{section.title}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSection(section.menus)}
+                                    className="text-[11px] font-semibold text-emerald-600 hover:text-emerald-700"
+                                  >
+                                    {allSelected ? 'Batal Semua' : 'Pilih Semua'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            {section.menus.map((menu) => (
+                              <tr key={menu.key} className={viewing(menu.key) ? 'bg-emerald-50/30' : ''}>
+                                <td className="py-2 px-3 text-slate-700">
+                                  {menu.group && <span className="text-slate-400">{menu.group} › </span>}
+                                  <span className="font-medium">{menu.label}</span>
+                                </td>
+                                <td className="py-2 px-3 text-center">
                                   <input
                                     type="checkbox"
-                                    checked={checked}
-                                    onChange={() => handleTogglePermission(item.key)}
-                                    className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                                    aria-label={`Lihat ${menu.label}`}
+                                    checked={viewing(menu.key)}
+                                    onChange={() => toggleView(menu.key)}
+                                    className="rounded text-emerald-600 focus:ring-emerald-500"
                                   />
-                                  <div className="flex flex-col">
-                                    <span>{item.label}</span>
-                                    <span className="font-mono text-[10px] text-slate-400">
-                                      {item.key}
-                                    </span>
-                                  </div>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  {menu.manage ? (
+                                    <input
+                                      type="checkbox"
+                                      aria-label={`Kelola ${menu.label}`}
+                                      checked={has(`${menu.key}.manage`)}
+                                      onChange={() => toggleManage(menu.key)}
+                                      className="rounded text-emerald-600 focus:ring-emerald-500"
+                                    />
+                                  ) : (
+                                    <span className="text-slate-300" title="Halaman ini hanya untuk dilihat">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        );
+                      })}
+                    </table>
                   </div>
+
+                  {catalog.extras.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-slate-800">Lainnya</span>
+                      {catalog.extras.map((extra) => (
+                        <label key={extra.key} className="flex items-center gap-2.5 text-xs text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={has(extra.key)}
+                            onChange={() => toggleExtra(extra.key)}
+                            className="rounded text-emerald-600 focus:ring-emerald-500"
+                          />
+                          {extra.label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Modal Footer */}

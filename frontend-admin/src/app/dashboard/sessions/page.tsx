@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatDateTime } from '../../../lib/date';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { useAuth } from '../../../context/AuthContext';
 import { adminApi, ApiError } from '../../../lib/api';
@@ -131,7 +132,7 @@ export default function AdminSessionsPage() {
                     </p>
                     <p className="text-xs text-slate-400">
                       Login{' '}
-                      {s.created_at ? new Date(s.created_at).toLocaleString('id-ID') : '-'}
+                      {formatDateTime(s.created_at)}
                     </p>
                   </div>
                   <button

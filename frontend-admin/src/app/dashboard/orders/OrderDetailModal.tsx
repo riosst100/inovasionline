@@ -5,7 +5,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, QrCode, X } from 'lucide-react';
 import { apiRequest } from '../../../lib/api';
 import { useLabels } from '../../../lib/labels';
-import { useOrderTabs, PAYMENT_LABELS, formatDateTime, rupiah } from './orderShared';
+import { useOrderTabs, PAYMENT_LABELS, rupiah } from './orderShared';
+import { formatDateTime } from '../../../lib/date';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (

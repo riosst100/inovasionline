@@ -14,6 +14,7 @@ use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -55,7 +56,7 @@ class FinanceController extends Controller
             ', [PaymentStatus::PAID->value, PaymentStatus::UNPAID->value, PaymentStatus::REFUNDED->value])
             ->first();
 
-        $profit = $this->profitTotals($from, $to);
+        $profit = self::profitTotals($from, $to);
         $shipping = (float) $orders->shipping;
         $serviceFee = (float) $orders->service_fee;
         $grossIncome = $profit['gross_profit'] + $shipping + $serviceFee;
@@ -170,14 +171,30 @@ class FinanceController extends Controller
         return ApiResponse::success([
             'period' => $period,
             'group' => $group,
-            'totals' => $this->profitTotals($from, $to),
+            'totals' => self::profitTotals($from, $to),
             'rows' => $rows,
             'row_limit' => self::PROFIT_ROW_LIMIT,
         ], 'Profit report retrieved successfully.');
     }
 
+    /**
+     * Laba bersih as in report()'s income statement: gross profit + shipping + service fees
+     * + other income − operating costs. Used by the dashboard overview.
+     */
+    public static function netIncome(Carbon $from, Carbon $to, string $fromDate, string $toDate): float
+    {
+        $fees = (float) Order::query()
+            ->where('created_at', '>=', $from)
+            ->where('created_at', '<', $to)
+            ->where('status', '!=', OrderStatus::CANCELLED)
+            ->sum(DB::raw('coalesce(shipping_fee, 0) + coalesce(service_fee, 0)'));
+        $manual = CompanyTransactionController::manualTotals($fromDate, $toDate);
+
+        return self::profitTotals($from, $to)['gross_profit'] + $fees + $manual['income'] - $manual['expense'];
+    }
+
     /** Same formula as Dashboard > Laporan penjualan: goods sold − order discounts − HPP. */
-    private function profitTotals(Carbon $from, Carbon $to): array
+    public static function profitTotals(Carbon $from, Carbon $to): array
     {
         $items = SoldItems::query($from, $to)
             ->toBase()

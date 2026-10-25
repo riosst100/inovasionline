@@ -13,6 +13,9 @@ interface AuthContextType {
   updateUser: (user: AdminUser) => void;
   isSuperAdmin: boolean;
   hasPermission: (permissionKey: string) => boolean;
+  /** Admin menu (AdminMenu key) access: view opens the page, manage implies view. */
+  canView: (menu: string) => boolean;
+  canManage: (menu: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -74,6 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return perms.includes('*') || perms.includes(permissionKey);
   };
 
+  const canManage = (menu: string): boolean => hasPermission(`${menu}.manage`);
+  const canView = (menu: string): boolean => hasPermission(`${menu}.view`) || canManage(menu);
+
   return (
     <AuthContext.Provider
       value={{
@@ -85,6 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateUser,
         isSuperAdmin: !!isSuperAdmin,
         hasPermission,
+        canView,
+        canManage,
       }}
     >
       {children}

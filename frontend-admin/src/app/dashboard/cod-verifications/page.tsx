@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { apiRequest, apiRequestFull, ApiError } from '../../../lib/api';
-import { formatDateTime } from '../../../lib/wallet';
+import { formatDateTime } from '../../../lib/date';
 import { CodVerificationRow, CodVerificationStatus, PaginationMeta } from '../../../types';
 import { AlertCircle, ChevronLeft, ChevronRight, Filter, Loader2, ScanFace, Search, ShieldOff, X } from 'lucide-react';
 

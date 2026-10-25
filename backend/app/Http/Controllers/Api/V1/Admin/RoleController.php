@@ -4,77 +4,21 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Role;
+use App\Support\Permissions\AdminMenu;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class RoleController extends Controller
 {
     /**
-     * Get list of all available system permissions grouped by module.
+     * Grantable permissions: a view/manage pair per admin menu (see AdminMenu) plus extras.
      */
     public function availablePermissions(): JsonResponse
     {
-        $permissions = [
-            'dashboard' => [
-                'title' => 'Dashboard & Analitik',
-                'items' => [
-                    ['key' => 'dashboard.view', 'label' => 'Lihat Dashboard & Ringkasan Metrik'],
-                ],
-            ],
-            'users' => [
-                'title' => 'Manajemen Pengguna',
-                'items' => [
-                    ['key' => 'users.view', 'label' => 'Lihat Data Pengguna'],
-                    ['key' => 'users.manage', 'label' => 'Buat & Kelola Admin / Staff'],
-                ],
-            ],
-            'roles' => [
-                'title' => 'Manajemen Role',
-                'items' => [
-                    ['key' => 'roles.view', 'label' => 'Lihat Daftar Role'],
-                    ['key' => 'roles.manage', 'label' => 'Buat, Ubah, & Hapus Hak Akses Role'],
-                ],
-            ],
-            'catalog' => [
-                'title' => 'Katalog & Produk',
-                'items' => [
-                    ['key' => 'catalog.view', 'label' => 'Lihat Daftar Produk & Kategori'],
-                    ['key' => 'catalog.manage', 'label' => 'Tambah & Kelola Produk / Kategori'],
-                ],
-            ],
-            'orders' => [
-                'title' => 'Pesanan & Transaksi',
-                'items' => [
-                    ['key' => 'orders.view', 'label' => 'Lihat Daftar Pesanan'],
-                    ['key' => 'orders.manage', 'label' => 'Kelola Status Pesanan & Pembatalan'],
-                ],
-            ],
-            'delivery' => [
-                'title' => 'Logistik & Driver',
-                'items' => [
-                    ['key' => 'delivery.view', 'label' => 'Lihat Antrean Pengiriman'],
-                    ['key' => 'delivery.update', 'label' => 'Update Status Pengantaran Kurir'],
-                ],
-            ],
-            'promotions' => [
-                'title' => 'Promosi & Banner',
-                'items' => [
-                    ['key' => 'banners.manage', 'label' => 'Kelola Banner Slider Promo'],
-                    ['key' => 'flash_sale.manage', 'label' => 'Kelola Slot Flash Sale'],
-                    ['key' => 'notifications.broadcast', 'label' => 'Kirim Broadcast Notifikasi'],
-                ],
-            ],
-            'settings' => [
-                'title' => 'Pengaturan & Logistik',
-                'items' => [
-                    ['key' => 'settings.manage', 'label' => 'Kelola Tarif Ongkir & Payment Gateway'],
-                ],
-            ],
-        ];
-
-        return ApiResponse::success($permissions, 'Available permissions retrieved successfully.');
+        return ApiResponse::success(AdminMenu::catalog(), 'Available permissions retrieved successfully.');
     }
 
     public function index(Request $request): JsonResponse
@@ -95,7 +39,7 @@ class RoleController extends Controller
             'slug' => 'nullable|string|max:100|unique:roles,slug',
             'description' => 'nullable|string|max:255',
             'permissions' => 'nullable|array',
-            'permissions.*' => 'string',
+            'permissions.*' => ['string', Rule::in(['*', ...AdminMenu::permissionKeys()])],
         ]);
 
         $slug = !empty($validated['slug'])
@@ -129,7 +73,7 @@ class RoleController extends Controller
             'name' => 'required|string|max:100',
             'description' => 'nullable|string|max:255',
             'permissions' => 'nullable|array',
-            'permissions.*' => 'string',
+            'permissions.*' => ['string', Rule::in(['*', ...AdminMenu::permissionKeys()])],
         ]);
 
         $role->name = $validated['name'];

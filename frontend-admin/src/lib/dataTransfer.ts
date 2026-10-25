@@ -28,11 +28,6 @@ export const STATUS_META: Record<DataTransferStatus, { label: string; badge: str
 export const isActiveTransfer = (t: Pick<DataTransfer, 'status'>) =>
   t.status === 'pending' || t.status === 'processing';
 
-export const formatDateTime = (iso: string | null) =>
-  iso
-    ? new Date(iso).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : '-';
-
 export type DataTransferQuery = {
   resource?: string;
   type?: DataTransferType | '';

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { formatDateTime, formatTime } from '../../../lib/date';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi } from '../../../lib/api';
 import { Driver, DriverOrder } from '../../../types';
@@ -510,17 +511,11 @@ export default function DriversPage() {
                         <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3.5 w-3.5" />
-                            <span>Order: {new Date(order.created_at).toLocaleDateString('id-ID', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}</span>
+                            <span>Order: {formatDateTime(order.created_at)}</span>
                           </div>
                           {order.completed_at && (
                             <span className="text-emerald-600 font-semibold">
-                              Selesai: {new Date(order.completed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                              Selesai: {formatTime(order.completed_at)}
                             </span>
                           )}
                         </div>

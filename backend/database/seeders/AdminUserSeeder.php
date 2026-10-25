@@ -39,11 +39,9 @@ class AdminUserSeeder extends Seeder
                 'permissions' => [
                     'dashboard.view',
                     'users.view',
-                    'catalog.view',
-                    'catalog.manage',
                     'orders.view',
                     'orders.manage',
-                    'banners.manage',
+                    ...self::viewAndManage(['products', 'categories', 'attributes', 'suppliers', 'brands', 'warehouses', 'product_stocks', 'banners']),
                 ],
                 'is_system' => true,
             ]
@@ -58,8 +56,9 @@ class AdminUserSeeder extends Seeder
                     'dashboard.view',
                     'orders.view',
                     'orders.manage',
-                    'catalog.view',
-                    'promotions.manage',
+                    'products.view',
+                    'categories.view',
+                    ...self::viewAndManage(['vouchers', 'discounts', 'flash_sales', 'free_shipping', 'wallet_bonus']),
                 ],
                 'is_system' => false,
             ]
@@ -72,7 +71,6 @@ class AdminUserSeeder extends Seeder
                 'description' => 'Petugas kurir pengantaran barang dan update status ekspedisi pengiriman.',
                 'permissions' => [
                     'orders.view',
-                    'delivery.view',
                     'delivery.update',
                 ],
                 'is_system' => false,
@@ -165,5 +163,11 @@ class AdminUserSeeder extends Seeder
         }
 
         $this->command?->info("Default roles, Super Admin, and drivers seeded successfully.");
+    }
+
+    /** View + manage permissions for admin menus (see AdminMenu). */
+    private static function viewAndManage(array $menus): array
+    {
+        return collect($menus)->flatMap(fn ($m) => ["{$m}.view", "{$m}.manage"])->all();
     }
 }

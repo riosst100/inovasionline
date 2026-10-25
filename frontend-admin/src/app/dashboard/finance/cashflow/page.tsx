@@ -8,7 +8,8 @@ import PeriodFilter, { Period, thisMonth } from '../../../../components/finance/
 import Stat, { signedRupiah } from '../../../../components/finance/Stat';
 import SearchableSelect from '../../../../components/ui/SearchableSelect';
 import { apiRequest, apiRequestFull, ApiError } from '../../../../lib/api';
-import { rupiah, todayWib } from '../../../../lib/wallet';
+import { rupiah } from '../../../../lib/wallet';
+import { formatDate, todayWib } from '../../../../lib/date';
 import { CashBook, CashEntry, CashSource, CashType, Employee, EmployeeList, PaginationMeta } from '../../../../types';
 import {
   AlertCircle,
@@ -30,9 +31,6 @@ const SOURCE_LABEL: Record<CashSource, string> = {
   supplier_bill: 'Tagihan supplier',
   manual: 'Dicatat manual',
 };
-
-const formatDate = (d: string) =>
-  new Date(`${d.slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
 const firstError = (err: unknown, fallback: string) =>
   (err instanceof ApiError && err.errors && Object.values(err.errors)[0]?.[0]) || (err instanceof ApiError ? err.message : fallback);

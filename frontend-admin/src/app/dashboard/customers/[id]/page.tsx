@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import { formatDate, formatDateTime } from '../../../../lib/date';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import AdminLayout from '../../../../components/layout/AdminLayout';
@@ -31,16 +32,6 @@ const METHOD_LABELS: Record<LoginMethod, string> = {
   register: 'Registrasi',
 };
 
-const fmtDate = (iso: string | null | undefined) =>
-  iso
-    ? new Date(iso).toLocaleString('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '-';
 
 function timeAgo(iso: string | null): string {
   if (!iso) return '-';
@@ -82,7 +73,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function VerifiedBadge({ at }: { at: string | null }) {
   return at ? (
     <span className="inline-flex items-center gap-1 text-emerald-700">
-      <CheckCircle className="h-3.5 w-3.5" /> {fmtDate(at)}
+      <CheckCircle className="h-3.5 w-3.5" /> {formatDateTime(at)}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 text-slate-400">
@@ -196,13 +187,13 @@ function CustomerDetailPageContent() {
                     {c.gender === 'male' ? 'Laki-laki' : c.gender === 'female' ? 'Perempuan' : c.gender || '-'}
                   </Field>
                   <Field label="Tanggal Lahir">
-                    {c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString('id-ID', { dateStyle: 'long' }) : '-'}
+                    {formatDate(c.date_of_birth, 'long')}
                   </Field>
                   <Field label="Alamat">{c.address_label || '-'}</Field>
                   <Field label="Saldo Dompet">
                     Rp {Number(c.wallet_balance ?? 0).toLocaleString('id-ID')}
                   </Field>
-                  <Field label="Terdaftar Sejak">{fmtDate(c.created_at)}</Field>
+                  <Field label="Terdaftar Sejak">{formatDateTime(c.created_at)}</Field>
                   <Field label="ID">{<span className="font-mono text-xs">{c.id}</span>}</Field>
                   {c.is_blocked && <Field label="Alasan Blokir">{c.block_reason || '-'}</Field>}
                   {(c.banned_features ?? []).length > 0 && <Field label="Alasan Banned">{c.ban_reason || '-'}</Field>}
@@ -229,7 +220,7 @@ function CustomerDetailPageContent() {
                   <Field label="Login Terakhir">
                     {data.login.last_login_at ? (
                       <>
-                        {fmtDate(data.login.last_login_at)}
+                        {formatDateTime(data.login.last_login_at)}
                         <span className="block text-xs text-slate-400">
                           via {METHOD_LABELS[data.login.last_login_method!] ?? data.login.last_login_method}
                           {data.login.last_login_ip ? ` · IP ${data.login.last_login_ip}` : ''}
@@ -271,7 +262,7 @@ function CustomerDetailPageContent() {
                           <p className="text-xs text-slate-500">
                             Terakhir aktif {timeAgo(s.last_active_at)}
                             {s.ip_address ? ` · IP ${s.ip_address}` : ''}
-                            {s.created_at ? ` · Login ${fmtDate(s.created_at)}` : ''}
+                            {s.created_at ? ` · Login ${formatDateTime(s.created_at)}` : ''}
                           </p>
                           {s.user_agent && (
                             <p className="truncate text-[11px] text-slate-400" title={s.user_agent}>{s.user_agent}</p>
@@ -314,8 +305,8 @@ function CustomerDetailPageContent() {
                             <td className="px-5 py-3 font-mono font-semibold text-slate-800">{ip.ip_address}</td>
                             <td className="px-5 py-3 text-slate-600">{ip.login_count}x</td>
                             <td className="px-5 py-3 text-slate-600">{ip.active_sessions}</td>
-                            <td className="px-5 py-3 text-slate-500" title={`Pertama: ${fmtDate(ip.first_seen_at)}`}>
-                              {fmtDate(ip.last_seen_at)}
+                            <td className="px-5 py-3 text-slate-500" title={`Pertama: ${formatDateTime(ip.first_seen_at)}`}>
+                              {formatDateTime(ip.last_seen_at)}
                             </td>
                           </tr>
                         ))}
@@ -339,7 +330,7 @@ function CustomerDetailPageContent() {
                           <p className="truncate font-mono text-[11px] text-slate-400">{d.token_preview}</p>
                         </div>
                         <div className="text-right text-[11px] text-slate-500">
-                          <p>Terdaftar {fmtDate(d.registered_at)}</p>
+                          <p>Terdaftar {formatDateTime(d.registered_at)}</p>
                           <p>Diperbarui {timeAgo(d.updated_at)}</p>
                         </div>
                       </div>
@@ -367,7 +358,7 @@ function CustomerDetailPageContent() {
                     <tbody className="divide-y divide-slate-100">
                       {data.login_history.map((log) => (
                         <tr key={log.id}>
-                          <td className="whitespace-nowrap px-5 py-3 text-slate-600">{fmtDate(log.created_at)}</td>
+                          <td className="whitespace-nowrap px-5 py-3 text-slate-600">{formatDateTime(log.created_at)}</td>
                           <td className="px-5 py-3">
                             <span className="rounded-md bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
                               {METHOD_LABELS[log.method] ?? log.method}

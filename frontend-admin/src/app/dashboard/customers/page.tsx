@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { formatDate } from '../../../lib/date';
 import Link from 'next/link';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import VerificationStatus from '../../../components/customers/VerificationStatus';
@@ -251,11 +252,7 @@ export default function CustomersPage() {
                         <LastSeen at={c.last_seen_at} />
                       </td>
                       <td className="py-4 px-5 text-xs text-slate-500">
-                        {new Date(c.created_at).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                        {formatDate(c.created_at)}
                       </td>
                       <td className="py-4 px-5">
                         {c.is_blocked ? (

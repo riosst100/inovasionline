@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { todayWib } from '../../lib/wallet';
+import { todayWib } from '../../lib/date';
 
 export type Period = { from: string; to: string };
 
