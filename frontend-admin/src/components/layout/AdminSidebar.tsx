@@ -26,6 +26,7 @@ import {
   Settings,
   MapPinned,
   Receipt,
+  CreditCard,
   Tag,
   Smartphone,
   Wallet,
@@ -153,6 +154,7 @@ export const NAV_SECTIONS: NavSection[] = [
         children: [
           { name: 'Cakupan Kota', href: '/dashboard/settings/service-cities', icon: MapPinned, perm: 'service_cities' },
           { name: 'Biaya Layanan', href: '/dashboard/settings/service-fee', icon: Receipt, perm: 'service_fee' },
+          { name: 'Payment Gateway', href: '/dashboard/settings/payment-gateway', icon: CreditCard, perm: 'payment_gateway' },
           { name: 'Badge Menu', href: '/dashboard/settings/nav-badge', icon: Tag, perm: 'nav_badge' },
           { name: 'Update Aplikasi', href: '/dashboard/settings/app-update', icon: Smartphone, perm: 'app_update' },
           { name: 'Status Pesanan', href: '/dashboard/order-statuses', icon: ListChecks, perm: 'order_statuses' },

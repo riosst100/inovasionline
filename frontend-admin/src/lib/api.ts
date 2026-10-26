@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -596,6 +596,17 @@ export const adminApi = {
 
   async saveServiceFee(payload: ServiceFeeSettings): Promise<ServiceFeeSettings> {
     return apiRequest<ServiceFeeSettings>('/admin/service-fee', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getMidtransSettings(): Promise<MidtransSettings> {
+    return apiRequest<MidtransSettings>('/admin/midtrans-settings');
+  },
+
+  async saveMidtransSettings(payload: MidtransSettingsPayload): Promise<MidtransSettings> {
+    return apiRequest<MidtransSettings>('/admin/midtrans-settings', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });

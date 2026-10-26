@@ -59,6 +59,7 @@ final class AdminMenu
                 ['reward_chest', 'Peti Hadiah', 'Iklan', true],
                 ['service_cities', 'Cakupan Kota', 'Pengaturan', true],
                 ['service_fee', 'Biaya Layanan', 'Pengaturan', true],
+                ['payment_gateway', 'Payment Gateway (Midtrans)', 'Pengaturan', true],
                 ['nav_badge', 'Badge Menu', 'Pengaturan', true],
                 ['app_update', 'Update Aplikasi', 'Pengaturan', true],
                 ['order_statuses', 'Status Pesanan', 'Pengaturan', true],

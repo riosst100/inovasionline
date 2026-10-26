@@ -4,10 +4,14 @@ namespace Tests\Unit;
 
 use App\Services\MidtransService;
 use App\Services\OrderCancellationService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class MidtransSignatureTest extends TestCase
 {
+    // The server key is read from midtrans_settings (falling back to config when empty).
+    use RefreshDatabase;
+
     public function test_validates_notification_signature(): void
     {
         config(['services.midtrans.server_key' => 'SB-Mid-server-test']);

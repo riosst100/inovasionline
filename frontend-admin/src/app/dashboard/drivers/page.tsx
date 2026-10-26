@@ -8,6 +8,7 @@ import DataTransferProgress from '../../../components/data-transfer/DataTransfer
 import { adminApi } from '../../../lib/api';
 import { useDataTransfers } from '../../../lib/dataTransfer';
 import { waLink } from '../../../lib/whatsapp';
+import WhatsAppIcon from '../../../components/ui/WhatsAppIcon';
 import { Driver, DriverOrder } from '../../../types';
 import {
   Truck,
@@ -307,7 +308,7 @@ export default function DriversPage() {
               <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="py-3.5 px-5">Profil Kurir</th>
-                  <th className="py-3.5 px-5">Nomor WA</th>
+                  <th className="py-3.5 px-5">Nomor HP</th>
                   <th className="py-3.5 px-5">Kendaraan</th>
                   <th className="py-3.5 px-5">Plat Nomor</th>
                   <th className="py-3.5 px-5">Status</th>
@@ -346,21 +347,23 @@ export default function DriversPage() {
                         </div>
                       </td>
 
-                      {/* WhatsApp */}
+                      {/* Phone, with a WhatsApp chat link */}
                       <td className="py-4 px-5 text-xs text-slate-600">
-                        {waLink(driver.phone) ? (
-                          <a
-                            href={waLink(driver.phone)!}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Chat via WhatsApp"
-                            className="font-medium text-emerald-700 hover:underline"
-                          >
-                            {driver.phone}
-                          </a>
-                        ) : (
-                          driver.phone || '-'
-                        )}
+                        <div className="flex items-center gap-2">
+                          <span>{driver.phone || '-'}</span>
+                          {waLink(driver.phone) && (
+                            <a
+                              href={waLink(driver.phone)!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Chat via WhatsApp"
+                              aria-label={`Chat ${driver.name} via WhatsApp`}
+                              className="rounded-md p-1 text-[#25D366] hover:bg-emerald-50"
+                            >
+                              <WhatsAppIcon className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
                       </td>
 
                       {/* Vehicle */}
