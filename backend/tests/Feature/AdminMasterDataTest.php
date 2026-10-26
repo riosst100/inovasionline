@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\AdminUser;
 use App\Models\Brand;
 use App\Models\Product;
+use App\Models\ProductAttribute;
 use App\Models\Role;
 use App\Models\Supplier;
 use App\Support\DataTransfer\DataTransferRegistry;
 use App\Support\DataTransfer\ImportResult;
 use App\Support\DataTransfer\RowSkippedException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -97,6 +99,71 @@ class AdminMasterDataTest extends TestCase
 
         $this->expectException(RowSkippedException::class);
         $suppliers->importRow(['name' => 'X', 'email' => 'bukan-email']);
+    }
+
+    public function test_attribute_import_create_then_update_and_protects_system_attributes(): void
+    {
+        $attributes = DataTransferRegistry::handler('attributes');
+
+        $this->assertSame(ImportResult::CREATED, $attributes->importRow([
+            'code' => 'warna', 'name' => 'Warna', 'type' => 'select', 'options' => 'Merah| Biru |Merah',
+        ]));
+        $this->assertSame(ImportResult::UPDATED, $attributes->importRow([
+            'code' => 'warna', 'name' => 'Warna Produk', 'type' => 'select', 'options' => 'Hijau', 'is_active' => '0',
+        ]));
+        $warna = ProductAttribute::where('code', 'warna')->sole();
+        $this->assertSame(['Hijau'], $warna->options);
+        $this->assertFalse($warna->is_active);
+        $this->assertFalse($warna->is_system);
+
+        $system = ProductAttribute::updateOrCreate(['code' => 'sku_test'], [
+            'name' => 'SKU', 'type' => 'text', 'is_system' => true, 'is_required' => true, 'is_active' => true,
+        ]);
+        $this->assertSame(ImportResult::UPDATED, $attributes->importRow([
+            'code' => 'sku_test', 'name' => 'Kode SKU', 'type' => 'number', 'is_active' => '0',
+        ]));
+        $system->refresh();
+        $this->assertSame('Kode SKU', $system->name);
+        $this->assertSame('text', $system->type);
+        $this->assertTrue($system->is_active);
+
+        $this->expectException(RowSkippedException::class);
+        $attributes->importRow(['code' => 'ukuran', 'name' => 'Ukuran', 'type' => 'select']);
+    }
+
+    public function test_driver_import_creates_with_password_and_never_touches_other_admins(): void
+    {
+        $drivers = DataTransferRegistry::handler('drivers');
+        $staff = $this->admin();
+
+        try {
+            $drivers->importRow(['name' => 'Budi', 'email' => 'budi@example.com']);
+            $this->fail('A new courier without password must be skipped.');
+        } catch (RowSkippedException) {
+        }
+
+        $this->assertSame(ImportResult::CREATED, $drivers->importRow([
+            'name' => 'Budi', 'email' => 'Budi@Example.com', 'phone' => '0811', 'password' => 'rahasia1',
+        ]));
+        $driver = AdminUser::where('email', 'budi@example.com')->sole();
+        $this->assertSame('driver', $driver->role->slug);
+        $this->assertSame('Motor', $driver->vehicle_type);
+        $this->assertTrue(Hash::check('rahasia1', $driver->password));
+
+        $this->assertSame(ImportResult::UPDATED, $drivers->importRow([
+            'name' => 'Budi S', 'email' => 'budi@example.com', 'vehicle_plate_number' => 'B 1 AB', 'password' => '',
+        ]));
+        $driver->refresh();
+        $this->assertSame('Budi S', $driver->name);
+        $this->assertSame('B 1 AB', $driver->vehicle_plate_number);
+        $this->assertTrue(Hash::check('rahasia1', $driver->password));
+
+        $exported = $drivers->exportQuery([])->get();
+        $this->assertSame([$driver->id], $exported->pluck('id')->all());
+        $this->assertNull($drivers->exportRow($exported->first())['password']);
+
+        $this->expectException(RowSkippedException::class);
+        $drivers->importRow(['name' => 'X', 'email' => $staff->email, 'password' => 'rahasia1']);
     }
 
     public function test_product_import_resolves_supplier_and_brand_by_name(): void

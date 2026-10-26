@@ -59,7 +59,7 @@ export default function AdminUsersPage() {
         }),
         adminApi.getRoles(),
       ]);
-      setStaffUsers(staffRes.data || []);
+      setStaffUsers(staffRes || []);
       setRoles(rolesRes || []);
     } catch (err: any) {
       setError(err?.message || 'Gagal memuat daftar staff admin.');

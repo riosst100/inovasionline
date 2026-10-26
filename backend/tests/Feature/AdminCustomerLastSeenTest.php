@@ -34,6 +34,38 @@ class AdminCustomerLastSeenTest extends TestCase
         $this->assertSame($user->id, AppInstall::sole()->user_id);
     }
 
+    public function test_heartbeat_stores_device_details_and_ip(): void
+    {
+        $installId = str_repeat('c', 20);
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])->postJson('/api/v1/app/heartbeat', [
+            'install_id' => $installId,
+            'platform' => 'android',
+            'device' => [
+                'id' => 'a1b2c3d4e5f60718',
+                'name' => 'Galaxy A15',
+                'brand' => 'samsung',
+                'model' => 'SM-A155F',
+                'os_version' => 'Android 14 (SDK 34)',
+                'is_emulator' => false,
+                'details' => ['build_tags' => 'release-keys'],
+            ],
+        ])->assertOk();
+
+        // Later heartbeats carry no device block and come from another network.
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.9'])->postJson('/api/v1/app/heartbeat', [
+            'install_id' => $installId,
+            'platform' => 'android',
+        ])->assertOk();
+
+        $install = AppInstall::sole();
+        $this->assertSame('a1b2c3d4e5f60718', $install->device_id);
+        $this->assertSame('SM-A155F', $install->device_model);
+        $this->assertFalse($install->is_emulator);
+        $this->assertSame(['build_tags' => 'release-keys'], $install->device_details);
+        $this->assertSame('203.0.113.7', $install->first_ip_address);
+        $this->assertSame('198.51.100.9', $install->ip_address);
+    }
+
     public function test_last_seen_is_the_latest_of_heartbeat_and_api_use(): void
     {
         [$appUser, $apiUser, $never] = User::factory()->count(3)->create();

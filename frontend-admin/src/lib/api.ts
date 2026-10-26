@@ -190,13 +190,13 @@ export const adminApi = {
   },
 
   // Admin & Staff Users (/api/admin/staff/*)
-  async getStaffUsers(params?: { search?: string; role_id?: string; page?: number }): Promise<PaginatedData<AdminUser>> {
+  async getStaffUsers(params?: { search?: string; role_id?: string; page?: number }): Promise<AdminUser[]> {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.role_id) query.append('role_id', params.role_id);
     if (params?.page) query.append('page', params.page.toString());
 
-    return apiRequest<PaginatedData<AdminUser>>(`/admin/staff?${query.toString()}`);
+    return apiRequest<AdminUser[]>(`/admin/staff?${query.toString()}`);
   },
 
   async createStaffUser(data: { name: string; username: string; email: string; phone?: string; password: string; role_id: string }): Promise<AdminUser> {
@@ -220,13 +220,13 @@ export const adminApi = {
   },
 
   // Driver Management (/api/admin/drivers/*)
-  async getDrivers(params?: { search?: string; is_active?: boolean; page?: number }): Promise<PaginatedData<Driver>> {
+  async getDrivers(params?: { search?: string; is_active?: boolean; page?: number }): Promise<Driver[]> {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.is_active !== undefined) query.append('is_active', params.is_active ? '1' : '0');
     if (params?.page) query.append('page', params.page.toString());
 
-    return apiRequest<PaginatedData<Driver>>(`/admin/drivers?${query.toString()}`);
+    return apiRequest<Driver[]>(`/admin/drivers?${query.toString()}`);
   },
 
   async createDriver(data: {
@@ -275,8 +275,8 @@ export const adminApi = {
     });
   },
 
-  async getDriverOrders(driverId: string, page = 1): Promise<PaginatedData<DriverOrder>> {
-    return apiRequest<PaginatedData<DriverOrder>>(`/admin/drivers/${driverId}/orders?page=${page}`);
+  async getDriverOrders(driverId: string, page = 1): Promise<DriverOrder[]> {
+    return apiRequest<DriverOrder[]>(`/admin/drivers/${driverId}/orders?page=${page}`);
   },
 
   // Customers (/api/admin/customers/*)

@@ -15,6 +15,15 @@ class AppInstall extends Model
 
     protected $fillable = [
         'install_id',
+        'device_id',
+        'device_name',
+        'device_brand',
+        'device_model',
+        'os_version',
+        'is_emulator',
+        'device_details',
+        'first_ip_address',
+        'ip_address',
         'user_id',
         'platform',
         'app_version',
@@ -27,6 +36,8 @@ class AppInstall extends Model
     protected function casts(): array
     {
         return [
+            'is_emulator' => 'boolean',
+            'device_details' => 'array',
             'first_seen_at' => 'datetime',
             'last_seen_at' => 'datetime',
         ];

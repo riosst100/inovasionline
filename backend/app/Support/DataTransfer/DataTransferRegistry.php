@@ -4,6 +4,8 @@ namespace App\Support\DataTransfer;
 
 use App\Support\DataTransfer\Handlers\BrandTransferHandler;
 use App\Support\DataTransfer\Handlers\CategoryTransferHandler;
+use App\Support\DataTransfer\Handlers\DriverTransferHandler;
+use App\Support\DataTransfer\Handlers\ProductAttributeTransferHandler;
 use App\Support\DataTransfer\Handlers\ProductStockTransferHandler;
 use App\Support\DataTransfer\Handlers\ProductTransferHandler;
 use App\Support\DataTransfer\Handlers\SupplierTransferHandler;
@@ -25,6 +27,8 @@ class DataTransferRegistry
         'product-stocks' => ProductStockTransferHandler::class,
         'suppliers' => SupplierTransferHandler::class,
         'brands' => BrandTransferHandler::class,
+        'attributes' => ProductAttributeTransferHandler::class,
+        'drivers' => DriverTransferHandler::class,
     ];
 
     /** @return array<int, string> */

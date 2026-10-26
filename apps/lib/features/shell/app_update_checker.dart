@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_update/in_app_update.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/theme.dart';
 import '../../providers/core_providers.dart';
@@ -61,11 +60,12 @@ class _AppUpdateCheckerState extends ConsumerState<AppUpdateChecker> {
   Future<void> _checkForUpdate() async {
     _checkedThisLaunch = true;
     try {
-      final update = await ref.read(appUpdateServiceProvider).checkForUpdate();
+      final service = ref.read(appUpdateServiceProvider);
+      final update = await service.checkForUpdate();
       if (update == null || !mounted) return;
 
       if (update.mandatory) {
-        await _showMandatoryUpdate(context, update);
+        await _showMandatoryUpdate(context, update, service);
         return;
       }
 
@@ -78,8 +78,17 @@ class _AppUpdateCheckerState extends ConsumerState<AppUpdateChecker> {
       if (info.flexibleUpdateAllowed) {
         // Completes once the download is done (or throws / is declined).
         final result = await InAppUpdate.startFlexibleUpdate();
-        if (result == AppUpdateResult.success && mounted) _offerRestart();
+        if (!mounted) return;
+        if (result == AppUpdateResult.success) {
+          _offerRestart();
+          return;
+        }
+        // Declined in Play's dialog: not asked again this launch.
+        if (result == AppUpdateResult.userDeniedUpdate) return;
       }
+      // No background download possible (or it failed): let the user start
+      // the update themselves.
+      _offerUpdate(info);
     } catch (_) {
       // Silent failure (offline, not installed from Play, ...): update checks
       // must never block or interrupt app usage.
@@ -100,25 +109,46 @@ class _AppUpdateCheckerState extends ConsumerState<AppUpdateChecker> {
     );
   }
 
+  void _offerUpdate(AppUpdateInfo info) {
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: const Text('Versi baru tersedia.'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: 'Update',
+          onPressed: () => ref.read(appUpdateServiceProvider).updateNow(info),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => widget.child;
 }
 
 /// Full-screen and not dismissible: the app stays unusable until the update
 /// is installed (which restarts the app).
-Future<void> _showMandatoryUpdate(BuildContext context, AvailableUpdate update) {
+Future<void> _showMandatoryUpdate(
+  BuildContext context,
+  AvailableUpdate update,
+  AppUpdateService service,
+) {
   return showGeneralDialog<void>(
     context: context,
     useRootNavigator: true,
     barrierDismissible: false,
-    pageBuilder: (_, _, _) => _MandatoryUpdateScreen(update: update),
+    pageBuilder: (_, _, _) =>
+        _MandatoryUpdateScreen(update: update, service: service),
   );
 }
 
 class _MandatoryUpdateScreen extends StatefulWidget {
-  const _MandatoryUpdateScreen({required this.update});
+  const _MandatoryUpdateScreen({required this.update, required this.service});
 
   final AvailableUpdate update;
+  final AppUpdateService service;
 
   @override
   State<_MandatoryUpdateScreen> createState() => _MandatoryUpdateScreenState();
@@ -142,26 +172,13 @@ class _MandatoryUpdateScreenState extends State<_MandatoryUpdateScreen> {
     try {
       if (info.installStatus == InstallStatus.downloaded) {
         await InAppUpdate.completeFlexibleUpdate();
-      } else if (info.immediateUpdateAllowed) {
-        await InAppUpdate.performImmediateUpdate();
       } else {
-        await _openPlayStore(info.packageName);
+        await widget.service.updateNow(info);
       }
     } catch (_) {
-      await _openPlayStore(info.packageName);
+      await widget.service.openPlayStore(info.packageName);
     } finally {
       if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _openPlayStore(String packageName) async {
-    try {
-      await launchUrl(
-        Uri.parse('market://details?id=$packageName'),
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {
-      // Nothing else to try; the button stays available.
     }
   }
 

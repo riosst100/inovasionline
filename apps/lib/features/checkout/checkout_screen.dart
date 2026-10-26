@@ -11,6 +11,7 @@ import '../../models/shipping_method.dart';
 import '../../models/user_address.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/user_address_provider.dart';
+import '../../services/analytics.dart';
 import '../../widgets/address_picker.dart';
 import '../wallet/topup_screen.dart';
 import '../wallet/wallet_providers.dart';
@@ -47,6 +48,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    Analytics.beginCheckout(widget.selection);
     _selectRecentAddress();
   }
 

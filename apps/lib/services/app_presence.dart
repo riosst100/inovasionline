@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/api/api_client.dart';
+import '../core/device/device_details.dart';
 import '../core/storage/install_id.dart';
 
 /// Reports this install to the backend so the admin dashboard can count
@@ -26,6 +27,9 @@ class AppPresence with WidgetsBindingObserver {
   int? _buildNumber;
   String? _lastScreen;
 
+  /// Sent with heartbeats until one succeeds, then dropped for this launch.
+  Map<String, dynamic>? _device;
+
   Future<void> start() async {
     try {
       _installId = await InstallId.read();
@@ -35,6 +39,7 @@ class AppPresence with WidgetsBindingObserver {
     } catch (_) {
       return;
     }
+    _device = await DeviceDetails.collect();
     WidgetsBinding.instance.addObserver(this);
     _router.routerDelegate.addListener(_onRouteChanged);
     _resume();
@@ -67,6 +72,7 @@ class AppPresence with WidgetsBindingObserver {
   Future<void> _send() async {
     final screen = _currentScreen();
     _lastScreen = screen;
+    final device = _device;
     try {
       await _api.dio.post(
         '/app/heartbeat',
@@ -76,8 +82,10 @@ class AppPresence with WidgetsBindingObserver {
           'app_version': _appVersion,
           'build_number': _buildNumber,
           'screen': screen,
+          'device': ?device,
         },
       );
+      if (device != null) _device = null;
     } catch (_) {}
   }
 }

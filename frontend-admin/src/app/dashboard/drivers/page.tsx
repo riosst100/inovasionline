@@ -3,7 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { formatDateTime, formatTime } from '../../../lib/date';
 import AdminLayout from '../../../components/layout/AdminLayout';
+import ImportExportActions from '../../../components/data-transfer/ImportExportActions';
+import DataTransferProgress from '../../../components/data-transfer/DataTransferProgress';
 import { adminApi } from '../../../lib/api';
+import { useDataTransfers } from '../../../lib/dataTransfer';
 import { Driver, DriverOrder } from '../../../types';
 import {
   Truck,
@@ -28,6 +31,14 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
+
+const IMPORT_HINT = (
+  <>
+    Kolom: <b>name</b> (wajib), <b>email</b> (wajib), phone, vehicle_type, vehicle_plate_number, is_active (1/0),
+    password (wajib untuk kurir baru, min. 6 karakter). Kurir dengan email yang sudah ada akan <b>diperbarui</b>
+    {' '}(password kosong = tidak diubah); selain itu dibuat baru. Password tidak ikut diekspor.
+  </>
+);
 
 export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -71,7 +82,7 @@ export default function DriversPage() {
         search: search || undefined,
         is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
       });
-      setDrivers(res.data || []);
+      setDrivers(res || []);
     } catch (err: any) {
       setError(err?.message || 'Gagal memuat data kurir.');
     } finally {
@@ -82,6 +93,10 @@ export default function DriversPage() {
   useEffect(() => {
     fetchDrivers();
   }, [statusFilter]);
+
+  const transfers = useDataTransfers({ resource: 'drivers', perPage: 5 }, (t) => {
+    if (t.type === 'import' && t.status === 'completed') fetchDrivers();
+  });
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,7 +211,7 @@ export default function DriversPage() {
     setDriverOrders([]);
     try {
       const res = await adminApi.getDriverOrders(driver.id);
-      setDriverOrders(res.data || []);
+      setDriverOrders(res || []);
     } catch {
       setDriverOrders([]);
     } finally {
@@ -233,14 +248,19 @@ export default function DriversPage() {
             </div>
           </div>
 
-          <button
-            onClick={openCreateModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Tambah Kurir Baru</span>
-          </button>
+          <div className="flex flex-wrap items-start gap-2">
+            <ImportExportActions resource="drivers" onStarted={transfers.track} importHint={IMPORT_HINT} />
+            <button
+              onClick={openCreateModal}
+              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Tambah Kurir Baru</span>
+            </button>
+          </div>
         </div>
+
+        <DataTransferProgress items={transfers.items} resource="drivers" />
 
         {/* Alerts */}
         {error && (

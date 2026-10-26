@@ -48,15 +48,7 @@ class DriverController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $driverRole = Role::firstOrCreate(
-            ['slug' => 'driver'],
-            [
-                'name' => 'Driver',
-                'description' => 'Petugas kurir pengantaran barang dan update status ekspedisi pengiriman.',
-                'permissions' => ['orders.view', 'delivery.view', 'delivery.update'],
-                'is_system' => false,
-            ]
-        );
+        $driverRole = Role::driver();
 
         $validated = $request->validate([
             'name' => 'required|string|max:150',

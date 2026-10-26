@@ -15,6 +15,7 @@ import 'features/shell/permission_gate.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/core_providers.dart';
+import 'services/analytics.dart';
 import 'services/app_presence.dart';
 import 'services/push_notification_handler.dart';
 
@@ -37,6 +38,13 @@ Future<void> bootstrap({required String envFile, required bool isDev}) async {
 
   // Install / online / checkout counts for the admin dashboard.
   unawaited(AppPresence(container.read(apiClientProvider), router).start());
+
+  // Screens, funnel and retention go to Firebase Analytics.
+  Analytics.trackScreens(router);
+  container.listen<String?>(
+    authProvider.select((auth) => auth.user?.id),
+    (_, userId) => Analytics.setUser(userId),
+  );
 
   // Firebase + push are not needed for the first frames, so they are set up
   // behind the intro; whatever uses FirebaseMessaging awaits firebaseReady.

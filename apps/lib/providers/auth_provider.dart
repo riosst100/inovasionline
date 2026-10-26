@@ -12,6 +12,7 @@ import '../config/env.dart';
 import '../core/api/account_block.dart';
 import '../core/api/api_exception.dart';
 import '../models/user.dart';
+import '../services/analytics.dart';
 import '../services/location_service.dart';
 import '../services/push_notification_handler.dart';
 import 'core_providers.dart';
@@ -79,6 +80,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .login(login: login, password: password)
           .then(_adoptGuestAddress);
       state = AuthState(status: AuthStatus.authenticated, user: user);
+      Analytics.login('password');
       _syncBlock(user);
       await _syncDeviceToken();
       return true;
@@ -111,6 +113,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           )
           .then(_adoptGuestAddress);
       state = AuthState(status: AuthStatus.authenticated, user: user);
+      Analytics.signUp('phone');
       _syncBlock(user);
       await _syncDeviceToken();
       return true;
@@ -175,6 +178,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .then(_adoptGuestAddress);
       debugPrint('[GOOGLE_AUTH] Step 7: login success, user: ${user.name}');
       state = AuthState(status: AuthStatus.authenticated, user: user);
+      Analytics.login('google');
       _syncBlock(user);
       await _syncDeviceToken();
       return true;
