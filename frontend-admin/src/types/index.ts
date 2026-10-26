@@ -37,7 +37,7 @@ export interface AdminUser {
 export interface Driver {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   vehicle_type: string | null;
   vehicle_plate_number: string | null;

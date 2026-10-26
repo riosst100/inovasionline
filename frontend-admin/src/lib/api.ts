@@ -231,8 +231,7 @@ export const adminApi = {
 
   async createDriver(data: {
     name: string;
-    email: string;
-    phone?: string;
+    phone: string;
     password: string;
     vehicle_type?: string;
     vehicle_plate_number?: string;
@@ -248,8 +247,7 @@ export const adminApi = {
     id: string,
     data: {
       name: string;
-      email: string;
-      phone?: string;
+      phone: string;
       password?: string;
       vehicle_type?: string;
       vehicle_plate_number?: string | null;

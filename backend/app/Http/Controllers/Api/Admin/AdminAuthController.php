@@ -20,24 +20,29 @@ class AdminAuthController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
-        // Admin web and admin app sign in by username; the driver app still sends its email.
+        // Admin web and admin app sign in by username; the driver app by phone number (older driver builds by email).
         $request->validate([
-            'username' => 'required_without:email|string',
-            'email' => 'required_without:username|email',
+            'username' => 'required_without_all:email,phone|string',
+            'phone' => 'required_without_all:username,email|string',
+            'email' => 'required_without_all:username,phone|email',
             'password' => 'required|string',
         ]);
 
-        $adminUser = AdminUser::with('role')
-            ->when(
-                $request->filled('username'),
-                fn ($q) => $q->where('username', AdminUser::normalizeUsername($request->string('username')->toString())),
-                fn ($q) => $q->where('email', $request->string('email')->toString()),
-            )
-            ->first();
+        $query = AdminUser::with('role');
+        if ($request->filled('username')) {
+            $query->where('username', AdminUser::normalizeUsername($request->string('username')->toString()));
+        } elseif ($request->filled('phone')) {
+            // Phone login is for couriers only: only their phones are stored normalized.
+            $query->where('phone', AdminUser::normalizePhone($request->string('phone')->toString()))
+                ->whereHas('role', fn ($q) => $q->where('slug', 'driver'));
+        } else {
+            $query->where('email', $request->string('email')->toString());
+        }
+        $adminUser = $query->first();
 
         if (! $adminUser || ! Hash::check($request->string('password')->toString(), $adminUser->password)) {
             return ApiResponse::error('Kredensial login admin tidak sesuai.', [
-                'login' => ['Username atau kata sandi salah.'],
+                'login' => [$request->filled('phone') ? 'Nomor HP atau kata sandi salah.' : 'Username atau kata sandi salah.'],
             ], 422);
         }
 

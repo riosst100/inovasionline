@@ -16,7 +16,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   // TODO: remove — debug-only prefill with seeded driver for quick testing.
-  final _email = TextEditingController(text: kDebugMode ? 'budi.driver@inovasionline.com' : '');
+  final _phone = TextEditingController(text: kDebugMode ? '081234567890' : '');
   final _password = TextEditingController(text: kDebugMode ? 'password' : '');
   bool _obscure = true;
   bool _submitting = false;
@@ -24,7 +24,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
-    _email.dispose();
+    _phone.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -36,7 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authProvider.notifier).login(email: _email.text.trim(), password: _password.text);
+      await ref.read(authProvider.notifier).login(phone: _phone.text.trim(), password: _password.text);
     } catch (e) {
       if (mounted) setState(() => _error = errorMessage(e));
     } finally {
@@ -82,12 +82,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 16),
                   ],
                   TextFormField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
+                    controller: _phone,
+                    keyboardType: TextInputType.phone,
+                    autofillHints: const [AutofillHints.telephoneNumber],
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline)),
-                    validator: (v) => (v == null || !v.contains('@')) ? 'Masukkan email yang valid.' : null,
+                    decoration: const InputDecoration(labelText: 'Nomor HP', hintText: '081234567890', prefixIcon: Icon(Icons.phone_outlined)),
+                    validator: (v) => (v ?? '').replaceAll(RegExp(r'\D'), '').length < 9 ? 'Masukkan nomor HP yang valid.' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(

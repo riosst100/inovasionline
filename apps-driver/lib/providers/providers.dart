@@ -48,8 +48,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Throws on failure so the form can show the server's message.
-  Future<void> login({required String email, required String password}) async {
-    final user = await _service.login(email: email, password: password);
+  Future<void> login({required String phone, required String password}) async {
+    final user = await _service.login(phone: phone, password: password);
     state = AuthState(status: AuthStatus.authenticated, user: user);
   }
 

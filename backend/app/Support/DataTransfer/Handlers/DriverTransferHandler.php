@@ -11,9 +11,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Rows are matched on `email` (case-insensitive); unmatched rows create a courier, which needs `password`.
- * Passwords are never exported; on an existing courier an empty `password` keeps the current one.
- * An email that belongs to a non-courier admin account (or a deleted one) is skipped.
+ * Rows are matched on `phone` (normalized like AdminUser::normalizePhone, so 0812…, +62 812… and 62812… are the
+ * same courier); unmatched rows create a courier, which needs `password`. Passwords are never exported; on an
+ * existing courier an empty `password` keeps the current one. A phone that belongs to a non-courier admin account
+ * (or a deleted one) is skipped.
  */
 class DriverTransferHandler implements TransferHandler
 {
@@ -24,7 +25,7 @@ class DriverTransferHandler implements TransferHandler
 
     public function headers(): array
     {
-        return ['name', 'email', 'phone', 'vehicle_type', 'vehicle_plate_number', 'is_active', 'password'];
+        return ['name', 'phone', 'vehicle_type', 'vehicle_plate_number', 'is_active', 'password'];
     }
 
     public function sampleRow(): array
@@ -32,8 +33,7 @@ class DriverTransferHandler implements TransferHandler
         return [
             // Deliberately not a real courier and without a password, so importing the untouched template is skipped.
             'name' => 'Contoh Kurir',
-            'email' => 'contoh.kurir@example.com',
-            'phone' => '081200000000',
+            'phone' => '080000000000',
             'vehicle_type' => 'Motor',
             'vehicle_plate_number' => 'B 1234 XYZ',
             'is_active' => '1',
@@ -53,7 +53,6 @@ class DriverTransferHandler implements TransferHandler
         /** @var AdminUser $model */
         return [
             'name' => $model->name,
-            'email' => $model->email,
             'phone' => $model->phone,
             'vehicle_type' => $model->vehicle_type,
             'vehicle_plate_number' => $model->vehicle_plate_number,
@@ -70,37 +69,27 @@ class DriverTransferHandler implements TransferHandler
     public function importRow(array $row): string
     {
         $name = trim((string) ($row['name'] ?? ''));
-        $email = mb_strtolower(trim((string) ($row['email'] ?? '')));
+        $phone = AdminUser::normalizePhone($row['phone'] ?? null);
         if ($name === '') {
             throw new RowSkippedException('Kolom name wajib diisi.');
         }
         if (mb_strlen($name) > 150) {
             throw new RowSkippedException('Kolom name maksimal 150 karakter.');
         }
-        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 150) {
-            throw new RowSkippedException('Kolom email wajib diisi dengan email yang valid.');
+        if ($phone === null || ! preg_match('/^08\d{7,13}$/', $phone)) {
+            throw new RowSkippedException('Kolom phone wajib diisi dengan nomor HP yang valid, contoh 081234567890.');
         }
 
-        $existing = AdminUser::withTrashed()->with('role')->whereRaw('lower(email) = ?', [$email])->first();
+        $existing = AdminUser::withTrashed()->with('role')->where('phone', $phone)->first();
         if ($existing && $existing->trashed()) {
-            throw new RowSkippedException("Email {$email} dipakai akun yang sudah dihapus.");
+            throw new RowSkippedException("Nomor HP {$phone} dipakai akun yang sudah dihapus.");
         }
         if ($existing && $existing->role?->slug !== 'driver') {
-            throw new RowSkippedException("Email {$email} sudah dipakai user admin yang bukan kurir.");
+            throw new RowSkippedException("Nomor HP {$phone} sudah dipakai user admin yang bukan kurir.");
         }
 
-        $data = ['name' => $name, 'email' => $email];
+        $data = ['name' => $name, 'phone' => $phone];
 
-        if (array_key_exists('phone', $row)) {
-            $phone = filled($row['phone']) ? trim($row['phone']) : null;
-            if ($phone !== null && mb_strlen($phone) > 30) {
-                throw new RowSkippedException('Kolom phone maksimal 30 karakter.');
-            }
-            if ($phone !== null && AdminUser::withTrashed()->where('phone', $phone)->when($existing, fn ($q) => $q->whereKeyNot($existing->id))->exists()) {
-                throw new RowSkippedException("Nomor HP {$phone} sudah dipakai akun lain.");
-            }
-            $data['phone'] = $phone;
-        }
         if (filled($row['vehicle_type'] ?? null)) {
             if (mb_strlen(trim($row['vehicle_type'])) > 50) {
                 throw new RowSkippedException('Kolom vehicle_type maksimal 50 karakter.');

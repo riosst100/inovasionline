@@ -135,23 +135,25 @@ class AdminMasterDataTest extends TestCase
     {
         $drivers = DataTransferRegistry::handler('drivers');
         $staff = $this->admin();
+        $staff->update(['phone' => '0899000111']);
 
         try {
-            $drivers->importRow(['name' => 'Budi', 'email' => 'budi@example.com']);
+            $drivers->importRow(['name' => 'Budi', 'phone' => '081100001111']);
             $this->fail('A new courier without password must be skipped.');
         } catch (RowSkippedException) {
         }
 
         $this->assertSame(ImportResult::CREATED, $drivers->importRow([
-            'name' => 'Budi', 'email' => 'Budi@Example.com', 'phone' => '0811', 'password' => 'rahasia1',
+            'name' => 'Budi', 'phone' => '+62 811-0000-1111', 'password' => 'rahasia1',
         ]));
-        $driver = AdminUser::where('email', 'budi@example.com')->sole();
+        $driver = AdminUser::where('phone', '081100001111')->sole();
+        $this->assertNull($driver->email);
         $this->assertSame('driver', $driver->role->slug);
         $this->assertSame('Motor', $driver->vehicle_type);
         $this->assertTrue(Hash::check('rahasia1', $driver->password));
 
         $this->assertSame(ImportResult::UPDATED, $drivers->importRow([
-            'name' => 'Budi S', 'email' => 'budi@example.com', 'vehicle_plate_number' => 'B 1 AB', 'password' => '',
+            'name' => 'Budi S', 'phone' => '6281100001111', 'vehicle_plate_number' => 'B 1 AB', 'password' => '',
         ]));
         $driver->refresh();
         $this->assertSame('Budi S', $driver->name);
@@ -163,7 +165,35 @@ class AdminMasterDataTest extends TestCase
         $this->assertNull($drivers->exportRow($exported->first())['password']);
 
         $this->expectException(RowSkippedException::class);
-        $drivers->importRow(['name' => 'X', 'email' => $staff->email, 'password' => 'rahasia1']);
+        $drivers->importRow(['name' => 'X', 'phone' => '0899000111', 'password' => 'rahasia1']);
+    }
+
+    public function test_driver_is_registered_and_signs_in_by_phone_without_email(): void
+    {
+        Sanctum::actingAs($this->admin(), ['admin']);
+
+        $this->postJson('/api/admin/drivers', ['name' => 'Budi', 'password' => 'rahasia1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('phone');
+        $this->postJson('/api/admin/drivers', ['name' => 'Budi', 'phone' => '12345', 'password' => 'rahasia1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('phone');
+
+        $this->postJson('/api/admin/drivers', ['name' => 'Budi', 'phone' => '+62 812-3456-7890', 'password' => 'rahasia1'])
+            ->assertCreated()
+            ->assertJsonPath('data.phone', '081234567890')
+            ->assertJsonPath('data.email', null);
+        $this->postJson('/api/admin/drivers', ['name' => 'Budi 2', 'phone' => '6281234567890', 'password' => 'rahasia1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('phone');
+
+        $this->app['auth']->forgetGuards();
+        $mobile = ['X-Client' => 'mobile'];
+        $this->postJson('/api/admin/auth/login', ['phone' => '0812 3456 7890', 'password' => 'salah123'], $mobile)->assertUnprocessable();
+        $this->postJson('/api/admin/auth/login', ['phone' => '+6281234567890', 'password' => 'rahasia1'], $mobile)
+            ->assertSuccessful()
+            ->assertJsonPath('data.user.name', 'Budi');
+
+        // Staff accounts keep signing in by username and cannot use the phone login.
+        AdminUser::where('email', 'admin@example.com')->update(['phone' => '089900001111']);
+        $this->postJson('/api/admin/auth/login', ['phone' => '089900001111', 'password' => 'secret123'], $mobile)->assertUnprocessable();
     }
 
     public function test_driver_plate_number_can_be_changed_and_cleared(): void
@@ -171,14 +201,14 @@ class AdminMasterDataTest extends TestCase
         Sanctum::actingAs($this->admin(), ['admin']);
 
         $id = $this->postJson('/api/admin/drivers', [
-            'name' => 'Budi', 'email' => 'budi@example.com', 'password' => 'rahasia1', 'vehicle_plate_number' => 'B 1 AB',
+            'name' => 'Budi', 'phone' => '081100001111', 'password' => 'rahasia1', 'vehicle_plate_number' => 'B 1 AB',
         ])->assertCreated()->json('data.id');
 
-        $this->putJson("/api/admin/drivers/{$id}", ['name' => 'Budi', 'email' => 'budi@example.com', 'vehicle_plate_number' => 'B 2 CD'])
+        $this->putJson("/api/admin/drivers/{$id}", ['name' => 'Budi', 'phone' => '081100001111', 'vehicle_plate_number' => 'B 2 CD'])
             ->assertSuccessful()
             ->assertJsonPath('data.vehicle_plate_number', 'B 2 CD');
 
-        $this->putJson("/api/admin/drivers/{$id}", ['name' => 'Budi', 'email' => 'budi@example.com', 'vehicle_plate_number' => ''])
+        $this->putJson("/api/admin/drivers/{$id}", ['name' => 'Budi', 'phone' => '081100001111', 'vehicle_plate_number' => ''])
             ->assertSuccessful()
             ->assertJsonPath('data.vehicle_plate_number', null);
     }

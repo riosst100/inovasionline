@@ -27,16 +27,10 @@ class AccountScreen extends ConsumerWidget {
                   subtitle: const Text('Nama'),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.email_outlined),
-                  title: Text(user?.email ?? '-'),
-                  subtitle: const Text('Email'),
+                  leading: const Icon(Icons.phone_outlined),
+                  title: Text(phone != null && phone.isNotEmpty ? phone : '-'),
+                  subtitle: const Text('Nomor HP'),
                 ),
-                if (phone != null && phone.isNotEmpty)
-                  ListTile(
-                    leading: const Icon(Icons.phone_outlined),
-                    title: Text(phone),
-                    subtitle: const Text('Telepon'),
-                  ),
                 if (vehicle != null && vehicle.isNotEmpty)
                   ListTile(
                     leading: const Icon(Icons.two_wheeler_outlined),

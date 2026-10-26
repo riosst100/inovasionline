@@ -7,6 +7,7 @@ import ImportExportActions from '../../../components/data-transfer/ImportExportA
 import DataTransferProgress from '../../../components/data-transfer/DataTransferProgress';
 import { adminApi } from '../../../lib/api';
 import { useDataTransfers } from '../../../lib/dataTransfer';
+import { waLink } from '../../../lib/whatsapp';
 import { Driver, DriverOrder } from '../../../types';
 import {
   Truck,
@@ -34,8 +35,9 @@ import {
 
 const IMPORT_HINT = (
   <>
-    Kolom: <b>name</b> (wajib), <b>email</b> (wajib), phone, vehicle_type, vehicle_plate_number, is_active (1/0),
-    password (wajib untuk kurir baru, min. 6 karakter). Kurir dengan email yang sudah ada akan <b>diperbarui</b>
+    Kolom: <b>name</b> (wajib), <b>phone</b> (wajib, nomor HP untuk login), vehicle_type, vehicle_plate_number,
+    is_active (1/0), password (wajib untuk kurir baru, min. 6 karakter). Kurir dengan nomor HP yang sudah ada akan{' '}
+    <b>diperbarui</b>
     {' '}(password kosong = tidak diubah); selain itu dibuat baru. Password tidak ikut diekspor.
   </>
 );
@@ -55,7 +57,6 @@ export default function DriversPage() {
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
     phone: '',
     vehicle_type: 'Motor Honda Vario 160',
     vehicle_plate_number: '',
@@ -107,7 +108,6 @@ export default function DriversPage() {
     setEditingDriver(null);
     setFormData({
       name: '',
-      email: '',
       phone: '',
       vehicle_type: 'Motor',
       vehicle_plate_number: '',
@@ -121,7 +121,6 @@ export default function DriversPage() {
     setEditingDriver(driver);
     setFormData({
       name: driver.name,
-      email: driver.email,
       phone: driver.phone || '',
       vehicle_type: driver.vehicle_type || 'Motor',
       vehicle_plate_number: driver.vehicle_plate_number || '',
@@ -141,7 +140,7 @@ export default function DriversPage() {
       );
       setSuccessMsg(
         `Status kurir "${driver.name}" berhasil diubah menjadi ${
-          updated.is_active ? 'Aktif (Enable)' : 'Non-Aktif (Disable)'
+          updated.is_active ? 'Aktif' : 'Non-Aktif'
         }.`
       );
     } catch (err: any) {
@@ -160,8 +159,7 @@ export default function DriversPage() {
       if (editingDriver) {
         await adminApi.updateDriver(editingDriver.id, {
           name: formData.name,
-          email: formData.email,
-          phone: formData.phone || undefined,
+          phone: formData.phone.trim(),
           vehicle_type: formData.vehicle_type || undefined,
           vehicle_plate_number: formData.vehicle_plate_number.trim() || null,
           password: formData.password || undefined,
@@ -171,8 +169,7 @@ export default function DriversPage() {
       } else {
         await adminApi.createDriver({
           name: formData.name,
-          email: formData.email,
-          phone: formData.phone || undefined,
+          phone: formData.phone.trim(),
           vehicle_type: formData.vehicle_type || undefined,
           vehicle_plate_number: formData.vehicle_plate_number || undefined,
           password: formData.password,
@@ -297,8 +294,8 @@ export default function DriversPage() {
               className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs md:text-sm font-medium text-slate-700 outline-none focus:border-emerald-500 focus:bg-white"
             >
               <option value="all">Semua Status (Aktif & Non-Aktif)</option>
-              <option value="active">Hanya Aktif (Enable)</option>
-              <option value="inactive">Hanya Non-Aktif (Disable)</option>
+              <option value="active">Hanya Aktif</option>
+              <option value="inactive">Hanya Non-Aktif</option>
             </select>
           </div>
         </div>
@@ -310,9 +307,10 @@ export default function DriversPage() {
               <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="py-3.5 px-5">Profil Kurir</th>
-                  <th className="py-3.5 px-5">Kontak</th>
-                  <th className="py-3.5 px-5">Kendaraan & Plat</th>
-                  <th className="py-3.5 px-5">Status (Enable/Disable)</th>
+                  <th className="py-3.5 px-5">Nomor WA</th>
+                  <th className="py-3.5 px-5">Kendaraan</th>
+                  <th className="py-3.5 px-5">Plat Nomor</th>
+                  <th className="py-3.5 px-5">Status</th>
                   <th className="py-3.5 px-5">Total Pesanan Diantar</th>
                   <th className="py-3.5 px-5 text-right">Aksi</th>
                 </tr>
@@ -320,7 +318,7 @@ export default function DriversPage() {
               <tbody className="divide-y divide-slate-100 font-medium">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                         <span>Memuat data kurir...</span>
@@ -329,7 +327,7 @@ export default function DriversPage() {
                   </tr>
                 ) : drivers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       Tidak ditemukan data kurir.
                     </td>
                   </tr>
@@ -344,30 +342,41 @@ export default function DriversPage() {
                           </div>
                           <div>
                             <span className="font-bold text-slate-900">{driver.name}</span>
-                            <p className="text-xs text-slate-400">{driver.email}</p>
                           </div>
                         </div>
                       </td>
 
-                      {/* Phone */}
+                      {/* WhatsApp */}
                       <td className="py-4 px-5 text-xs text-slate-600">
-                        {driver.phone || '-'}
+                        {waLink(driver.phone) ? (
+                          <a
+                            href={waLink(driver.phone)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Chat via WhatsApp"
+                            className="font-medium text-emerald-700 hover:underline"
+                          >
+                            {driver.phone}
+                          </a>
+                        ) : (
+                          driver.phone || '-'
+                        )}
                       </td>
 
-                      {/* Vehicle & Plate */}
+                      {/* Vehicle */}
+                      <td className="py-4 px-5 text-xs font-semibold text-slate-800">
+                        {driver.vehicle_type || 'Motor'}
+                      </td>
+
+                      {/* Plate */}
                       <td className="py-4 px-5">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-xs font-semibold text-slate-800">
-                            {driver.vehicle_type || 'Motor'}
+                        {driver.vehicle_plate_number ? (
+                          <span className="font-mono text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.2 w-fit">
+                            {driver.vehicle_plate_number}
                           </span>
-                          {driver.vehicle_plate_number ? (
-                            <span className="font-mono text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.2 w-fit">
-                              {driver.vehicle_plate_number}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-slate-400">-</span>
-                          )}
-                        </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">-</span>
+                        )}
                       </td>
 
                       {/* Status with Toggle Button */}
@@ -381,7 +390,7 @@ export default function DriversPage() {
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
                               : 'bg-slate-200 text-slate-600 border border-slate-300 hover:bg-slate-300'
                           }`}
-                          title="Klik untuk ubah status Enable/Disable"
+                          title="Klik untuk ubah status"
                         >
                           {togglingId === driver.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -390,7 +399,7 @@ export default function DriversPage() {
                           ) : (
                             <XCircle className="h-3.5 w-3.5 text-slate-500" />
                           )}
-                          <span>{driver.is_active ? 'Enable (Aktif)' : 'Disable (Non-Aktif)'}</span>
+                          <span>{driver.is_active ? 'Aktif' : 'Non-Aktif'}</span>
                         </button>
                       </td>
 
@@ -593,33 +602,20 @@ export default function DriversPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Alamat Email <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="kurir@inovasionline.com"
-                      required
-                      className="w-full rounded-xl border border-slate-300 py-2.5 px-3.5 text-xs md:text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Nomor Telepon / WhatsApp
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="081234567890"
-                      className="w-full rounded-xl border border-slate-300 py-2.5 px-3.5 text-xs md:text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Nomor HP / WhatsApp <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="081234567890"
+                    required
+                    className="w-full rounded-xl border border-slate-300 py-2.5 px-3.5 text-xs md:text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">Dipakai kurir untuk login di aplikasi kurir.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -675,7 +671,7 @@ export default function DriversPage() {
                     />
                     <div className="flex flex-col">
                       <span className="text-xs font-bold text-slate-900">
-                        Status Kurir Aktif (Enable)
+                        Status Kurir Aktif
                       </span>
                       <span className="text-[11px] text-slate-500">
                         Kurir aktif dapat login dan menerima tugas pengiriman pesanan.
