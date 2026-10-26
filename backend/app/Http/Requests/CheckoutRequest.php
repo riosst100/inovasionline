@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\DeviceInfo;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CheckoutRequest extends FormRequest
@@ -32,6 +33,16 @@ class CheckoutRequest extends FormRequest
             // offered first next time.
             'address_id' => ['nullable', 'string'],
             'customer_notes' => ['nullable', 'string', 'max:1000'],
+            // Evidence for disputed orders, stored in order_device_logs.
+            'install_id' => ['nullable', 'string', 'max:64'],
+            'app_version' => ['nullable', 'string', 'max:32'],
+            'build_number' => ['nullable', 'integer', 'min:0'],
+            ...DeviceInfo::rules(),
+            'location' => ['nullable', 'array'],
+            'location.latitude' => ['required_with:location', 'numeric', 'between:-90,90'],
+            'location.longitude' => ['required_with:location', 'numeric', 'between:-180,180'],
+            'location.accuracy' => ['nullable', 'numeric', 'min:0'],
+            'location.at' => ['nullable', 'date'],
         ];
     }
 }

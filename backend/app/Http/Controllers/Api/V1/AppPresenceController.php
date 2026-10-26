@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\AppInstall;
 use App\Models\User;
+use App\Support\DeviceInfo;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,14 +29,7 @@ class AppPresenceController extends Controller
             'app_version' => ['nullable', 'string', 'max:32'],
             'build_number' => ['nullable', 'integer', 'min:0'],
             'screen' => ['nullable', 'string', 'max:120'],
-            'device' => ['nullable', 'array'],
-            'device.id' => ['nullable', 'string', 'max:128'],
-            'device.name' => ['nullable', 'string', 'max:120'],
-            'device.brand' => ['nullable', 'string', 'max:60'],
-            'device.model' => ['nullable', 'string', 'max:120'],
-            'device.os_version' => ['nullable', 'string', 'max:60'],
-            'device.is_emulator' => ['nullable', 'boolean'],
-            'device.details' => ['nullable', 'array', 'max:30'],
+            ...DeviceInfo::rules(),
         ]);
 
         $now = now();
@@ -50,15 +44,7 @@ class AppPresenceController extends Controller
             'last_seen_at' => $now,
         ]);
         if ($device = $data['device'] ?? null) {
-            $install->fill([
-                'device_id' => $device['id'] ?? $install->device_id,
-                'device_name' => $device['name'] ?? $install->device_name,
-                'device_brand' => $device['brand'] ?? $install->device_brand,
-                'device_model' => $device['model'] ?? $install->device_model,
-                'os_version' => $device['os_version'] ?? $install->os_version,
-                'is_emulator' => $device['is_emulator'] ?? $install->is_emulator,
-                'device_details' => $device['details'] ?? $install->device_details,
-            ]);
+            $install->fill(array_filter(DeviceInfo::columns($device), fn ($value) => $value !== null));
         }
         $install->first_seen_at ??= $now;
         $install->first_ip_address ??= $ip;
