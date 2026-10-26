@@ -277,7 +277,7 @@ export default function SuppliersPage() {
             )}
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Nama Supplier</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Nama Supplier <span className="text-rose-500">*</span></label>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}

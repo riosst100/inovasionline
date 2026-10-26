@@ -483,7 +483,7 @@ export default function FlashSalesPage() {
                 )}
 
                 <label className="block space-y-1">
-                  <span className="text-sm font-medium text-slate-700">Nama Flash Sale</span>
+                  <span className="text-sm font-medium text-slate-700">Nama Flash Sale <span className="text-rose-500">*</span></span>
                   <input
                     required
                     value={form.name}
@@ -495,7 +495,7 @@ export default function FlashSalesPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1">
-                    <span className="text-sm font-medium text-slate-700">Mulai</span>
+                    <span className="text-sm font-medium text-slate-700">Mulai <span className="text-rose-500">*</span></span>
                     <div className="flex gap-2">
                       <input
                         type="date"
@@ -514,7 +514,7 @@ export default function FlashSalesPage() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-sm font-medium text-slate-700">Selesai</span>
+                    <span className="text-sm font-medium text-slate-700">Selesai <span className="text-rose-500">*</span></span>
                     <div className="flex gap-2">
                       <input
                         type="date"
@@ -547,7 +547,7 @@ export default function FlashSalesPage() {
 
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-slate-700">
-                    Produk Flash Sale <span className="text-slate-400">({form.products.length})</span>
+                    Produk Flash Sale <span className="text-rose-500">*</span> <span className="text-slate-400">({form.products.length})</span>
                   </span>
 
                   {form.products.length === 0 ? (

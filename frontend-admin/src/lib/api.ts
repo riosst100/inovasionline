@@ -252,7 +252,7 @@ export const adminApi = {
       phone?: string;
       password?: string;
       vehicle_type?: string;
-      vehicle_plate_number?: string;
+      vehicle_plate_number?: string | null;
       is_active?: boolean;
     }
   ): Promise<Driver> {

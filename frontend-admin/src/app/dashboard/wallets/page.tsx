@@ -217,21 +217,31 @@ function WalletDrawer({ userId, onClose, onChanged }: { userId: string; onClose:
                 </button>
               ))}
             </div>
-            <input
-              type="number"
-              min={1}
-              className={input}
-              placeholder="Nominal (Rp)"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <input
-              className={input}
-              maxLength={255}
-              placeholder="Alasan (wajib), mis. kompensasi keterlambatan"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            <label className="block space-y-1 text-xs font-medium text-slate-600">
+              <span>
+                Nominal (Rp) <span className="text-rose-500">*</span>
+              </span>
+              <input
+                type="number"
+                min={1}
+                className={input}
+                placeholder="Nominal (Rp)"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </label>
+            <label className="block space-y-1 text-xs font-medium text-slate-600">
+              <span>
+                Alasan <span className="text-rose-500">*</span>
+              </span>
+              <input
+                className={input}
+                maxLength={255}
+                placeholder="mis. kompensasi keterlambatan"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </label>
             <button
               type="button"
               onClick={submit}

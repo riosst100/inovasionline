@@ -107,7 +107,10 @@ class DriverController extends Controller
             'email' => $validated['email'],
             'phone' => $validated['phone'] ?? null,
             'vehicle_type' => $validated['vehicle_type'] ?? $driver->vehicle_type,
-            'vehicle_plate_number' => $validated['vehicle_plate_number'] ?? $driver->vehicle_plate_number,
+            // Sent but empty clears the plate; only an omitted field keeps it.
+            'vehicle_plate_number' => array_key_exists('vehicle_plate_number', $validated)
+                ? $validated['vehicle_plate_number']
+                : $driver->vehicle_plate_number,
         ];
 
         if (!empty($validated['password'])) {

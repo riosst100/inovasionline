@@ -162,7 +162,7 @@ export default function NewProductPage() {
 
           <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
             <label className="block text-xs font-semibold text-slate-600">
-              Nama
+              Nama <span className="text-rose-500">*</span>
               <input required value={form.name} onChange={(e) => setField('name', e.target.value)} className={inputCls} />
             </label>
 
@@ -195,7 +195,7 @@ export default function NewProductPage() {
                 />
               </div>
               <label className="block text-xs font-semibold text-slate-600">
-                Status
+                Status <span className="text-rose-500">*</span>
                 <select value={form.status} onChange={(e) => setField('status', e.target.value)} className={inputCls}>
                   {Object.entries(STATUSES).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -205,7 +205,7 @@ export default function NewProductPage() {
                 </select>
               </label>
               <label className="block text-xs font-semibold text-slate-600">
-                Harga Normal
+                Harga Normal <span className="text-rose-500">*</span>
                 <div className="relative">
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">Rp</span>
                   <input inputMode="numeric" required value={formatRupiah(form.regular_price)} onChange={(e) => setField('regular_price', toDigits(e.target.value))} className={`${inputCls} pl-9`} />
@@ -266,7 +266,7 @@ export default function NewProductPage() {
                 {rows.map((row, i) => (
                   <div key={i} className="grid grid-cols-[1fr_7rem_auto] items-end gap-2">
                     <div className="text-xs font-semibold text-slate-600">
-                      {i === 0 && 'Gudang'}
+                      {i === 0 && <>Gudang <span className="text-rose-500">*</span></>}
                       <SearchableSelect
                         value={row.warehouse_id}
                         onChange={(v) => updateRow(i, { warehouse_id: v })}
@@ -276,7 +276,7 @@ export default function NewProductPage() {
                       />
                     </div>
                     <label className="block text-xs font-semibold text-slate-600">
-                      {i === 0 && 'Stok'}
+                      {i === 0 && <>Stok <span className="text-rose-500">*</span></>}
                       <input inputMode="numeric" value={row.quantity} onChange={(e) => updateRow(i, { quantity: toDigits(e.target.value) })} className={inputCls} />
                     </label>
                     <button type="button" title="Hapus" onClick={() => setRows((rs) => rs.filter((_, idx) => idx !== i))} className="mb-1 rounded-lg p-2 text-rose-600 hover:bg-rose-50">

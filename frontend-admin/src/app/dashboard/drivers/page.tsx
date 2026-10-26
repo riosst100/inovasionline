@@ -163,7 +163,7 @@ export default function DriversPage() {
           email: formData.email,
           phone: formData.phone || undefined,
           vehicle_type: formData.vehicle_type || undefined,
-          vehicle_plate_number: formData.vehicle_plate_number || undefined,
+          vehicle_plate_number: formData.vehicle_plate_number.trim() || null,
           password: formData.password || undefined,
           is_active: formData.is_active,
         });

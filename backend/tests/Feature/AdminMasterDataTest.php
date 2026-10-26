@@ -166,6 +166,23 @@ class AdminMasterDataTest extends TestCase
         $drivers->importRow(['name' => 'X', 'email' => $staff->email, 'password' => 'rahasia1']);
     }
 
+    public function test_driver_plate_number_can_be_changed_and_cleared(): void
+    {
+        Sanctum::actingAs($this->admin(), ['admin']);
+
+        $id = $this->postJson('/api/admin/drivers', [
+            'name' => 'Budi', 'email' => 'budi@example.com', 'password' => 'rahasia1', 'vehicle_plate_number' => 'B 1 AB',
+        ])->assertCreated()->json('data.id');
+
+        $this->putJson("/api/admin/drivers/{$id}", ['name' => 'Budi', 'email' => 'budi@example.com', 'vehicle_plate_number' => 'B 2 CD'])
+            ->assertSuccessful()
+            ->assertJsonPath('data.vehicle_plate_number', 'B 2 CD');
+
+        $this->putJson("/api/admin/drivers/{$id}", ['name' => 'Budi', 'email' => 'budi@example.com', 'vehicle_plate_number' => ''])
+            ->assertSuccessful()
+            ->assertJsonPath('data.vehicle_plate_number', null);
+    }
+
     public function test_product_import_resolves_supplier_and_brand_by_name(): void
     {
         $supplier = Supplier::create(['name' => 'CV Grosir']);

@@ -109,7 +109,7 @@ export default function AppUpdatePage() {
           <>
             <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Build minimum (wajib update)</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Build minimum (wajib update) <span className="text-rose-500">*</span></label>
                 <input
                   type="number"
                   min={0}

@@ -195,7 +195,7 @@ export default function RewardChestPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Peti per hari</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Peti per hari <span className="text-rose-500">*</span></label>
                   <input
                     type="number"
                     min={1}
@@ -209,7 +209,7 @@ export default function RewardChestPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Budget harian (Rp)</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Budget harian (Rp) <span className="text-rose-500">*</span></label>
                   <input
                     type="number"
                     min={0}
@@ -224,7 +224,7 @@ export default function RewardChestPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Kelipatan nominal (Rp)</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Kelipatan nominal (Rp) <span className="text-rose-500">*</span></label>
                   <input
                     type="number"
                     min={1}
@@ -257,9 +257,9 @@ export default function RewardChestPage() {
 
               <div className="space-y-3">
                 <div className="hidden grid-cols-[1fr_1fr_110px_40px] gap-3 px-1 text-xs font-medium text-slate-500 sm:grid">
-                  <span>Nominal minimum (Rp)</span>
-                  <span>Nominal maksimum (Rp)</span>
-                  <span>Peluang (%)</span>
+                  <span>Nominal minimum (Rp) <span className="text-rose-500">*</span></span>
+                  <span>Nominal maksimum (Rp) <span className="text-rose-500">*</span></span>
+                  <span>Peluang (%) <span className="text-rose-500">*</span></span>
                   <span />
                 </div>
                 {form.tiers.map((tier, i) => {

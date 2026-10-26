@@ -277,7 +277,7 @@ export default function EmployeesPage() {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Nama</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Nama <span className="text-rose-500">*</span></label>
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={150} className={inputCls} />
               </div>
               <div>
@@ -293,7 +293,7 @@ export default function EmployeesPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Posisi</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Posisi <span className="text-rose-500">*</span></label>
               <input
                 value={form.position}
                 onChange={(e) => setForm({ ...form, position: e.target.value })}
@@ -309,7 +309,7 @@ export default function EmployeesPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Sistem Gaji</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Sistem Gaji <span className="text-rose-500">*</span></label>
               <div className="grid grid-cols-3 gap-2">
                 {(Object.entries(SALARY_TYPES) as [SalaryType, { label: string }][]).map(([v, t]) => (
                   <button
@@ -327,7 +327,7 @@ export default function EmployeesPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Jumlah Gaji {SALARY_TYPES[form.salary_type].unit}</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Jumlah Gaji {SALARY_TYPES[form.salary_type].unit} <span className="text-rose-500">*</span></label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">Rp</span>
                 <input

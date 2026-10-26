@@ -229,7 +229,7 @@ export default function AdsensePage() {
               {toggle('interstitial_enabled', 'Iklan layar penuh (interstitial)', 'Muncul saat membuka detail produk.')}
               {form.interstitial_enabled && (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Tampilkan setiap</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Tampilkan setiap <span className="text-rose-500">*</span></label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -247,7 +247,7 @@ export default function AdsensePage() {
                 </div>
               )}
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Iklan native di feed Postingan</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Iklan native di feed Postingan <span className="text-rose-500">*</span></label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-600">Setiap</span>
                   <input

@@ -79,7 +79,7 @@ export default function SearchSuggestionsPage() {
 
         <form onSubmit={add} className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="min-w-[200px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-slate-600">Query</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Query <span className="text-rose-500">*</span></label>
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
@@ -90,7 +90,7 @@ export default function SearchSuggestionsPage() {
             />
           </div>
           <div className="w-40">
-            <label className="mb-1 block text-xs font-medium text-slate-600">Jumlah pencarian</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Jumlah pencarian <span className="text-rose-500">*</span></label>
             <input
               type="number"
               min={0}

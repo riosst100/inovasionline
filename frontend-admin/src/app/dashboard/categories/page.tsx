@@ -258,7 +258,7 @@ export default function AdminCategoriesPage() {
             </div>
 
             <label className="block text-xs font-bold text-slate-700">
-              Nama
+              Nama <span className="text-rose-500">*</span>
               <input
                 required
                 value={form.name}

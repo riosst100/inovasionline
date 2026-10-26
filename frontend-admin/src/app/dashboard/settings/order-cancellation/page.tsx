@@ -117,7 +117,7 @@ export default function OrderCancellationPage() {
         ) : (
           <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Batas waktu pembatalan (detik)</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Batas waktu pembatalan (detik) <span className="text-rose-500">*</span></label>
               <input
                 type="number"
                 min={0}
@@ -158,7 +158,7 @@ export default function OrderCancellationPage() {
               </p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Batas waktu kirim (menit)</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Batas waktu kirim (menit) <span className="text-rose-500">*</span></label>
               <input
                 type="number"
                 min={5}
@@ -191,7 +191,7 @@ export default function OrderCancellationPage() {
               </p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Minimal transaksi selesai</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Minimal transaksi selesai <span className="text-rose-500">*</span></label>
               <input
                 type="number"
                 min={0}
@@ -213,7 +213,7 @@ export default function OrderCancellationPage() {
               </p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Jatuh tempo tagihan (hari)</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Jatuh tempo tagihan (hari) <span className="text-rose-500">*</span></label>
               <input
                 type="number"
                 min={1}

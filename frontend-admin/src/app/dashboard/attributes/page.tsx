@@ -331,7 +331,7 @@ export default function ProductAttributesPage() {
             )}
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Nama</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Nama <span className="text-rose-500">*</span></label>
               <input
                 value={form.name}
                 onChange={(e) =>
@@ -349,7 +349,7 @@ export default function ProductAttributesPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Kode</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Kode <span className="text-rose-500">*</span></label>
               <input
                 value={form.code}
                 onChange={(e) => {
@@ -370,7 +370,7 @@ export default function ProductAttributesPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Tipe</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Tipe <span className="text-rose-500">*</span></label>
                 <select
                   value={form.type}
                   onChange={(e) => setForm({ ...form, type: e.target.value as ProductAttributeType })}
@@ -408,7 +408,7 @@ export default function ProductAttributesPage() {
 
             {form.type === 'select' && !lockStructure && (
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Opsi (satu per baris)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Opsi (satu per baris) <span className="text-rose-500">*</span></label>
                 <textarea
                   value={form.optionsText}
                   onChange={(e) => setForm({ ...form, optionsText: e.target.value })}

@@ -413,7 +413,7 @@ function SchedulesSection({ method }: { method: ShippingMethod }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Jam Mulai (WIB)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Jam Mulai (WIB) <span className="text-rose-500">*</span></label>
                 <input
                   type="time"
                   value={form.start_time}
@@ -423,7 +423,7 @@ function SchedulesSection({ method }: { method: ShippingMethod }) {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Jam Selesai (WIB)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Jam Selesai (WIB) <span className="text-rose-500">*</span></label>
                 <input
                   type="time"
                   value={form.end_time}
@@ -435,7 +435,7 @@ function SchedulesSection({ method }: { method: ShippingMethod }) {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Nama Jadwal</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Nama Jadwal <span className="text-rose-500">*</span></label>
               <input
                 value={form.label}
                 onChange={(e) => setForm({ ...form, label: e.target.value })}
@@ -448,7 +448,7 @@ function SchedulesSection({ method }: { method: ShippingMethod }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Batas Pesan (menit)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Batas Pesan (menit) <span className="text-rose-500">*</span></label>
                 <input
                   type="number"
                   min={0}
@@ -586,11 +586,11 @@ function HolidaysSection({ method }: { method: ShippingMethod }) {
         className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
       >
         <div className="w-44">
-          <label className="mb-1 block text-xs font-medium text-slate-600">Tanggal</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Tanggal <span className="text-rose-500">*</span></label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className={inputCls} />
         </div>
         <div className="min-w-[180px] flex-1">
-          <label className="mb-1 block text-xs font-medium text-slate-600">Keterangan</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Keterangan <span className="text-rose-500">*</span></label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}

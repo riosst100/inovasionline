@@ -107,7 +107,7 @@ export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | nu
         <h2 className="text-sm font-semibold text-slate-900">Informasi Umum</h2>
         <div className="grid gap-3">
           <div>
-            <label className={labelCls}>Kode</label>
+            <label className={labelCls}>Kode <span className="text-rose-500">*</span></label>
             <input
               value={form.code}
               onChange={(e) => set('code', e.target.value.toUpperCase())}
@@ -120,7 +120,7 @@ export default function WarehouseForm({ warehouse }: { warehouse: Warehouse | nu
           </div>
         </div>
         <div>
-          <label className={labelCls}>Nama</label>
+          <label className={labelCls}>Nama <span className="text-rose-500">*</span></label>
           <input
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
