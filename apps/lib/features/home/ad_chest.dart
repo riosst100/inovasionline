@@ -50,7 +50,7 @@ class _AdChestWalletStripState extends ConsumerState<AdChestWalletStrip> with Si
     final left = status.canOpen ? status.remaining : 0;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: 6),
       child: Material(
         color: Colors.black.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(12),
@@ -58,7 +58,7 @@ class _AdChestWalletStripState extends ConsumerState<AdChestWalletStrip> with Si
           onTap: () => context.push('/chest'),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+            padding: const EdgeInsets.fromLTRB(10, 4, 6, 4),
             child: Row(
               children: [
                 AnimatedBuilder(

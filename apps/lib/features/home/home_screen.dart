@@ -1042,7 +1042,7 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
                 onTap: () => ref.read(walletBalanceHiddenProvider.notifier).toggle(),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 0),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1066,7 +1066,7 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
                   ),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 0),
               KeyedSubtree(key: walletBalanceTargetKey, child: balance),
             ],
           ),
@@ -1088,13 +1088,13 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           balanceRow,
-          const SizedBox(height: 8),
+          const SizedBox(height: 3),
           Row(
             children: [
               Icon(Icons.info_outline_rounded, size: 11, color: Colors.white.withValues(alpha: 0.7)),
@@ -1227,7 +1227,7 @@ class _CountUpBalanceState extends State<_CountUpBalance> with SingleTickerProvi
               shown == null ? '—' : (widget.hidden ? 'Rp ••••••' : formatCurrency(shown.roundToDouble())),
               maxLines: 1,
               style: TextStyle(
-                fontSize: 21,
+                fontSize: 15,
                 fontWeight: FontWeight.w800,
                 color: Color.lerp(Colors.white, const Color(0xFFFDE047), pulse),
                 letterSpacing: -0.3,
@@ -1259,13 +1259,13 @@ class _WalletAction extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
                 color: primary ? Colors.white : Colors.white.withValues(alpha: 0.18),
                 shape: BoxShape.circle,
@@ -1274,12 +1274,12 @@ class _WalletAction extends StatelessWidget {
                     ? [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 6, offset: const Offset(0, 2))]
                     : null,
               ),
-              child: Icon(icon, size: 19, color: primary ? const Color(0xFF0284C7) : Colors.white),
+              child: Icon(icon, size: 16, color: primary ? const Color(0xFF0284C7) : Colors.white),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Colors.white),
+              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
             ),
           ],
         ),
