@@ -1144,7 +1144,7 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
               ),
               const SizedBox(height: 5),
               const Text(
-                'Masuk untuk mendapatkan saldo belanja hingga 20rb!',
+                'Daftar untuk mendapatkan bonus Saldo Belanja!',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1159,7 +1159,7 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
         ),
         const SizedBox(width: 10),
         FilledButton(
-          onPressed: () => context.push('/account/login'),
+          onPressed: () => context.push('/account/register'),
           style: FilledButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: _gradient.last,
@@ -1168,7 +1168,7 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
             shape: const StadiumBorder(),
             elevation: 0,
           ),
-          child: const Text('Masuk', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+          child: const Text('Daftar', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
         ),
       ],
     );
@@ -1453,13 +1453,12 @@ class _WalletFreeShippingPromo extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
+          color: const Color(0xFFF97316),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFBBF7D0)),
         ),
         child: const Row(
           children: [
-            Icon(Icons.local_shipping_rounded, color: Color(0xFF16A34A), size: 13),
+            Icon(Icons.local_shipping_rounded, color: Colors.white, size: 13),
             SizedBox(width: 6),
             Expanded(
               child: Text.rich(
@@ -1467,14 +1466,14 @@ class _WalletFreeShippingPromo extends StatelessWidget {
                   children: [
                     TextSpan(
                       text: 'Gratis Ongkir ',
-                      style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
+                      style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                     TextSpan(text: 'untuk pembayaran pakai Saldo Belanja'),
                   ],
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 10, color: Color(0xFF334155)),
+                style: TextStyle(fontSize: 10, color: Colors.white),
               ),
             ),
           ],

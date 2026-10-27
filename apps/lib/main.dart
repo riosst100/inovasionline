@@ -17,6 +17,7 @@ import 'providers/auth_provider.dart';
 import 'providers/core_providers.dart';
 import 'services/app_presence.dart';
 import 'services/push_notification_handler.dart';
+import 'services/analytics_service.dart';
 
 Future<void> bootstrap({required String envFile, required bool isDev}) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,8 @@ Future<void> bootstrap({required String envFile, required bool isDev}) async {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
     precacheSplashLogo(),
   ]);
+
+  Analytics.trackRouter(router);
 
   final container = ProviderContainer();
   // Starts restoring the session (currentUser API call) right away, so it

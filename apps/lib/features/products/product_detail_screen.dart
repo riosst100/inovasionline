@@ -12,6 +12,7 @@ import '../../widgets/skeleton.dart';
 import '../ads/ad_banner.dart';
 import '../ads/admob.dart';
 import '../cart/cart_providers.dart';
+import '../../services/analytics_service.dart';
 
 final productDetailProvider = FutureProvider.autoDispose
     .family<ProductDetail, String>((ref, slug) {
@@ -46,6 +47,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen>
   void initState() {
     super.initState();
     ref.read(interstitialAdsProvider).onProductOpened();
+    Analytics.event('view_item', {'item_id': widget.slug});
   }
 
   @override

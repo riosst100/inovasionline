@@ -16,6 +16,7 @@ import '../services/location_service.dart';
 import '../services/push_notification_handler.dart';
 import 'core_providers.dart';
 import 'delivery_address_provider.dart';
+import '../services/analytics_service.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
@@ -80,6 +81,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .then(_adoptGuestAddress);
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
+      Analytics.setUser(user.id.toString());
+      Analytics.event('login', {'method': 'password'});
       await _syncDeviceToken();
       return true;
     } on DioException catch (e) {
@@ -112,6 +115,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .then(_adoptGuestAddress);
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
+      Analytics.setUser(user.id.toString());
+      Analytics.event('sign_up', {'method': 'phone'});
       await _syncDeviceToken();
       return true;
     } on DioException catch (e) {
@@ -176,6 +181,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[GOOGLE_AUTH] Step 7: login success, user: ${user.name}');
       state = AuthState(status: AuthStatus.authenticated, user: user);
       _syncBlock(user);
+      Analytics.setUser(user.id.toString());
+      Analytics.event('login', {'method': 'google'});
       await _syncDeviceToken();
       return true;
     } on DioException catch (e) {
@@ -243,6 +250,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Best-effort: an unreachable backend shouldn't block logout.
     }
     await _ref.read(authServiceProvider).logout();
+    Analytics.event('logout');
+    Analytics.setUser(null);
     AccountBlock.notifier.value = null;
     state = const AuthState(status: AuthStatus.unauthenticated);
   }

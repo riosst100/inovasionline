@@ -16,6 +16,7 @@ import '../wallet/topup_screen.dart';
 import '../wallet/wallet_providers.dart';
 import 'checkout_providers.dart';
 import 'user_address_sheets.dart';
+import '../../services/analytics_service.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key, required this.selection});
@@ -47,6 +48,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    Analytics.event('begin_checkout', {'items': widget.selection.items.length});
     _selectRecentAddress();
   }
 
@@ -509,6 +511,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (success) {
       final order = ref.read(checkoutProvider).order;
       if (order != null) {
+        Analytics.event('purchase', {
+          'transaction_id': order.orderNumber,
+          'value': order.grandTotal,
+          'currency': 'IDR',
+          'payment_method': _paymentMethod?.id.toString() ?? '',
+        });
         context.go('/orders/${order.id}');
         _showSnack('Pesanan berhasil dibuat!');
         if (order.needsOnlinePayment && order.paymentRedirectUrl != null) {

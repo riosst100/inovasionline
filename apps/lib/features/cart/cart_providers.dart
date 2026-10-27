@@ -6,6 +6,7 @@ import '../../core/api/api_exception.dart';
 import '../../models/cart.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
+import '../../services/analytics_service.dart';
 
 String _errorMessage(Object error, String fallback) {
   if (error is DioException && error.error is ApiException) {
@@ -60,6 +61,7 @@ class CartNotifier extends StateNotifier<CartState> {
           .read(cartServiceProvider)
           .addItem(productId: productId, variantId: variantId, quantity: quantity);
       state = CartState(cart: cart);
+      Analytics.event('add_to_cart', {'item_id': productId, 'quantity': quantity});
       return true;
     } catch (e) {
       state = state.copyWith(error: _errorMessage(e, 'Gagal menambahkan ke keranjang.'));

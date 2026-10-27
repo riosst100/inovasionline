@@ -18,6 +18,7 @@ import '../../services/location_service.dart';
 import '../../services/push_notification_handler.dart';
 import '../../widgets/app_loading_skeleton.dart';
 import 'manual_address_screen.dart';
+import '../../services/analytics_service.dart';
 
 /// First thing that happens once the native splash is gone.
 ///
@@ -61,6 +62,10 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   bool _permissionsDone = false;
   bool _locatingStarted = false;
   bool _locatingDone = false;
+
+  /// The location explanation screen has been passed: permission granted and
+  /// GPS on (or no location needed at all).
+  bool _locationStepDone = false;
 
   /// Status line for the loading screen; null while we do not yet know that a
   /// lookup will really happen (so nothing is shown when there is none).
@@ -119,7 +124,7 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     // of our own screen. Asking only ever happens from a button press.
     if (state == AppLifecycleState.resumed &&
         !_checking &&
-        !_permissionsDone &&
+        (!_permissionsDone || !_locationStepDone) &&
         !_requesting) {
       _syncStatuses();
     }
@@ -173,15 +178,15 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     _locationNeeded = await _needsDefaultAddress();
     if (!mounted) return;
 
-    if (_locationNeeded && !_locationGranted && !_locationPermanentlyDenied) {
-      await _introPlayed.future;
-      if (!mounted) return;
-      await _requestLocation();
-    }
+    // Location is not asked here: the explanation screen comes first, and its
+    // button asks for permission and then switches GPS on.
+    _locationStepDone = !_locationNeeded ||
+        (_locationGranted && await LocationService.isServiceEnabled());
 
     if (!mounted) return;
     setState(() => _checking = false);
     _evaluate();
+    if (!_locationStepDone) Analytics.locationIntroShown();
 
     if (_locationNeeded) {
       _locationSuggestionDone = true;
@@ -259,8 +264,34 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   }
 
   void _evaluate() {
-    setState(() => _permissionsDone =
-        _notificationGranted && (_locationGranted || !_locationNeeded));
+    setState(() => _permissionsDone = _notificationGranted);
+  }
+
+  /// Button on the location explanation screen: ask for permission if it is
+  /// missing, then switch GPS on straight away.
+  Future<void> _onEnableLocation() async {
+    if (_locationPermanentlyDenied && !_locationGranted) {
+      await openAppSettings();
+      return;
+    }
+    Analytics.locationButtonTapped();
+    setState(() => _requesting = true);
+    if (!_locationGranted) {
+      await _requestLocation();
+      Analytics.locationPermission(
+        granted: _locationGranted,
+        permanent: _locationPermanentlyDenied,
+      );
+    }
+    if (!mounted) return;
+    if (_locationGranted) {
+      final enabled = await _requestGps();
+      Analytics.locationServiceResult(enabled: enabled);
+      if (!mounted) return;
+      // Declined GPS is handled later by the "Lokasi Belum Aktif" screen.
+      setState(() => _locationStepDone = true);
+    }
+    setState(() => _requesting = false);
   }
 
   Future<void> _requestNotification() async {
@@ -300,22 +331,6 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     _evaluate();
   }
 
-  Future<void> _onLocationAction() async {
-    if (_locationPermanentlyDenied) {
-      await openAppSettings();
-      return;
-    }
-    setState(() => _requesting = true);
-    await _requestLocation();
-    if (!mounted) return;
-    setState(() => _requesting = false);
-    _evaluate();
-  }
-
-  /// Primary button: the first permission that is still missing.
-  Future<void> _onPrimaryAction() =>
-      !_notificationGranted ? _onNotificationAction() : _onLocationAction();
-
   /// Jumps straight to the app's notification settings screen on Android
   /// (skipping the generic App Info page) so the user only has to flip one
   /// switch. Falls back to the generic app settings page elsewhere.
@@ -343,7 +358,7 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   Future<void> _ensureGpsOn() async {
     if (await LocationService.isServiceEnabled()) return;
 
-    if (mounted) setState(() => _locatingText = 'Menyalakan GPS...');
+    if (mounted) setState(() => _locatingText = 'Menyalakan lokasi...');
     final enabled = await _requestGps();
     if (enabled || !mounted) return;
 
@@ -410,6 +425,9 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     }
 
     if (!mounted) return;
+    if (ref.read(locationFailureProvider) == LocationFailure.outOfArea) {
+      Analytics.outOfArea();
+    }
     setState(() {
       _outOfArea = ref.read(locationFailureProvider) == LocationFailure.outOfArea;
       _locatingDone = true;
@@ -472,12 +490,16 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
       return _PermissionScreen(
         notificationGranted: _notificationGranted,
         notificationPermanentlyDenied: _notificationPermanentlyDenied,
-        locationGranted: _locationGranted,
-        locationPermanentlyDenied: _locationPermanentlyDenied,
         requesting: _requesting,
-        onPrimary: _onPrimaryAction,
         onRequestNotification: _onNotificationAction,
-        onRequestLocation: _onLocationAction,
+      );
+    }
+
+    if (!_locationStepDone) {
+      return _LocationIntroScreen(
+        busy: _requesting,
+        permanentlyDenied: _locationPermanentlyDenied && !_locationGranted,
+        onEnable: _onEnableLocation,
       );
     }
 
@@ -862,36 +884,22 @@ class _PermissionScreen extends StatelessWidget {
   const _PermissionScreen({
     required this.notificationGranted,
     required this.notificationPermanentlyDenied,
-    required this.locationGranted,
-    required this.locationPermanentlyDenied,
     required this.requesting,
-    required this.onPrimary,
     required this.onRequestNotification,
-    required this.onRequestLocation,
   });
 
   final bool notificationGranted;
   final bool notificationPermanentlyDenied;
-  final bool locationGranted;
-  final bool locationPermanentlyDenied;
   final bool requesting;
-  final VoidCallback onPrimary;
   final VoidCallback onRequestNotification;
-  final VoidCallback onRequestLocation;
 
   @override
   Widget build(BuildContext context) {
-    final missingNotification = !notificationGranted;
-    final blockedForever = missingNotification
-        ? notificationPermanentlyDenied
-        : locationPermanentlyDenied;
     final primaryLabel = requesting
         ? 'Menunggu...'
-        : blockedForever
+        : notificationPermanentlyDenied
         ? 'Buka Pengaturan'
-        : missingNotification
-        ? 'Izinkan Notifikasi'
-        : 'Izinkan Lokasi';
+        : 'Izinkan Notifikasi';
 
     return PopScope(
       canPop: false,
@@ -928,7 +936,7 @@ class _PermissionScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Izinkan notifikasi dan lokasi untuk melanjutkan.',
+                          'Izinkan notifikasi untuk melanjutkan.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AppColors.mutedForeground),
                         ),
@@ -946,20 +954,6 @@ class _PermissionScreen extends StatelessWidget {
                               : 'Izinkan',
                           onAction: requesting ? null : onRequestNotification,
                         ),
-                        const SizedBox(height: 12),
-                        _PermissionTile(
-                          icon: Icons.location_on_rounded,
-                          color: const Color(0xFF0284C7),
-                          title: 'Lokasi',
-                          description:
-                              'Mengatur alamat pengiriman awal sesuai posisi kamu.',
-                          badge: 'Wajib',
-                          granted: locationGranted,
-                          actionLabel: locationPermanentlyDenied
-                              ? 'Pengaturan'
-                              : 'Izinkan',
-                          onAction: requesting ? null : onRequestLocation,
-                        ),
                       ],
                     ),
                   ),
@@ -968,7 +962,7 @@ class _PermissionScreen extends StatelessWidget {
                   width: double.infinity,
                   height: 48,
                   child: FilledButton(
-                    onPressed: requesting ? null : onPrimary,
+                    onPressed: requesting ? null : onRequestNotification,
                     child: Text(primaryLabel),
                   ),
                 ),
@@ -1259,6 +1253,94 @@ class _OutOfAreaScreen extends ConsumerWidget {
   }
 }
 
+/// Explains why the app needs location before anything is asked of the user.
+class _LocationIntroScreen extends StatelessWidget {
+  const _LocationIntroScreen({
+    required this.onEnable,
+    required this.busy,
+    required this.permanentlyDenied,
+  });
+
+  final VoidCallback onEnable;
+  final bool busy;
+  final bool permanentlyDenied;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.location_on_rounded,
+                          size: 44,
+                          color: Color(0xFF0284C7),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Nyalakan Lokasi',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Aplikasi perlu menyalakan lokasi untuk menentukan posisi '
+                        'kamu, agar katalog produk dan pengiriman sesuai '
+                        'dengan tempat kamu berada.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.mutedForeground,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: busy ? null : onEnable,
+                    child: Text(
+                      busy
+                          ? 'Menunggu...'
+                          : permanentlyDenied
+                          ? 'Buka Pengaturan'
+                          : 'Nyalakan Lokasi',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: () => SystemNavigator.pop(),
+                  child: const Text('Keluar Aplikasi'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _GpsOffScreen extends StatelessWidget {
   const _GpsOffScreen({required this.onEnable, required this.busy});
 
@@ -1292,14 +1374,14 @@ class _GpsOffScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'GPS Belum Aktif',
+                  'Lokasi Belum Aktif',
                   style: Theme.of(context).textTheme.headlineSmall
                       ?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Nyalakan GPS di HP kamu untuk menentukan alamat pengiriman. '
-                  'Aplikasi akan lanjut otomatis setelah GPS aktif.',
+                  'Nyalakan lokasi di HP kamu untuk menentukan alamat pengiriman. '
+                  'Aplikasi akan lanjut otomatis setelah lokasi aktif.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.mutedForeground),
                 ),
@@ -1309,7 +1391,7 @@ class _GpsOffScreen extends StatelessWidget {
                   height: 48,
                   child: FilledButton(
                     onPressed: busy ? null : onEnable,
-                    child: Text(busy ? 'Menyalakan GPS...' : 'Aktifkan GPS'),
+                    child: Text(busy ? 'Menyalakan lokasi...' : 'Nyalakan Lokasi'),
                   ),
                 ),
               ],
