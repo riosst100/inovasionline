@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { useAuth } from '../../../context/AuthContext';
-import { adminApi, ApiError } from '../../../lib/api';
+import { adminApi, apiRequestFull, ApiError } from '../../../lib/api';
 import { Customer } from '../../../types';
 import { AlertCircle, Bell, CheckCircle2, Loader2, Search, Send, Users, X } from 'lucide-react';
 
@@ -32,9 +32,12 @@ export default function AdminNotificationsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminApi.getCustomers({ search: search.trim() || undefined, page });
-      setCustomers(res.data);
-      setLastPage(res.last_page);
+      const query = new URLSearchParams({ page: String(page) });
+      if (search.trim()) query.set('search', search.trim());
+      // apiRequest unwraps to the plain row array; the page count is in `meta`.
+      const res = await apiRequestFull<Customer[]>(`/admin/customers?${query.toString()}`);
+      setCustomers(res.data ?? []);
+      setLastPage(res.meta?.last_page ?? 1);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Gagal memuat daftar pengguna.');
     } finally {
