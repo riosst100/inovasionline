@@ -3,6 +3,7 @@ import '../../config/env.dart';
 import '../storage/token_storage.dart';
 import 'account_block.dart';
 import 'api_exception.dart';
+import 'connectivity.dart';
 
 class ApiClient {
   ApiClient(this._tokenStorage) : dio = Dio(
@@ -21,6 +22,22 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Reads (GET) may fail or be served from what is already loaded, but
+          // anything sent to the server needs internet: refuse it up front
+          // instead of letting it hang until a timeout.
+          if (options.method != 'GET' &&
+              !Connectivity.online.value &&
+              !await Connectivity.check()) {
+            return handler.reject(
+              DioException(
+                requestOptions: options,
+                type: DioExceptionType.connectionError,
+                error: ApiException(
+                  'Tidak ada koneksi internet. Periksa koneksi Anda lalu coba lagi.',
+                ),
+              ),
+            );
+          }
           final token = await _tokenStorage.readToken();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';

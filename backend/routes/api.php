@@ -143,14 +143,15 @@ Route::prefix('v1')->group(function () {
             Route::get('/me', [UserVerificationController::class, 'show']);
         });
 
-        Route::prefix('device-tokens')->group(function () {
-            Route::post('/', [DeviceTokenController::class, 'store']);
-            Route::delete('/', [DeviceTokenController::class, 'destroy']);
-        });
+        Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
     });
 
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::get('/categories/{slug}', [CategoryController::class, 'show']);
+
+    // Public on purpose: the app registers its push token before login too. A signed-in caller
+    // (bearer token) gets the token linked to their account; see DeviceTokenController.
+    Route::post('/device-tokens', [DeviceTokenController::class, 'store'])->middleware('throttle:30,1');
 
     Route::get('/app-version', [AppVersionController::class, 'show']);
 

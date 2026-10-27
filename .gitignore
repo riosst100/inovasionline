@@ -50,3 +50,6 @@ apps/.widget_preview/
 download/*.apk
 download/release.json
 download/.*.tmp
+
+# scrcpy (Android screen mirroring tool), local only
+scrcpy-win64-v4.1/

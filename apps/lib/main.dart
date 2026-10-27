@@ -11,6 +11,7 @@ import 'config/env.dart';
 import 'config/router.dart';
 import 'config/theme.dart';
 import 'features/shell/blocked_account_gate.dart';
+import 'features/shell/connectivity_gate.dart';
 import 'features/shell/permission_gate.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
@@ -89,8 +90,12 @@ class InovasiOnlineApp extends StatelessWidget {
           top: false,
           left: false,
           right: false,
-          child: PermissionGate(
-            child: BlockedAccountGate(child: child ?? const SizedBox.shrink()),
+          child: ConnectivityGate(
+            child: PermissionGate(
+              child: BlockedAccountGate(
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
           ),
         ),
       ),

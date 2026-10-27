@@ -11,6 +11,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../config/env.dart';
 import '../core/api/account_block.dart';
 import '../core/api/api_exception.dart';
+import '../core/api/connectivity.dart';
 import '../models/user.dart';
 import '../services/analytics.dart';
 import '../services/location_service.dart';
@@ -148,7 +149,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  static const _offlineMessage = 'Tidak ada koneksi internet. Periksa koneksi Anda lalu coba lagi.';
+
   Future<bool> loginWithGoogle() async {
+    // The Google account picker fails with a cryptic platform error when offline, so check first.
+    if (!await Connectivity.check()) {
+      state = state.copyWith(error: _offlineMessage);
+      return false;
+    }
     try {
       debugPrint('[GOOGLE_AUTH] Step 1: initializing GoogleSignIn with serverClientId: ${Env.googleServerClientId}');
       final googleSignIn = GoogleSignIn(
@@ -190,7 +198,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[GOOGLE_AUTH] Unexpected error: $e');
       debugPrint('[GOOGLE_AUTH] Stack: $stack');
       final msg = e.toString();
-      if (msg.contains('ApiException: 10')) {
+      if (msg.contains('network_error') || msg.contains('ApiException: 7')) {
+        state = state.copyWith(error: _offlineMessage);
+      } else if (msg.contains('ApiException: 10')) {
         state = state.copyWith(
           error:
               'Gagal masuk dengan Google (Error 10): SHA-1 fingerprint belum terdaftar di Firebase Console.',

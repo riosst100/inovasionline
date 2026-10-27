@@ -89,7 +89,9 @@ class NotificationService
 
     private function pruneInvalidTokens(MulticastSendReport $report): void
     {
-        $invalidTokens = $report->invalidTokens();
+        // FCM's "NotRegistered" (app uninstalled / token expired) is reported as unknown, malformed
+        // tokens as invalid; both are dead.
+        $invalidTokens = [...$report->invalidTokens(), ...$report->unknownTokens()];
 
         if ($invalidTokens === []) {
             return;
