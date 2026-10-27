@@ -14,7 +14,7 @@ class DeviceTokenController extends Controller
     {
         $request->user()->deviceTokens()->updateOrCreate(
             ['token' => $request->validated('token')],
-            ['platform' => $request->validated('platform')]
+            ['platform' => $request->validated('platform'), 'last_seen_at' => now()]
         );
 
         return ApiResponse::success(null, 'Device token registered successfully.');

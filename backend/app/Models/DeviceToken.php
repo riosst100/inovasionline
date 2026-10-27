@@ -15,7 +15,13 @@ class DeviceToken extends Model
         'user_id',
         'token',
         'platform',
+        'last_seen_at',
     ];
+
+    protected function casts(): array
+    {
+        return ['last_seen_at' => 'datetime'];
+    }
 
     public function user(): BelongsTo
     {
