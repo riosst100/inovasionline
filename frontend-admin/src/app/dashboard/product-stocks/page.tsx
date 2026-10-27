@@ -247,7 +247,7 @@ export default function ProductStocksPage() {
               {editRows.map((row, i) => (
                 <div key={i} className="grid grid-cols-[1fr_7rem_auto] items-end gap-2">
                   <div className="text-xs font-semibold text-slate-600">
-                    {i === 0 && 'Gudang'}
+                    {i === 0 && <>Gudang <span className="text-rose-500">*</span></>}
                     <SearchableSelect
                       value={row.warehouse_id}
                       onChange={(v) => updateRow(i, { warehouse_id: v })}
@@ -257,7 +257,7 @@ export default function ProductStocksPage() {
                     />
                   </div>
                   <label className="block text-xs font-semibold text-slate-600">
-                    {i === 0 && 'Stok'}
+                    {i === 0 && <>Stok <span className="text-rose-500">*</span></>}
                     <input
                       inputMode="numeric"
                       value={row.quantity}

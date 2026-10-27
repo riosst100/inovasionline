@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\V1\Admin\WalletController as AdminWalletController;
 use App\Http\Controllers\Api\V1\Admin\WalletReportController as AdminWalletReportController;
 use App\Http\Controllers\Api\V1\Admin\WalletTopupController as AdminWalletTopupController;
 use App\Http\Controllers\Api\V1\Admin\ServiceFeeController as AdminServiceFeeController;
+use App\Http\Controllers\Api\V1\Admin\MidtransSettingController as AdminMidtransSettingController;
 use App\Http\Controllers\Api\V1\Admin\ShippingMethodController as AdminShippingMethodController;
 use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateController as AdminShippingRateTemplateController;
 use App\Http\Controllers\Api\V1\Admin\ShippingRateTemplateRowController as AdminShippingRateTemplateRowController;
@@ -546,6 +547,9 @@ Route::prefix('admin')->group(function () {
 
         Route::get('service-fee', [AdminServiceFeeController::class, 'show'])->middleware('menu:service_fee');
         Route::put('service-fee', [AdminServiceFeeController::class, 'update'])->middleware('menu:service_fee');
+
+        Route::get('midtrans-settings', [AdminMidtransSettingController::class, 'show'])->middleware('menu:payment_gateway');
+        Route::put('midtrans-settings', [AdminMidtransSettingController::class, 'update'])->middleware('menu:payment_gateway');
 
         Route::get('free-shipping', [AdminFreeShippingController::class, 'show'])->middleware('menu:free_shipping');
         Route::put('free-shipping', [AdminFreeShippingController::class, 'update'])->middleware('menu:free_shipping');

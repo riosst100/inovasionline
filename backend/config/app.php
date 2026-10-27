@@ -15,7 +15,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
-    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+    // FRONTEND_URL is a comma-separated list (CORS origins); links use the first one.
+    'frontend_url' => trim(explode(',', (string) env('FRONTEND_URL', 'http://localhost:3000'))[0]),
 
     /*
     |--------------------------------------------------------------------------

@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:in_app_update/in_app_update.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/theme.dart';
 import '../../models/user.dart';
@@ -47,15 +45,7 @@ class AccountScreen extends ConsumerWidget {
         return;
       }
       // Asked for explicitly, so Play's full-screen update straight away.
-      final info = update.play;
-      if (info.immediateUpdateAllowed) {
-        await InAppUpdate.performImmediateUpdate();
-      } else {
-        await launchUrl(
-          Uri.parse('market://details?id=${info.packageName}'),
-          mode: LaunchMode.externalApplication,
-        );
-      }
+      await ref.read(appUpdateServiceProvider).updateNow(update.play);
     } catch (_) {
       messenger
         ..hideCurrentSnackBar()

@@ -345,7 +345,7 @@ function ReviewDrawer({
         ) : (
           <div className="mt-5 space-y-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="revoke-reason">
-              Cabut verifikasi
+              Cabut verifikasi <span className="text-rose-500">*</span>
             </label>
             <textarea
               id="revoke-reason"

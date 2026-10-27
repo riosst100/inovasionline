@@ -304,7 +304,7 @@ export default function ShippingMethodsPage() {
             )}
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Nama Metode</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Nama Metode <span className="text-rose-500">*</span></label>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -328,7 +328,7 @@ export default function ShippingMethodsPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Ongkir (Rp)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Ongkir (Rp) <span className="text-rose-500">*</span></label>
                 <input
                   type="number"
                   min={0}
@@ -380,7 +380,7 @@ export default function ShippingMethodsPage() {
               </label>
               {form.requires_schedule && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">Bisa dipesan hingga (hari ke depan)</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Bisa dipesan hingga (hari ke depan) <span className="text-rose-500">*</span></label>
                   <input
                     type="number"
                     min={1}

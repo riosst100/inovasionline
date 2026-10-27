@@ -27,6 +27,20 @@ class Role extends Model
         ];
     }
 
+    /** The courier role, created on first use (by the Kurir page or its import). */
+    public static function driver(): self
+    {
+        return self::firstOrCreate(
+            ['slug' => 'driver'],
+            [
+                'name' => 'Driver',
+                'description' => 'Petugas kurir pengantaran barang dan update status ekspedisi pengiriman.',
+                'permissions' => ['orders.view', 'delivery.view', 'delivery.update'],
+                'is_system' => false,
+            ]
+        );
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);

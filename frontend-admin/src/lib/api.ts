@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -190,13 +190,13 @@ export const adminApi = {
   },
 
   // Admin & Staff Users (/api/admin/staff/*)
-  async getStaffUsers(params?: { search?: string; role_id?: string; page?: number }): Promise<PaginatedData<AdminUser>> {
+  async getStaffUsers(params?: { search?: string; role_id?: string; page?: number }): Promise<AdminUser[]> {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.role_id) query.append('role_id', params.role_id);
     if (params?.page) query.append('page', params.page.toString());
 
-    return apiRequest<PaginatedData<AdminUser>>(`/admin/staff?${query.toString()}`);
+    return apiRequest<AdminUser[]>(`/admin/staff?${query.toString()}`);
   },
 
   async createStaffUser(data: { name: string; username: string; email: string; phone?: string; password: string; role_id: string }): Promise<AdminUser> {
@@ -220,19 +220,18 @@ export const adminApi = {
   },
 
   // Driver Management (/api/admin/drivers/*)
-  async getDrivers(params?: { search?: string; is_active?: boolean; page?: number }): Promise<PaginatedData<Driver>> {
+  async getDrivers(params?: { search?: string; is_active?: boolean; page?: number }): Promise<Driver[]> {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
     if (params?.is_active !== undefined) query.append('is_active', params.is_active ? '1' : '0');
     if (params?.page) query.append('page', params.page.toString());
 
-    return apiRequest<PaginatedData<Driver>>(`/admin/drivers?${query.toString()}`);
+    return apiRequest<Driver[]>(`/admin/drivers?${query.toString()}`);
   },
 
   async createDriver(data: {
     name: string;
-    email: string;
-    phone?: string;
+    phone: string;
     password: string;
     vehicle_type?: string;
     vehicle_plate_number?: string;
@@ -248,11 +247,10 @@ export const adminApi = {
     id: string,
     data: {
       name: string;
-      email: string;
-      phone?: string;
+      phone: string;
       password?: string;
       vehicle_type?: string;
-      vehicle_plate_number?: string;
+      vehicle_plate_number?: string | null;
       is_active?: boolean;
     }
   ): Promise<Driver> {
@@ -275,8 +273,8 @@ export const adminApi = {
     });
   },
 
-  async getDriverOrders(driverId: string, page = 1): Promise<PaginatedData<DriverOrder>> {
-    return apiRequest<PaginatedData<DriverOrder>>(`/admin/drivers/${driverId}/orders?page=${page}`);
+  async getDriverOrders(driverId: string, page = 1): Promise<DriverOrder[]> {
+    return apiRequest<DriverOrder[]>(`/admin/drivers/${driverId}/orders?page=${page}`);
   },
 
   // Customers (/api/admin/customers/*)
@@ -598,6 +596,17 @@ export const adminApi = {
 
   async saveServiceFee(payload: ServiceFeeSettings): Promise<ServiceFeeSettings> {
     return apiRequest<ServiceFeeSettings>('/admin/service-fee', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getMidtransSettings(): Promise<MidtransSettings> {
+    return apiRequest<MidtransSettings>('/admin/midtrans-settings');
+  },
+
+  async saveMidtransSettings(payload: MidtransSettingsPayload): Promise<MidtransSettings> {
+    return apiRequest<MidtransSettings>('/admin/midtrans-settings', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });

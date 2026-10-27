@@ -436,7 +436,7 @@ function BillForm({
         )}
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Supplier</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Supplier <span className="text-rose-500">*</span></label>
           <SearchableSelect
             value={form.supplier_id}
             onChange={(v) => setForm({ ...form, supplier_id: v })}
@@ -447,7 +447,7 @@ function BillForm({
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Nomor Tagihan / Invoice</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Nomor Tagihan / Invoice <span className="text-rose-500">*</span></label>
           <input
             value={form.bill_number}
             onChange={(e) => setForm({ ...form, bill_number: e.target.value })}
@@ -460,7 +460,7 @@ function BillForm({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Tanggal Tagihan</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Tanggal Tagihan <span className="text-rose-500">*</span></label>
             <input type="date" value={form.bill_date} onChange={(e) => setForm({ ...form, bill_date: e.target.value })} required className={inputCls} />
           </div>
           <div>
@@ -476,7 +476,7 @@ function BillForm({
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Nominal</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Nominal <span className="text-rose-500">*</span></label>
           <div className="relative">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">Rp</span>
             <input
@@ -561,7 +561,7 @@ function PayDialog({ bill, onClose, onPaid }: { bill: SupplierBill; onClose: () 
         )}
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Tanggal Bayar</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Tanggal Bayar <span className="text-rose-500">*</span></label>
           <input type="date" value={paidDate} max={todayWib()} onChange={(e) => setPaidDate(e.target.value)} required className={inputCls} />
         </div>
         <div>

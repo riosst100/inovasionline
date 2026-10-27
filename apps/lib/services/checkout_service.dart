@@ -1,11 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/api/api_client.dart';
+import '../core/device/device_details.dart';
+import '../core/storage/install_id.dart';
 import '../models/delivery_schedule.dart';
 import '../models/order.dart';
 import '../models/payment_method.dart';
 import '../models/shipping_method.dart';
+import 'location_service.dart';
 
 class CheckoutService {
   CheckoutService(this._apiClient);
@@ -80,7 +85,9 @@ class CheckoutService {
     String? deliveryScheduleId,
     String? deliveryDate,
   }) async {
+    final evidence = await _deviceEvidence();
     final response = await _apiClient.dio.post('/checkout', data: {
+      ...evidence,
       'cart_item_ids': cartItemIds,
       'payment_method_id': paymentMethodId,
       'shipping_method_id': shippingMethodId,
@@ -97,6 +104,38 @@ class CheckoutService {
       'customer_notes': customerNotes,
     });
     return Order.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  /// Device, install and last known position, stored with the order as
+  /// evidence against fake orders (the backend adds the IP). Best effort and
+  /// capped at 2 seconds, so it can never block or fail a checkout.
+  Future<Map<String, dynamic>> _deviceEvidence() async {
+    try {
+      final results = await Future.wait<Object?>([
+        DeviceDetails.collect(),
+        InstallId.read(),
+        PackageInfo.fromPlatform(),
+        // Its own shorter cap, so a slow lookup doesn't cost the device details.
+        LocationService.lastKnownPosition().timeout(const Duration(milliseconds: 1500), onTimeout: () => null),
+      ]).timeout(const Duration(seconds: 2));
+      final packageInfo = results[2] as PackageInfo;
+      final position = results[3] as Position?;
+      return {
+        'device': ?results[0],
+        'install_id': results[1],
+        'app_version': packageInfo.version,
+        'build_number': ?int.tryParse(packageInfo.buildNumber),
+        if (position != null)
+          'location': {
+            'latitude': position.latitude,
+            'longitude': position.longitude,
+            'accuracy': position.accuracy,
+            'at': position.timestamp.toUtc().toIso8601String(),
+          },
+      };
+    } catch (_) {
+      return {};
+    }
   }
 
   /// Whether this account already passed the one-time face check (COD and Paylater).

@@ -11,8 +11,8 @@ class AuthService {
   final ApiClient _api;
   final TokenStorage _tokens;
 
-  Future<DriverUser> login({required String email, required String password}) async {
-    final res = await _api.dio.post('/admin/auth/login', data: {'email': email, 'password': password});
+  Future<DriverUser> login({required String phone, required String password}) async {
+    final res = await _api.dio.post('/admin/auth/login', data: {'phone': phone, 'password': password});
     final data = res.data['data'] as Map<String, dynamic>;
     final user = data['user'] as Map<String, dynamic>;
 

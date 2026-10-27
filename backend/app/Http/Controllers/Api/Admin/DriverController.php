@@ -48,30 +48,21 @@ class DriverController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $driverRole = Role::firstOrCreate(
-            ['slug' => 'driver'],
-            [
-                'name' => 'Driver',
-                'description' => 'Petugas kurir pengantaran barang dan update status ekspedisi pengiriman.',
-                'permissions' => ['orders.view', 'delivery.view', 'delivery.update'],
-                'is_system' => false,
-            ]
-        );
+        $driverRole = Role::driver();
 
+        $request->merge(['phone' => AdminUser::normalizePhone($request->input('phone'))]);
         $validated = $request->validate([
             'name' => 'required|string|max:150',
-            'email' => 'required|email|max:150|unique:admin_users,email',
-            'phone' => 'nullable|string|max:30|unique:admin_users,phone',
+            'phone' => $this->phoneRules(),
             'password' => 'required|string|min:6',
             'vehicle_type' => 'nullable|string|max:50',
             'vehicle_plate_number' => 'nullable|string|max:30',
             'is_active' => 'nullable|boolean',
-        ]);
+        ], $this->phoneMessages());
 
         $driver = AdminUser::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
+            'phone' => $validated['phone'],
             'password' => Hash::make($validated['password']),
             'role_id' => $driverRole->id,
             'vehicle_type' => $validated['vehicle_type'] ?? 'Motor',
@@ -100,22 +91,24 @@ class DriverController extends Controller
      */
     public function update(Request $request, AdminUser $driver): JsonResponse
     {
+        $request->merge(['phone' => AdminUser::normalizePhone($request->input('phone'))]);
         $validated = $request->validate([
             'name' => 'required|string|max:150',
-            'email' => ['required', 'email', 'max:150', Rule::unique('admin_users', 'email')->ignore($driver->id)],
-            'phone' => ['nullable', 'string', 'max:30', Rule::unique('admin_users', 'phone')->ignore($driver->id)],
+            'phone' => $this->phoneRules($driver),
             'password' => 'nullable|string|min:6',
             'vehicle_type' => 'nullable|string|max:50',
             'vehicle_plate_number' => 'nullable|string|max:30',
             'is_active' => 'nullable|boolean',
-        ]);
+        ], $this->phoneMessages());
 
         $data = [
             'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
+            'phone' => $validated['phone'],
             'vehicle_type' => $validated['vehicle_type'] ?? $driver->vehicle_type,
-            'vehicle_plate_number' => $validated['vehicle_plate_number'] ?? $driver->vehicle_plate_number,
+            // Sent but empty clears the plate; only an omitted field keeps it.
+            'vehicle_plate_number' => array_key_exists('vehicle_plate_number', $validated)
+                ? $validated['vehicle_plate_number']
+                : $driver->vehicle_plate_number,
         ];
 
         if (!empty($validated['password'])) {
@@ -135,7 +128,7 @@ class DriverController extends Controller
     }
 
     /**
-     * Set driver status enable / disable.
+     * Set driver status active / inactive.
      */
     public function setStatus(Request $request, AdminUser $driver): JsonResponse
     {
@@ -146,7 +139,7 @@ class DriverController extends Controller
         $driver->is_active = $validated['is_active'];
         $driver->save();
 
-        $statusText = $driver->is_active ? 'diaktifkan (Enable)' : 'dinonaktifkan (Disable)';
+        $statusText = $driver->is_active ? 'diaktifkan' : 'dinonaktifkan';
 
         return ApiResponse::success(
             new AdminUserResource($driver->fresh()->load('role')->loadCount('deliveredOrders')),
@@ -205,5 +198,20 @@ class DriverController extends Controller
                 'total' => $paginator->total(),
             ]
         );
+    }
+
+    /** The courier's login: a normalized (AdminUser::normalizePhone) Indonesian mobile number, unique across admin accounts. */
+    private function phoneRules(?AdminUser $driver = null): array
+    {
+        return ['required', 'string', 'regex:/^08\d{7,13}$/', Rule::unique('admin_users', 'phone')->ignore($driver?->id)];
+    }
+
+    private function phoneMessages(): array
+    {
+        return [
+            'phone.required' => 'Nomor HP wajib diisi.',
+            'phone.regex' => 'Nomor HP tidak valid, contoh 081234567890.',
+            'phone.unique' => 'Nomor HP sudah dipakai akun lain.',
+        ];
     }
 }

@@ -37,7 +37,7 @@ export interface AdminUser {
 export interface Driver {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   vehicle_type: string | null;
   vehicle_plate_number: string | null;
@@ -414,6 +414,30 @@ export interface ServiceFeeSettings {
   value: number;
   min_fee: number | null;
   max_fee: number | null;
+}
+
+export type MidtransMode = 'sandbox' | 'production';
+
+export interface MidtransModeKeys {
+  client_key: string | null;
+  server_key_set: boolean;
+  server_key_hint: string | null;
+}
+
+export interface MidtransSettings {
+  mode: MidtransMode;
+  /** True until saved once in the panel: values come from the backend .env. */
+  from_env: boolean;
+  notification_url: string;
+  sandbox: MidtransModeKeys;
+  production: MidtransModeKeys;
+}
+
+/** A blank server_key keeps the stored one. */
+export interface MidtransSettingsPayload {
+  mode: MidtransMode;
+  sandbox: { client_key: string; server_key: string };
+  production: { client_key: string; server_key: string };
 }
 
 export interface WalletRow {

@@ -8,11 +8,11 @@ import '../../core/utils/formatters.dart';
 import '../../models/product.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
+import '../../services/analytics.dart';
 import '../../widgets/skeleton.dart';
 import '../ads/ad_banner.dart';
 import '../ads/admob.dart';
 import '../cart/cart_providers.dart';
-import '../../services/analytics_service.dart';
 
 final productDetailProvider = FutureProvider.autoDispose
     .family<ProductDetail, String>((ref, slug) {
@@ -47,7 +47,14 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen>
   void initState() {
     super.initState();
     ref.read(interstitialAdsProvider).onProductOpened();
-    Analytics.event('view_item', {'item_id': widget.slug});
+    // Once per opening: pull-to-refresh reloads the product but is not a new view.
+    var viewLogged = false;
+    ref.listenManual(productDetailProvider(widget.slug), (_, next) {
+      final product = next.valueOrNull;
+      if (product == null || viewLogged) return;
+      viewLogged = true;
+      Analytics.viewItem(product);
+    }, fireImmediately: true);
   }
 
   @override

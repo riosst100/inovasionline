@@ -55,8 +55,8 @@ dependencies:
   permission_handler: ^11.3.1
   path_provider: ^2.1.5
   firebase_core: ^3.8.0
-  firebase_analytics: ^11.4.0
   firebase_messaging: ^15.1.5
+  firebase_analytics: ^11.6.0
   flutter_local_notifications: ^18.0.1
   android_intent_plus: ^5.2.0
   geolocator: ^14.1.1
@@ -66,6 +66,8 @@ dependencies:
   google_mlkit_face_detection: ^0.15.1
   camera_android: ^0.10.12
   in_app_update: ^5.0.0
+  device_info_plus: ^13.3.0
+  android_id: ^0.6.0
 
 dev_dependencies:
   flutter_test:

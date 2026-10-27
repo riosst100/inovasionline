@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\MidtransSetting;
 use App\Models\Order;
 use App\Models\WalletTopup;
 use App\Support\Enums\OrderStatus;
@@ -102,7 +103,7 @@ class MidtransService
      */
     public function cancelTransaction(Order $order): void
     {
-        $serverKey = (string) config('services.midtrans.server_key');
+        $serverKey = MidtransSetting::current()->serverKey();
 
         if ($serverKey === '' || ! $order->payment_token) {
             return;
@@ -124,7 +125,7 @@ class MidtransService
     {
         $expected = hash(
             'sha512',
-            ($payload['order_id'] ?? '').($payload['status_code'] ?? '').($payload['gross_amount'] ?? '').config('services.midtrans.server_key')
+            ($payload['order_id'] ?? '').($payload['status_code'] ?? '').($payload['gross_amount'] ?? '').MidtransSetting::current()->serverKey()
         );
 
         return hash_equals($expected, (string) ($payload['signature_key'] ?? ''));
@@ -316,7 +317,7 @@ class MidtransService
      */
     private function requestSnap(array $payload): array
     {
-        $serverKey = (string) config('services.midtrans.server_key');
+        $serverKey = MidtransSetting::current()->serverKey();
 
         if ($serverKey === '') {
             throw new RuntimeException('Payment gateway is not configured.');
@@ -362,7 +363,7 @@ class MidtransService
     /** Midtrans answers with status_code 404 in the body until the buyer picks a payment channel. */
     private function fetchStatus(string $midtransOrderId): ?array
     {
-        $serverKey = (string) config('services.midtrans.server_key');
+        $serverKey = MidtransSetting::current()->serverKey();
 
         if ($serverKey === '') {
             return null;
@@ -383,14 +384,14 @@ class MidtransService
 
     private function apiUrl(): string
     {
-        return config('services.midtrans.is_production')
+        return MidtransSetting::current()->isProduction()
             ? 'https://api.midtrans.com'
             : 'https://api.sandbox.midtrans.com';
     }
 
     private function snapUrl(): string
     {
-        return config('services.midtrans.is_production')
+        return MidtransSetting::current()->isProduction()
             ? 'https://app.midtrans.com'
             : 'https://app.sandbox.midtrans.com';
     }

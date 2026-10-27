@@ -14,11 +14,11 @@ import '../../models/nearest_address.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/delivery_address_provider.dart';
+import '../../services/analytics.dart';
 import '../../services/location_service.dart';
 import '../../services/push_notification_handler.dart';
 import '../../widgets/app_loading_skeleton.dart';
 import 'manual_address_screen.dart';
-import '../../services/analytics_service.dart';
 
 /// First thing that happens once the native splash is gone.
 ///

@@ -134,7 +134,7 @@ export default function ServiceFeePage() {
               </label>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Nama yang ditampilkan</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Nama yang ditampilkan <span className="text-rose-500">*</span></label>
                 <input
                   className={input}
                   maxLength={60}
@@ -145,7 +145,7 @@ export default function ServiceFeePage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Jenis biaya</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Jenis biaya <span className="text-rose-500">*</span></label>
                   <select
                     className={input}
                     value={form.type}
@@ -157,7 +157,7 @@ export default function ServiceFeePage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">
-                    {form.type === 'percent' ? 'Persentase (%)' : 'Nominal (Rp)'}
+                    {form.type === 'percent' ? 'Persentase (%)' : 'Nominal (Rp)'} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"

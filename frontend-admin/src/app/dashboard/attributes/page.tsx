@@ -2,8 +2,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
+import ImportExportActions from '../../../components/data-transfer/ImportExportActions';
+import DataTransferProgress from '../../../components/data-transfer/DataTransferProgress';
 import { adminApi, ApiError } from '../../../lib/api';
-import { ProductAttribute, ProductAttributeType } from '../../../types';
+import { useDataTransfers } from '../../../lib/dataTransfer';
+import { DataTransfer, ProductAttribute, ProductAttributeType } from '../../../types';
 import { AlertCircle, CheckCircle2, Loader2, Lock, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 const TYPE_LABELS: Record<ProductAttributeType, string> = {
@@ -14,6 +17,15 @@ const TYPE_LABELS: Record<ProductAttributeType, string> = {
   select: 'Pilihan',
   date: 'Tanggal',
 };
+
+const IMPORT_HINT = (
+  <>
+    Kolom: <b>code</b> (wajib), <b>name</b> (wajib), <b>type</b> (wajib untuk atribut kustom: text, textarea,
+    number, boolean, select, date), options (untuk select, pisahkan dengan |), description, is_required (1/0),
+    is_active (1/0), sort_order. Atribut dengan code yang sudah ada akan <b>diperbarui</b>; selain itu dibuat baru.
+    Atribut sistem hanya memperbarui name, description, dan is_active.
+  </>
+);
 
 type FormState = {
   code: string;
@@ -68,6 +80,14 @@ export default function ProductAttributesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const onTransferFinished = useCallback(
+    (t: DataTransfer) => {
+      if (t.type === 'import' && t.status === 'completed') load();
+    },
+    [load]
+  );
+  const transfers = useDataTransfers({ resource: 'attributes', perPage: 5 }, onTransferFinished);
 
   const openCreate = () => {
     setForm(emptyForm);
@@ -164,13 +184,18 @@ export default function ProductAttributesPage() {
               Atribut sistem bawaan (SKU, nama, harga, dll.) tidak dapat dihapus. Anda dapat menambah atribut kustom.
             </p>
           </div>
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            <Plus className="h-4 w-4" /> Tambah Atribut
-          </button>
+          <div className="flex flex-wrap items-start gap-2">
+            <ImportExportActions resource="attributes" onStarted={transfers.track} importHint={IMPORT_HINT} />
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              <Plus className="h-4 w-4" /> Tambah Atribut
+            </button>
+          </div>
         </div>
+
+        <DataTransferProgress items={transfers.items} resource="attributes" />
 
         {error && !modal && (
           <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
@@ -306,7 +331,7 @@ export default function ProductAttributesPage() {
             )}
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Nama</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Nama <span className="text-rose-500">*</span></label>
               <input
                 value={form.name}
                 onChange={(e) =>
@@ -324,7 +349,7 @@ export default function ProductAttributesPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Kode</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Kode <span className="text-rose-500">*</span></label>
               <input
                 value={form.code}
                 onChange={(e) => {
@@ -345,7 +370,7 @@ export default function ProductAttributesPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Tipe</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Tipe <span className="text-rose-500">*</span></label>
                 <select
                   value={form.type}
                   onChange={(e) => setForm({ ...form, type: e.target.value as ProductAttributeType })}
@@ -383,7 +408,7 @@ export default function ProductAttributesPage() {
 
             {form.type === 'select' && !lockStructure && (
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Opsi (satu per baris)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Opsi (satu per baris) <span className="text-rose-500">*</span></label>
                 <textarea
                   value={form.optionsText}
                   onChange={(e) => setForm({ ...form, optionsText: e.target.value })}

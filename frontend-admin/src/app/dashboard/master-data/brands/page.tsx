@@ -236,7 +236,7 @@ export default function BrandsPage() {
             )}
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Nama Brand</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Nama Brand <span className="text-rose-500">*</span></label>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}

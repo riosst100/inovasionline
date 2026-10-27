@@ -96,7 +96,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Username
+                Username <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
@@ -117,7 +117,7 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Kata Sandi
+                Kata Sandi <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">

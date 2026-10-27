@@ -6,6 +6,7 @@ import '../../models/order.dart';
 import '../../models/payment_method.dart';
 import '../../models/shipping_method.dart';
 import '../../providers/core_providers.dart';
+import '../../services/analytics.dart';
 import '../orders/order_providers.dart';
 import '../wallet/wallet_providers.dart';
 
@@ -99,6 +100,7 @@ class CheckoutNotifier extends StateNotifier<CheckoutState> {
           );
       _ref.invalidate(myOrdersProvider);
       invalidateWallet(_ref); // paying with balance debits it
+      Analytics.purchase(order);
 
       state = CheckoutState(order: order);
       return true;

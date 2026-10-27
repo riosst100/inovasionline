@@ -62,6 +62,23 @@ class AdminUser extends Authenticatable
         return mb_strtolower(trim($username));
     }
 
+    /**
+     * One stored form for an Indonesian phone number, so a courier signing in with "+62 812-…" or "0812…" finds
+     * the same account: digits only, starting with 0 (62… and 8… are rewritten). Null when there are no digits.
+     */
+    public static function normalizePhone(?string $phone): ?string
+    {
+        $digits = preg_replace('/\D/', '', (string) $phone);
+        if ($digits === '') {
+            return null;
+        }
+        if (str_starts_with($digits, '62')) {
+            return '0'.substr($digits, 2);
+        }
+
+        return str_starts_with($digits, '8') ? '0'.$digits : $digits;
+    }
+
     /** Free username derived from an email (its local part) or a name. */
     public static function uniqueUsername(string $source): string
     {

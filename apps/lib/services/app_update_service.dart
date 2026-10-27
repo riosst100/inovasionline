@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:in_app_update/in_app_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config/env.dart';
 import '../core/api/api_client.dart';
@@ -61,6 +62,34 @@ class AppUpdateService {
       mandatory: policy != null && currentBuild < policy.minBuildNumber,
       message: policy?.message,
     );
+  }
+
+  /// Updates right away: Play's full-screen update when it allows one,
+  /// otherwise (or when that fails) the app's Play Store page. Returns false
+  /// only when the user backed out of Play's update screen.
+  Future<bool> updateNow(AppUpdateInfo info) async {
+    if (info.immediateUpdateAllowed) {
+      try {
+        final result = await InAppUpdate.performImmediateUpdate();
+        if (result == AppUpdateResult.userDeniedUpdate) return false;
+        if (result == AppUpdateResult.success) return true;
+      } catch (_) {
+        // Falls through to the Play Store page.
+      }
+    }
+    await openPlayStore(info.packageName);
+    return true;
+  }
+
+  Future<void> openPlayStore(String packageName) async {
+    try {
+      await launchUrl(
+        Uri.parse('market://details?id=$packageName'),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      // Nothing else to try; callers keep their update button available.
+    }
   }
 
   /// Admin's minimum build; null when the backend cannot be reached, in which

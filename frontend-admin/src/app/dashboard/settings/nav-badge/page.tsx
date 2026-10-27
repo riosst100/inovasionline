@@ -142,7 +142,7 @@ export default function NavBadgePage() {
               </label>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Teks badge</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Teks badge <span className="text-rose-500">*</span></label>
                 <input
                   className={input}
                   maxLength={16}

@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\AdminUser;
 use App\Models\Brand;
 use App\Models\Product;
+use App\Models\ProductAttribute;
 use App\Models\Role;
 use App\Models\Supplier;
 use App\Support\DataTransfer\DataTransferRegistry;
 use App\Support\DataTransfer\ImportResult;
 use App\Support\DataTransfer\RowSkippedException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -97,6 +99,118 @@ class AdminMasterDataTest extends TestCase
 
         $this->expectException(RowSkippedException::class);
         $suppliers->importRow(['name' => 'X', 'email' => 'bukan-email']);
+    }
+
+    public function test_attribute_import_create_then_update_and_protects_system_attributes(): void
+    {
+        $attributes = DataTransferRegistry::handler('attributes');
+
+        $this->assertSame(ImportResult::CREATED, $attributes->importRow([
+            'code' => 'warna', 'name' => 'Warna', 'type' => 'select', 'options' => 'Merah| Biru |Merah',
+        ]));
+        $this->assertSame(ImportResult::UPDATED, $attributes->importRow([
+            'code' => 'warna', 'name' => 'Warna Produk', 'type' => 'select', 'options' => 'Hijau', 'is_active' => '0',
+        ]));
+        $warna = ProductAttribute::where('code', 'warna')->sole();
+        $this->assertSame(['Hijau'], $warna->options);
+        $this->assertFalse($warna->is_active);
+        $this->assertFalse($warna->is_system);
+
+        $system = ProductAttribute::updateOrCreate(['code' => 'sku_test'], [
+            'name' => 'SKU', 'type' => 'text', 'is_system' => true, 'is_required' => true, 'is_active' => true,
+        ]);
+        $this->assertSame(ImportResult::UPDATED, $attributes->importRow([
+            'code' => 'sku_test', 'name' => 'Kode SKU', 'type' => 'number', 'is_active' => '0',
+        ]));
+        $system->refresh();
+        $this->assertSame('Kode SKU', $system->name);
+        $this->assertSame('text', $system->type);
+        $this->assertTrue($system->is_active);
+
+        $this->expectException(RowSkippedException::class);
+        $attributes->importRow(['code' => 'ukuran', 'name' => 'Ukuran', 'type' => 'select']);
+    }
+
+    public function test_driver_import_creates_with_password_and_never_touches_other_admins(): void
+    {
+        $drivers = DataTransferRegistry::handler('drivers');
+        $staff = $this->admin();
+        $staff->update(['phone' => '0899000111']);
+
+        try {
+            $drivers->importRow(['name' => 'Budi', 'phone' => '081100001111']);
+            $this->fail('A new courier without password must be skipped.');
+        } catch (RowSkippedException) {
+        }
+
+        $this->assertSame(ImportResult::CREATED, $drivers->importRow([
+            'name' => 'Budi', 'phone' => '+62 811-0000-1111', 'password' => 'rahasia1',
+        ]));
+        $driver = AdminUser::where('phone', '081100001111')->sole();
+        $this->assertNull($driver->email);
+        $this->assertSame('driver', $driver->role->slug);
+        $this->assertSame('Motor', $driver->vehicle_type);
+        $this->assertTrue(Hash::check('rahasia1', $driver->password));
+
+        $this->assertSame(ImportResult::UPDATED, $drivers->importRow([
+            'name' => 'Budi S', 'phone' => '6281100001111', 'vehicle_plate_number' => 'B 1 AB', 'password' => '',
+        ]));
+        $driver->refresh();
+        $this->assertSame('Budi S', $driver->name);
+        $this->assertSame('B 1 AB', $driver->vehicle_plate_number);
+        $this->assertTrue(Hash::check('rahasia1', $driver->password));
+
+        $exported = $drivers->exportQuery([])->get();
+        $this->assertSame([$driver->id], $exported->pluck('id')->all());
+        $this->assertNull($drivers->exportRow($exported->first())['password']);
+
+        $this->expectException(RowSkippedException::class);
+        $drivers->importRow(['name' => 'X', 'phone' => '0899000111', 'password' => 'rahasia1']);
+    }
+
+    public function test_driver_is_registered_and_signs_in_by_phone_without_email(): void
+    {
+        Sanctum::actingAs($this->admin(), ['admin']);
+
+        $this->postJson('/api/admin/drivers', ['name' => 'Budi', 'password' => 'rahasia1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('phone');
+        $this->postJson('/api/admin/drivers', ['name' => 'Budi', 'phone' => '12345', 'password' => 'rahasia1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('phone');
+
+        $this->postJson('/api/admin/drivers', ['name' => 'Budi', 'phone' => '+62 812-3456-7890', 'password' => 'rahasia1'])
+            ->assertCreated()
+            ->assertJsonPath('data.phone', '081234567890')
+            ->assertJsonPath('data.email', null);
+        $this->postJson('/api/admin/drivers', ['name' => 'Budi 2', 'phone' => '6281234567890', 'password' => 'rahasia1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('phone');
+
+        $this->app['auth']->forgetGuards();
+        $mobile = ['X-Client' => 'mobile'];
+        $this->postJson('/api/admin/auth/login', ['phone' => '0812 3456 7890', 'password' => 'salah123'], $mobile)->assertUnprocessable();
+        $this->postJson('/api/admin/auth/login', ['phone' => '+6281234567890', 'password' => 'rahasia1'], $mobile)
+            ->assertSuccessful()
+            ->assertJsonPath('data.user.name', 'Budi');
+
+        // Staff accounts keep signing in by username and cannot use the phone login.
+        AdminUser::where('email', 'admin@example.com')->update(['phone' => '089900001111']);
+        $this->postJson('/api/admin/auth/login', ['phone' => '089900001111', 'password' => 'secret123'], $mobile)->assertUnprocessable();
+    }
+
+    public function test_driver_plate_number_can_be_changed_and_cleared(): void
+    {
+        Sanctum::actingAs($this->admin(), ['admin']);
+
+        $id = $this->postJson('/api/admin/drivers', [
+            'name' => 'Budi', 'phone' => '081100001111', 'password' => 'rahasia1', 'vehicle_plate_number' => 'B 1 AB',
+        ])->assertCreated()->json('data.id');
+
+        $this->putJson("/api/admin/drivers/{$id}", ['name' => 'Budi', 'phone' => '081100001111', 'vehicle_plate_number' => 'B 2 CD'])
+            ->assertSuccessful()
+            ->assertJsonPath('data.vehicle_plate_number', 'B 2 CD');
+
+        $this->putJson("/api/admin/drivers/{$id}", ['name' => 'Budi', 'phone' => '081100001111', 'vehicle_plate_number' => ''])
+            ->assertSuccessful()
+            ->assertJsonPath('data.vehicle_plate_number', null);
     }
 
     public function test_product_import_resolves_supplier_and_brand_by_name(): void

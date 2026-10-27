@@ -38,6 +38,21 @@ class LocationService {
   /// Opens the system location settings so the user can switch GPS on.
   static Future<bool> openSettings() => Geolocator.openLocationSettings();
 
+  /// The position the OS already has cached: instant, and never prompts or
+  /// shows a dialog. Null without permission or when there is none.
+  static Future<Position?> lastKnownPosition() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Current device position. Never prompts for permission (PermissionGate
   /// owns that), but when GPS is off, Android shows its own "turn on device
   /// location" dialog from here; [LocationResult.serviceDisabled] is set if

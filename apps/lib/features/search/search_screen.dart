@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/product.dart';
 import '../../providers/core_providers.dart';
+import '../../services/analytics.dart';
 import '../../widgets/product_grid.dart';
 import '../../widgets/skeleton.dart';
 import '../ads/ad_banner.dart';
@@ -68,6 +69,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _search(String query) async {
+    Analytics.search(query);
     setState(() => _loading = true);
     try {
       final result = await ref.read(searchServiceProvider).search(query);

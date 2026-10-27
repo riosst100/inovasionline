@@ -443,7 +443,7 @@ function EntryForm({
         )}
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Kategori</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Kategori <span className="text-rose-500">*</span></label>
           <input
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -462,7 +462,7 @@ function EntryForm({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Nominal</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Nominal <span className="text-rose-500">*</span></label>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">Rp</span>
               <input
@@ -475,7 +475,7 @@ function EntryForm({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Tanggal</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Tanggal <span className="text-rose-500">*</span></label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className={inputCls} />
           </div>
         </div>

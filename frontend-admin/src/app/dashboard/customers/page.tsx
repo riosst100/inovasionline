@@ -335,16 +335,18 @@ export default function CustomersPage() {
                 ['phone', 'No. Telepon (opsional)', 'tel', false],
                 ['password', 'Password (min. 8 karakter)', 'password', true],
               ] as const).map(([key, label, type, required]) => (
-                <input
-                  key={key}
-                  type={type}
-                  required={required}
-                  minLength={key === 'password' ? 8 : undefined}
-                  value={addForm[key]}
-                  onChange={(e) => setAddForm((p) => ({ ...p, [key]: e.target.value }))}
-                  placeholder={label}
-                  className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-emerald-500"
-                />
+                <label key={key} className="block text-xs font-semibold text-slate-700">
+                  {label} {required && <span className="text-rose-500">*</span>}
+                  <input
+                    type={type}
+                    required={required}
+                    minLength={key === 'password' ? 8 : undefined}
+                    value={addForm[key]}
+                    onChange={(e) => setAddForm((p) => ({ ...p, [key]: e.target.value }))}
+                    placeholder={label}
+                    className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm font-normal outline-none focus:border-emerald-500"
+                  />
+                </label>
               ))}
             </div>
 

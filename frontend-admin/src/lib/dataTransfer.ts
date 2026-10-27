@@ -16,6 +16,8 @@ export const RESOURCE_LABELS: Record<string, string> = {
   'product-stocks': 'Stok Produk',
   suppliers: 'Supplier',
   brands: 'Brand',
+  attributes: 'Atribut Produk',
+  drivers: 'Kurir',
 };
 
 export const STATUS_META: Record<DataTransferStatus, { label: string; badge: string; bar: string }> = {
