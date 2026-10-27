@@ -16,6 +16,9 @@ until dc exec -T backend test -f storage/framework/.inovasionline-ready; do slee
 log "Backend: clear caches"
 dc exec -T backend php artisan optimize:clear
 
+log "Backend: warm config/route/view caches"
+dc exec -T backend php artisan optimize || echo "optimize skipped (e.g. a route closure blocks route:cache)"
+
 log "Backend: restart background services"
 dc restart reverb queue
 

@@ -48,7 +48,9 @@ dependencies:
   share_plus: ^13.3.0
   image_picker: ^1.1.2
   image_cropper: ^8.1.0
+  video_compress: ^3.1.4
   video_player: ^2.9.2
+  web_socket_channel: ^3.0.1
   fc_native_video_thumbnail: ^3.0.1
   scrollable_positioned_list: ^0.3.8
   package_info_plus: ^10.2.1
@@ -60,7 +62,6 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   android_intent_plus: ^5.2.0
   geolocator: ^14.1.1
-  location: ^10.0.2
   google_mobile_ads: ^9.1.0
   camera: ^0.12.1
   google_mlkit_face_detection: ^0.15.1

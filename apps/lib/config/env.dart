@@ -10,11 +10,16 @@ class Env {
 
   static String? get googleServerClientId => dotenv.env['GOOGLE_SERVER_CLIENT_ID'];
 
-  static String get reverbHost => dotenv.env['REVERB_HOST'] ?? '10.0.2.2';
+  static String get reverbHost => _nonEmpty('REVERB_HOST') ?? '10.0.2.2';
 
   static int get reverbPort => int.tryParse(dotenv.env['REVERB_PORT'] ?? '') ?? 8080;
 
   static String get reverbScheme => dotenv.env['REVERB_SCHEME'] ?? 'http';
 
-  static String get reverbAppKey => dotenv.env['REVERB_APP_KEY'] ?? 'inovasionline-key';
+  static String get reverbAppKey => _nonEmpty('REVERB_APP_KEY') ?? 'inovasionline-key';
+
+  static String? _nonEmpty(String key) {
+    final value = dotenv.env[key];
+    return value == null || value.isEmpty ? null : value;
+  }
 }

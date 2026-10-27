@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_compress/video_compress.dart';
 import 'package:video_player/video_player.dart';
 import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import '../../config/theme.dart';
@@ -12,6 +13,9 @@ import 'product_tag_picker_sheet.dart';
 
 const _maxVideoDurationSeconds = 60;
 const _maxVideoSizeBytes = 50 * 1024 * 1024;
+
+/// Raw camera video can be far bigger than what we upload; it is compressed before the size check.
+const _maxRawVideoSizeBytes = 300 * 1024 * 1024;
 
 class _PickedVideo {
   _PickedVideo({required this.file, required this.thumbnail, required this.durationSeconds});
@@ -60,10 +64,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     final picked = await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(seconds: 90));
     if (picked == null) return;
 
-    final file = File(picked.path);
-    final sizeBytes = await file.length();
-    if (sizeBytes > _maxVideoSizeBytes) {
-      setState(() => _error = 'Ukuran video maksimal 50MB.');
+    var file = File(picked.path);
+    if (await file.length() > _maxRawVideoSizeBytes) {
+      setState(() => _error = 'Ukuran video terlalu besar.');
       return;
     }
 
@@ -83,6 +86,18 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
           _preparingVideo = false;
           _error = 'Durasi video maksimal $_maxVideoDurationSeconds detik.';
         });
+        return;
+      }
+
+      file = await _compress(file);
+      if (await file.length() > _maxVideoSizeBytes) {
+        controller.dispose();
+        if (mounted) {
+          setState(() {
+            _preparingVideo = false;
+            _error = 'Ukuran video maksimal 50MB.';
+          });
+        }
         return;
       }
 
@@ -116,6 +131,24 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         });
       }
     }
+  }
+
+  /// Re-encodes to ~540p so a minute of phone video is a few MB instead of 100+. Falls back to the
+  /// original when compression fails or doesn't help.
+  Future<File> _compress(File original) async {
+    try {
+      final info = await VideoCompress.compressVideo(
+        original.path,
+        quality: VideoQuality.Res960x540Quality,
+        deleteOrigin: false,
+        includeAudio: true,
+      );
+      final compressed = info?.file;
+      if (compressed != null && await compressed.length() < await original.length()) {
+        return compressed;
+      }
+    } catch (_) {}
+    return original;
   }
 
   void _removeVideo() {

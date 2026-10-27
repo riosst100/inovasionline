@@ -71,7 +71,8 @@ class RegionController extends Controller
             ->orderBy('name')
             ->get();
 
-        return ApiResponse::success(RegionResource::collection($provinces), 'Provinces retrieved successfully.');
+        return ApiResponse::success(RegionResource::collection($provinces), 'Provinces retrieved successfully.')
+            ->header('Cache-Control', 'public, max-age=3600');
     }
 
     public function cities(Request $request, string $provinceCode): JsonResponse
@@ -82,7 +83,8 @@ class RegionController extends Controller
             ->orderBy('name')
             ->get();
 
-        return ApiResponse::success(RegionResource::collection($cities), 'Cities retrieved successfully.');
+        return ApiResponse::success(RegionResource::collection($cities), 'Cities retrieved successfully.')
+            ->header('Cache-Control', 'public, max-age=3600');
     }
 
     public function districts(Request $request, string $cityCode): JsonResponse
@@ -92,7 +94,8 @@ class RegionController extends Controller
             ->orderBy('name')
             ->get();
 
-        return ApiResponse::success(RegionResource::collection($districts), 'Districts retrieved successfully.');
+        return ApiResponse::success(RegionResource::collection($districts), 'Districts retrieved successfully.')
+            ->header('Cache-Control', 'public, max-age=3600');
     }
 
     public function villages(Request $request, string $districtCode): JsonResponse
@@ -102,6 +105,7 @@ class RegionController extends Controller
             ->orderBy('name')
             ->get();
 
-        return ApiResponse::success(RegionResource::collection($villages), 'Villages retrieved successfully.');
+        return ApiResponse::success(RegionResource::collection($villages), 'Villages retrieved successfully.')
+            ->header('Cache-Control', 'public, max-age=3600');
     }
 }

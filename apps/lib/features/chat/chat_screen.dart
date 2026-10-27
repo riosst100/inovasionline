@@ -16,6 +16,9 @@ import 'chat_thread_screen.dart';
 
 const _chatListPollInterval = Duration(seconds: 5);
 
+/// With the socket connected, refresh only every Nth tick (30s): group threads aren't pushed.
+const _liveSafetyPollEvery = 6;
+
 class ChatScreen extends ConsumerWidget {
   const ChatScreen({super.key});
 
@@ -86,8 +89,10 @@ class _ChatThreadListView extends ConsumerStatefulWidget {
 enum _ChatFilter { all, unread, favorite }
 
 class _ChatThreadListViewState extends ConsumerState<_ChatThreadListView>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   Timer? _pollTimer;
+  VoidCallback? _unlisten;
+  int _ticks = 0;
   _ChatFilter _filter = _ChatFilter.all;
   late final TabController _tabController;
   final _searchController = TextEditingController();
@@ -97,14 +102,43 @@ class _ChatThreadListViewState extends ConsumerState<_ChatThreadListView>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _pollTimer = Timer.periodic(
-      _chatListPollInterval,
-      (_) => ref.invalidate(chatThreadsProvider),
-    );
+    WidgetsBinding.instance.addObserver(this);
+    _startPolling();
+    final userId = ref.read(authProvider).user?.id;
+    if (userId != null) {
+      // Direct messages to this user arrive here; group threads rely on the fallback poll.
+      _unlisten = ref.read(realtimeProvider).listen(
+        'user.$userId',
+        'chat.message',
+        () => ref.invalidate(chatThreadsProvider),
+      );
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(_chatListPollInterval, (_) {
+      if (ref.read(realtimeProvider).connected.value && ++_ticks % _liveSafetyPollEvery != 0) return;
+      ref.invalidate(chatThreadsProvider);
+    });
+  }
+
+  /// No point hitting the API every few seconds while the app is in the background.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      ref.invalidate(chatThreadsProvider);
+    } else if (state == AppLifecycleState.paused) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _unlisten?.call();
     _pollTimer?.cancel();
     _tabController.dispose();
     _searchController.dispose();

@@ -8,6 +8,10 @@ class ApiClient {
   ApiClient(this._tokenStorage) : dio = Dio(
           BaseOptions(
             baseUrl: Env.apiBaseUrl,
+            // Fail fast on a dead connection instead of hanging. No sendTimeout: uploads (photos,
+            // video) legitimately take long on slow networks.
+            connectTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 45),
             headers: {
               'Accept': 'application/json',
               'X-Client': 'mobile',
@@ -23,7 +27,9 @@ class ApiClient {
           }
           handler.next(options);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
+          final retried = await _retryOnce(error);
+          if (retried != null) return handler.resolve(retried);
           handler.next(_mapError(error));
         },
       ),
@@ -32,6 +38,23 @@ class ApiClient {
 
   final Dio dio;
   final TokenStorage _tokenStorage;
+
+  /// One automatic retry for GET requests that failed on the network itself (flaky mobile data).
+  /// Never for writes: a timed-out POST may have gone through on the server.
+  Future<Response<dynamic>?> _retryOnce(DioException error) async {
+    final request = error.requestOptions;
+    final transient = error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.connectionError;
+    if (request.method != 'GET' || !transient || request.extra['retried'] == true) return null;
+
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      return await dio.fetch<dynamic>(request.copyWith(extra: {...request.extra, 'retried': true}));
+    } catch (_) {
+      return null;
+    }
+  }
 
   DioException _mapError(DioException error) {
     final data = error.response?.data;

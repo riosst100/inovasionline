@@ -1,5 +1,4 @@
 import 'package:geolocator/geolocator.dart';
-import 'package:location/location.dart' as loc;
 
 class LocationResult {
   const LocationResult({this.position, this.serviceDisabled = false});
@@ -19,8 +18,16 @@ class LocationService {
   static Future<bool> requestEnableService() async {
     try {
       if (await Geolocator.isLocationServiceEnabled()) return true;
-      final accepted = await loc.Location().requestService();
-      if (!accepted) return await Geolocator.isLocationServiceEnabled();
+      // With GPS off, Geolocator's Android implementation shows Google's resolution dialog
+      // itself; declining it throws LocationServiceDisabledException.
+      await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+    } on LocationServiceDisabledException {
+      return false;
     } catch (_) {
       return await Geolocator.isLocationServiceEnabled();
     }

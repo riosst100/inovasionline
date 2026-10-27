@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/api/api_client.dart';
+import '../core/realtime/realtime_client.dart';
 import '../core/storage/token_storage.dart';
 import '../services/app_update_service.dart';
 import '../services/auth_service.dart';
@@ -22,6 +23,11 @@ final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
 
 final apiClientProvider = Provider<ApiClient>(
   (ref) => ApiClient(ref.watch(tokenStorageProvider)),
+);
+
+/// Live updates (chat) over Reverb. One shared socket for the whole app.
+final realtimeProvider = Provider<RealtimeClient>(
+  (ref) => RealtimeClient(ref.watch(apiClientProvider)),
 );
 
 final authServiceProvider = Provider<AuthService>(

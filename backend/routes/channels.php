@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Broadcast;
 Broadcast::channel('admin.orders', fn ($user) => $user instanceof AdminUser && AdminMenu::canView($user, 'orders'));
 Broadcast::channel('admin.dashboard', fn ($user) => $user instanceof AdminUser && AdminMenu::canView($user, 'dashboard'));
 
+// A user's own channel: signals that one of their direct-message threads changed.
+Broadcast::channel('user.{userId}', fn ($user, string $userId) => $user instanceof User && (string) $user->id === $userId);
+
 Broadcast::channel('chat-thread.{threadId}', function (User $user, string $threadId) {
     $thread = ChatThread::find($threadId);
 

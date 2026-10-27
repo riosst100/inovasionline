@@ -7,6 +7,7 @@ use App\Models\ChatThread;
 use App\Models\ChatThreadParticipant;
 use App\Models\User;
 use App\Support\Enums\ChatRegionLevel;
+use App\Events\ChatMessageSent;
 use App\Support\Enums\ChatThreadType;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -215,6 +216,8 @@ class ChatService
         ]);
 
         $thread->touch();
+
+        event(ChatMessageSent::for($thread, $message));
 
         $this->notifyRecipientOfDirectMessage($sender, $thread, $message);
 

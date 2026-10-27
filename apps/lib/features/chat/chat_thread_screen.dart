@@ -16,6 +16,9 @@ import 'chat_thread_info_screen.dart';
 
 const _chatPollInterval = Duration(seconds: 5);
 
+/// With the socket connected, poll only every Nth tick (30s) as a safety net.
+const _liveSafetyPollEvery = 6;
+
 /// A [HorizontalDragGestureRecognizer] that gives up as soon as the pointer's
 /// movement is clearly more vertical than horizontal, so a swipe intended to
 /// scroll the message list (even one that starts slightly diagonal) is not
@@ -136,7 +139,10 @@ class ChatThreadScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatThreadScreen> createState() => _ChatThreadScreenState();
 }
 
-class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
+class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen>
+    with WidgetsBindingObserver {
+  VoidCallback? _unlisten;
+  int _ticks = 0;
   final _messageController = TextEditingController();
   final List<ChatMessage> _messages = [];
   final _itemScrollController = ItemScrollController();
@@ -154,14 +160,41 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
-    _pollTimer = Timer.periodic(_chatPollInterval, (_) => _poll());
+    _startPolling();
+    _unlisten = ref
+        .read(realtimeProvider)
+        .listen('chat-thread.${widget.threadId}', 'chat.message', _poll);
     _itemPositionsListener.itemPositions.addListener(_onPositionsChanged);
     ref.read(chatServiceProvider).markAsRead(widget.threadId);
   }
 
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(_chatPollInterval, (_) {
+      // New messages are pushed over the socket; while it is up, polling is only a safety net.
+      if (ref.read(realtimeProvider).connected.value && ++_ticks % _liveSafetyPollEvery != 0) return;
+      _poll();
+    });
+  }
+
+  /// No point hitting the API every few seconds while the app is in the background.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      _poll();
+    } else if (state == AppLifecycleState.paused) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _unlisten?.call();
     _pollTimer?.cancel();
     _highlightTimer?.cancel();
     _itemPositionsListener.itemPositions.removeListener(_onPositionsChanged);
