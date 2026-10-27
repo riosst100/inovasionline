@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Support\ImageOptimizer;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\ProductImage;
@@ -166,7 +167,7 @@ class ProductController extends Controller
 
         foreach ($request->file('images') as $file) {
             $product->images()->create([
-                'path' => $file->store('products', 'public'),
+                'path' => ImageOptimizer::store($file, 'products'),
                 'alt_text' => $product->name,
                 'is_primary' => ! $hasPrimary,
                 'sort_order' => $next++,

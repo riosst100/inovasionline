@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -109,7 +110,7 @@ class _ChatThreadInfoScreenState extends ConsumerState<ChatThreadInfoScreen> {
                   backgroundColor: AppColors.surface,
                   foregroundColor: AppColors.primary,
                   backgroundImage: widget.avatarUrl != null
-                      ? NetworkImage(widget.avatarUrl!)
+                      ? CachedNetworkImageProvider(widget.avatarUrl!)
                       : null,
                   child: widget.avatarUrl == null
                       ? Icon(
@@ -200,7 +201,7 @@ class _ParticipantTile extends StatelessWidget {
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.primary,
         backgroundImage: participant.avatarUrl != null
-            ? NetworkImage(participant.avatarUrl!)
+            ? CachedNetworkImageProvider(participant.avatarUrl!)
             : null,
         child: participant.avatarUrl == null
             ? const Icon(Icons.person_outline)

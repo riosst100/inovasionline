@@ -124,8 +124,8 @@ class _ProductTagPickerSheetState extends ConsumerState<ProductTagPickerSheet> {
                                 child: SizedBox(
                                   width: 44,
                                   height: 44,
-                                  child: product.imageUrl != null
-                                      ? CachedNetworkImage(imageUrl: product.imageUrl!, fit: BoxFit.cover)
+                                  child: product.listImageUrl != null
+                                      ? CachedNetworkImage(memCacheWidth: 200, imageUrl: product.listImageUrl!, fit: BoxFit.cover)
                                       : Container(color: AppColors.surface, child: const Icon(Icons.image_outlined, size: 18)),
                                 ),
                               ),

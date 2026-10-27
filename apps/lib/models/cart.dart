@@ -9,6 +9,7 @@ class CartItem {
     required this.quantity,
     required this.lineTotal,
     this.productImageUrl,
+    this.productThumbUrl,
     this.variantId,
     this.variantName,
   });
@@ -19,6 +20,7 @@ class CartItem {
     productName: json['product_name'] as String,
     productSlug: json['product_slug'] as String,
     productImageUrl: json['product_image_url'] as String?,
+    productThumbUrl: json['product_thumb_url'] as String?,
     variantId: json['variant_id'] as String?,
     variantName: json['variant_name'] as String?,
     unitPrice: double.tryParse(json['unit_price'].toString()) ?? 0,
@@ -32,6 +34,9 @@ class CartItem {
   final String productName;
   final String productSlug;
   final String? productImageUrl;
+  final String? productThumbUrl;
+
+  String? get listImageUrl => productThumbUrl ?? productImageUrl;
   final String? variantId;
   final String? variantName;
   final double unitPrice;

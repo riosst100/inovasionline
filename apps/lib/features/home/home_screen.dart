@@ -1584,9 +1584,8 @@ class _CategoriesSection extends StatelessWidget {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          cat.imageUrl != null && cat.imageUrl!.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: cat.imageUrl!,
+                          cat.listImageUrl != null && cat.listImageUrl!.isNotEmpty
+                              ? CachedNetworkImage(memCacheWidth: 300, imageUrl: cat.listImageUrl!,
                                   fit: BoxFit.cover,
                                   errorWidget: (_, _, _) => const Center(
                                     child: Icon(Icons.image_outlined, size: 26, color: Color(0xFF94A3B8)),
@@ -1685,8 +1684,8 @@ class _CategoriesSection extends StatelessWidget {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                cat.imageUrl != null
-                                    ? CachedNetworkImage(imageUrl: cat.imageUrl!, fit: BoxFit.cover)
+                                cat.listImageUrl != null
+                                    ? CachedNetworkImage(memCacheWidth: 300, imageUrl: cat.listImageUrl!, fit: BoxFit.cover)
                                     : const Center(child: Icon(Icons.image_outlined, size: 24, color: Color(0xFF94A3B8))),
                                     ],
                             ),

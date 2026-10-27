@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ImageOptimizer;
 use App\Models\Banner;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ class BannerService
     public function create(array $data, ?UploadedFile $image = null): Banner
     {
         $nextSortOrder = ((int) Banner::query()->max('sort_order')) + 1;
-        $imagePath = $image !== null ? $image->store('banners', 'public') : ($data['image_url'] ?? '');
+        $imagePath = $image !== null ? ImageOptimizer::store($image, 'banners', 1600) : ($data['image_url'] ?? '');
 
         return Banner::create([
             'name' => $data['name'],
@@ -35,7 +36,7 @@ class BannerService
             if ($banner->image_path && !str_starts_with($banner->image_path, 'http')) {
                 Storage::disk('public')->delete($banner->image_path);
             }
-            $data['image_path'] = $image->store('banners', 'public');
+            $data['image_path'] = ImageOptimizer::store($image, 'banners', 1600);
         } elseif (!empty($data['image_url'])) {
             $data['image_path'] = $data['image_url'];
         }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ImageOptimizer;
 use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\User;
@@ -25,7 +26,7 @@ class CategoryService
             'slug' => $this->generateSlug($data['name']),
             'is_active' => $data['is_active'] ?? true,
             'sort_order' => $data['sort_order'] ?? ((int) Category::query()->max('sort_order')) + 1,
-            'image_path' => $image?->store('categories', 'public'),
+            'image_path' => ($image ? ImageOptimizer::store($image, 'categories', 600) : null),
             // created_by has a FK to users; admin accounts live in admin_users.
             'created_by' => $admin instanceof User ? $admin->id : null,
         ]);
@@ -93,7 +94,7 @@ class CategoryService
             if ($category->image_path && ! str_starts_with($category->image_path, 'http')) {
                 Storage::disk('public')->delete($category->image_path);
             }
-            $data['image_path'] = $image->store('categories', 'public');
+            $data['image_path'] = ImageOptimizer::store($image, 'categories', 600);
         }
 
         $category->update([

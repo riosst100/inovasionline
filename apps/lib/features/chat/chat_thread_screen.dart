@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
@@ -370,7 +371,7 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                         : null,
                     image: widget.avatarUrl != null
                         ? DecorationImage(
-                            image: NetworkImage(widget.avatarUrl!),
+                            image: CachedNetworkImageProvider(widget.avatarUrl!),
                             fit: BoxFit.cover,
                           )
                         : null,

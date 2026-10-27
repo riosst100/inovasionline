@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -617,7 +618,7 @@ class _ThreadAvatar extends StatelessWidget {
               )
             : null,
         image: avatarUrl != null
-            ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover)
+            ? DecorationImage(image: CachedNetworkImageProvider(avatarUrl), fit: BoxFit.cover)
             : null,
       ),
       child: avatarUrl == null

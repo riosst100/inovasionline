@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ServiceFeeSetting extends Model
 {
-    protected $fillable = ['is_active', 'label', 'type', 'value', 'min_fee', 'max_fee'];
+    protected $fillable = ['is_active', 'label', 'type', 'value', 'min_fee', 'max_fee', 'free_min_subtotal'];
 
     protected function casts(): array
     {
@@ -15,6 +15,7 @@ class ServiceFeeSetting extends Model
             'value' => 'float',
             'min_fee' => 'float',
             'max_fee' => 'float',
+            'free_min_subtotal' => 'float',
         ];
     }
 
@@ -32,6 +33,11 @@ class ServiceFeeSetting extends Model
     public function calculate(float $subtotal): float
     {
         if (! $this->is_active || $this->value <= 0) {
+            return 0.0;
+        }
+
+        // Free service fee once the product subtotal reaches the threshold.
+        if ($this->free_min_subtotal !== null && $this->free_min_subtotal > 0 && $subtotal >= $this->free_min_subtotal) {
             return 0.0;
         }
 
@@ -56,6 +62,7 @@ class ServiceFeeSetting extends Model
             'value' => (float) $this->value,
             'min_fee' => $this->min_fee,
             'max_fee' => $this->max_fee,
+            'free_min_subtotal' => $this->free_min_subtotal,
         ];
     }
 }

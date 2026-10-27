@@ -14,6 +14,8 @@ class BannerController extends Controller
     {
         $banners = Banner::query()->where('is_active', true)->orderBy('sort_order')->get();
 
-        return ApiResponse::success(PublicBannerResource::collection($banners), 'Banners retrieved successfully.');
+        // Rarely changes; a short shared-cache window spares the DB on every app open.
+        return ApiResponse::success(PublicBannerResource::collection($banners), 'Banners retrieved successfully.')
+            ->header('Cache-Control', 'public, max-age=60');
     }
 }

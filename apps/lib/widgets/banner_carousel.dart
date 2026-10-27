@@ -139,8 +139,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   final banner = banners[bannerIndex];
                   return GestureDetector(
                     onTap: () => _handleTap(bannerIndex),
-                    child: CachedNetworkImage(
-                      imageUrl: banner.imageUrl,
+                    child: CachedNetworkImage(memCacheWidth: 900, imageUrl: banner.imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
@@ -277,8 +276,7 @@ class _BannerPreviewDialogState extends State<_BannerPreviewDialog> {
                     minScale: 1,
                     maxScale: 5,
                     child: Center(
-                      child: CachedNetworkImage(
-                        imageUrl: banners[index].imageUrl,
+                      child: CachedNetworkImage(memCacheWidth: 900, imageUrl: banners[index].imageUrl,
                         fit: BoxFit.contain,
                         width: double.infinity,
                         height: double.infinity,

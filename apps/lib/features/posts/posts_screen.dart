@@ -443,8 +443,7 @@ class _PostMediaGrid extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: AspectRatio(
           aspectRatio: 1.3,
-          child: CachedNetworkImage(
-            imageUrl: media.first.url,
+          child: CachedNetworkImage(memCacheWidth: 800, imageUrl: media.first.url,
             fit: BoxFit.cover,
           ),
         ),
@@ -468,7 +467,7 @@ class _PostMediaGrid extends StatelessWidget {
           return Stack(
             fit: StackFit.expand,
             children: [
-              CachedNetworkImage(imageUrl: media[index].url, fit: BoxFit.cover),
+              CachedNetworkImage(memCacheWidth: 800, imageUrl: media[index].url, fit: BoxFit.cover),
               if (isLastVisible)
                 Container(
                   color: Colors.black.withValues(alpha: 0.45),
@@ -548,8 +547,7 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
             if (ready)
               VideoPlayer(controller)
             else if (widget.media.thumbnailUrl != null)
-              CachedNetworkImage(
-                imageUrl: widget.media.thumbnailUrl!,
+              CachedNetworkImage(memCacheWidth: 800, imageUrl: widget.media.thumbnailUrl!,
                 fit: BoxFit.cover,
               )
             else
@@ -619,9 +617,8 @@ class _PostProductTags extends StatelessWidget {
                     child: SizedBox(
                       width: 60,
                       height: 60,
-                      child: product.imageUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: product.imageUrl!,
+                      child: product.listImageUrl != null
+                          ? CachedNetworkImage(memCacheWidth: 200, imageUrl: product.listImageUrl!,
                               fit: BoxFit.cover,
                             )
                           : Container(
@@ -719,8 +716,7 @@ class _SharedPostPreview extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: AspectRatio(
                 aspectRatio: 1.5,
-                child: CachedNetworkImage(
-                  imageUrl: post.media.first.url,
+                child: CachedNetworkImage(memCacheWidth: 800, imageUrl: post.media.first.url,
                   fit: BoxFit.cover,
                 ),
               ),

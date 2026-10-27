@@ -414,6 +414,7 @@ export interface ServiceFeeSettings {
   value: number;
   min_fee: number | null;
   max_fee: number | null;
+  free_min_subtotal: number | null;
 }
 
 export type MidtransMode = 'sandbox' | 'production';

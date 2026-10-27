@@ -15,6 +15,7 @@ class PostProductTagResource extends JsonResource
             'slug' => $this->slug,
             'regular_price' => $this->regular_price,
             'sale_price' => $this->sale_price,
+            'thumb_url' => \App\Support\ImageOptimizer::thumbUrl($this->images->first()?->path),
             'image_url' => $this->images->first() ? asset('storage/'.$this->images->first()->path) : null,
         ];
     }

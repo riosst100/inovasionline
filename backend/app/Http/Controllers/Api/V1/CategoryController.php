@@ -25,7 +25,8 @@ class CategoryController extends Controller
 
         $this->attachProductCounts($categories);
 
-        return ApiResponse::success(CategoryResource::collection($categories), 'Categories retrieved successfully.');
+        return ApiResponse::success(CategoryResource::collection($categories), 'Categories retrieved successfully.')
+            ->header('Cache-Control', 'public, max-age=60');
     }
 
     public function show(Request $request, string $slug): JsonResponse

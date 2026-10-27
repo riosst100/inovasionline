@@ -103,6 +103,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (cfg == null || cfg['is_active'] != true) return 0;
     final value = (cfg['value'] as num?)?.toDouble() ?? 0;
     if (value <= 0) return 0;
+    final freeMin = (cfg['free_min_subtotal'] as num?)?.toDouble();
+    if (freeMin != null && freeMin > 0 && widget.selection.subtotal >= freeMin) {
+      return 0;
+    }
     var fee = cfg['type'] == 'percent'
         ? widget.selection.subtotal * value / 100
         : value;
@@ -961,9 +965,8 @@ class _CheckoutItemRow extends StatelessWidget {
             height: 48,
             color: const Color(0xFFF1F5F9),
             child:
-                item.productImageUrl != null && item.productImageUrl!.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: item.productImageUrl!,
+                item.listImageUrl != null && item.listImageUrl!.isNotEmpty
+                ? CachedNetworkImage(memCacheWidth: 240, imageUrl: item.listImageUrl!,
                     fit: BoxFit.cover,
                     placeholder: (_, _) => const Center(
                       child: SizedBox(

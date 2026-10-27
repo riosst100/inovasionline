@@ -6,6 +6,7 @@ class Category {
     this.parentId,
     this.description,
     this.imageUrl,
+    this.thumbUrl,
     this.isActive = true,
     this.productsCount,
   });
@@ -17,6 +18,7 @@ class Category {
         slug: json['slug'] as String,
         description: json['description'] as String?,
         imageUrl: json['image_url'] as String?,
+        thumbUrl: json['thumb_url'] as String?,
         isActive: json['is_active'] as bool? ?? true,
         productsCount: (json['products_count'] as num?)?.toInt(),
       );
@@ -27,7 +29,10 @@ class Category {
   final String slug;
   final String? description;
   final String? imageUrl;
+  final String? thumbUrl;
   final bool isActive;
+
+  String? get listImageUrl => thumbUrl ?? imageUrl;
 
   /// Active products in this category and its children; null when unknown.
   final int? productsCount;
@@ -41,6 +46,7 @@ class Category {
         slug: slug,
         description: description,
         imageUrl: imageUrl ?? this.imageUrl,
+        thumbUrl: thumbUrl,
         isActive: isActive,
         productsCount: productsCount,
       );

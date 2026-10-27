@@ -15,12 +15,14 @@ const DEFAULTS: ServiceFeeSettings = {
   value: 0,
   min_fee: null,
   max_fee: null,
+  free_min_subtotal: null,
 };
 
 const toNum = (v: string): number | null => (v.trim() === '' ? null : Number(v));
 
 function calculate(s: ServiceFeeSettings, subtotal: number): number {
   if (!s.is_active || !(s.value > 0)) return 0;
+  if (s.free_min_subtotal != null && s.free_min_subtotal > 0 && subtotal >= s.free_min_subtotal) return 0;
   let fee = s.type === 'percent' ? (subtotal * s.value) / 100 : s.value;
   if (s.min_fee != null) fee = Math.max(fee, s.min_fee);
   if (s.max_fee != null) fee = Math.min(fee, s.max_fee);
@@ -55,7 +57,7 @@ export default function ServiceFeePage() {
   };
 
   const dirty = JSON.stringify(form) !== initial;
-  const examples = useMemo(() => [20000, 100000, 500000], []);
+  const examples = useMemo(() => [20000, 100000, 500000, 1000000], []);
 
   const save = async () => {
     setSaving(true);
@@ -195,6 +197,24 @@ export default function ServiceFeePage() {
                   </div>
                 </div>
               )}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Gratis biaya layanan jika subtotal produk minimal (Rp, opsional)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  className={input}
+                  placeholder="Kosongkan jika tidak ada"
+                  value={form.free_min_subtotal ?? ''}
+                  onChange={(e) => set('free_min_subtotal', toNum(e.target.value))}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Jika subtotal produk mencapai nilai ini, biaya layanan menjadi GRATIS.
+                </p>
+              </div>
             </section>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

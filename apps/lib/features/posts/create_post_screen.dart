@@ -47,7 +47,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   }
 
   Future<void> _pickImages() async {
-    final picked = await _picker.pickMultiImage(imageQuality: 85, limit: 10 - _media.length);
+    final picked = await _picker.pickMultiImage(imageQuality: 80, maxWidth: 1600, maxHeight: 1600, limit: 10 - _media.length);
     if (picked.isEmpty) return;
     setState(() => _media.addAll(picked.map((x) => File(x.path))));
   }

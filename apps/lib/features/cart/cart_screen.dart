@@ -380,9 +380,8 @@ class _CartItemTile extends ConsumerWidget {
                     border: Border.all(color: AppColors.border),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: item.productImageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: item.productImageUrl!,
+                  child: item.listImageUrl != null
+                      ? CachedNetworkImage(memCacheWidth: 240, imageUrl: item.listImageUrl!,
                           fit: BoxFit.cover,
                           errorWidget: (_, _, _) => const Icon(Icons.image_outlined, color: AppColors.mutedForeground),
                         )

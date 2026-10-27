@@ -50,7 +50,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               leading: const Icon(Icons.photo_camera_outlined),
               title: const Text('Ambil Foto'),
               onTap: () async {
-                final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+                final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80, maxWidth: 800, maxHeight: 800);
                 if (context.mounted) Navigator.of(context).pop(file);
               },
             ),
@@ -58,7 +58,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               leading: const Icon(Icons.photo_library_outlined),
               title: const Text('Pilih dari Galeri'),
               onTap: () async {
-                final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+                final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 800, maxHeight: 800);
                 if (context.mounted) Navigator.of(context).pop(file);
               },
             ),

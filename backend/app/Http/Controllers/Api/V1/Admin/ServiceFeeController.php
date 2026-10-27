@@ -25,6 +25,7 @@ class ServiceFeeController extends Controller
             'value' => ['required', 'numeric', 'min:0', $request->input('type') === 'percent' ? 'max:100' : 'max:999999999'],
             'min_fee' => ['nullable', 'numeric', 'min:0'],
             'max_fee' => ['nullable', 'numeric', 'min:0', 'gte:min_fee'],
+            'free_min_subtotal' => ['nullable', 'numeric', 'min:0', 'max:999999999'],
         ], [
             'value.max' => 'Nilai terlalu besar (persentase maksimal 100).',
             'max_fee.gte' => 'Biaya maksimum harus lebih besar atau sama dengan biaya minimum.',

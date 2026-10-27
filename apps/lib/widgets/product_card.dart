@@ -111,9 +111,8 @@ class ProductCard extends ConsumerWidget {
                   Container(
                     color: const Color(0xFFF8FAFC),
                     padding: EdgeInsets.all(edge),
-                    child: product.imageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: product.imageUrl!,
+                    child: product.listImageUrl != null
+                        ? CachedNetworkImage(memCacheWidth: 400, imageUrl: product.listImageUrl!,
                             fit: BoxFit.contain,
                             placeholder: (_, _) => Container(color: const Color(0xFFF1F5F9)),
                             errorWidget: (_, _, _) => const Icon(

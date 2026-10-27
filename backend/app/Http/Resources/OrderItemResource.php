@@ -16,6 +16,7 @@ class OrderItemResource extends JsonResource
             'product_name' => $this->product_name,
             'product_sku' => $this->product_sku,
             'variant_name' => $this->variant_name,
+            'product_thumb_url' => \App\Support\ImageOptimizer::thumbUrl($this->product_image_path),
             'product_image_url' => $this->product_image_path ? asset('storage/'.$this->product_image_path) : null,
             'unit_price' => (float) $this->unit_price,
             'quantity' => $this->quantity,

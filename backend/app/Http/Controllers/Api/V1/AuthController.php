@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Support\ImageOptimizer;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\GoogleLoginRequest;
@@ -221,7 +222,7 @@ class AuthController extends Controller
             if ($user->avatar_path) {
                 Storage::disk('public')->delete($user->avatar_path);
             }
-            $data['avatar_path'] = $request->file('avatar')->store('avatars', 'public');
+            $data['avatar_path'] = ImageOptimizer::store($request->file('avatar'), 'avatars', 400);
         }
 
         $user->update($data);

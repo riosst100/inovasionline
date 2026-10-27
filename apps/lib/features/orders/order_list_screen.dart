@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -89,6 +90,10 @@ class _OrderTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (order.items.isNotEmpty) ...[
+              _FirstItemPreview(order: order),
+              const SizedBox(height: 10),
+            ],
             Row(
               children: [
                 Expanded(
@@ -116,6 +121,58 @@ class _OrderTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Thumbnail + name of the first product at the top of the card; the rest are summarised.
+class _FirstItemPreview extends StatelessWidget {
+  const _FirstItemPreview({required this.order});
+
+  final Order order;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = order.items.first;
+    final url = item.listImageUrl;
+    final others = order.items.length - 1;
+
+    return Row(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 52,
+            height: 52,
+            color: AppColors.surface,
+            child: url != null && url.isNotEmpty
+                ? CachedNetworkImage(memCacheWidth: 240, imageUrl: url,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, _, _) => const Icon(Icons.image_outlined, color: AppColors.mutedForeground),
+                  )
+                : const Icon(Icons.image_outlined, color: AppColors.mutedForeground),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.productName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              if (others > 0)
+                Text(
+                  '+$others produk lainnya',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.mutedForeground),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -15,6 +15,7 @@ class OrderItem {
     this.productSku,
     this.variantName,
     this.productImageUrl,
+    this.productThumbUrl,
     this.notes,
   });
 
@@ -26,6 +27,7 @@ class OrderItem {
         productSku: json['product_sku'] as String?,
         variantName: json['variant_name'] as String?,
         productImageUrl: json['product_image_url'] as String?,
+        productThumbUrl: json['product_thumb_url'] as String?,
         unitPrice: double.tryParse(json['unit_price'].toString()) ?? 0,
         quantity: json['quantity'] as int? ?? 0,
         discountAmount: double.tryParse(json['discount_amount'].toString()) ?? 0,
@@ -40,6 +42,9 @@ class OrderItem {
   final String? productSku;
   final String? variantName;
   final String? productImageUrl;
+  final String? productThumbUrl;
+
+  String? get listImageUrl => productThumbUrl ?? productImageUrl;
   final double unitPrice;
   final int quantity;
   final double discountAmount;

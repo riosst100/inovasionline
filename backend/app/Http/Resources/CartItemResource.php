@@ -20,6 +20,7 @@ class CartItemResource extends JsonResource
             'product_id' => $product->id,
             'product_name' => $product->name,
             'product_slug' => $product->slug,
+            'product_thumb_url' => \App\Support\ImageOptimizer::thumbUrl($product->images->first()?->path),
             'product_image_url' => $product->images->first() ? asset('storage/'.$product->images->first()->path) : null,
             'variant_id' => $variant?->id,
             'variant_name' => $variant?->name,

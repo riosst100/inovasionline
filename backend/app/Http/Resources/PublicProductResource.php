@@ -28,6 +28,7 @@ class PublicProductResource extends JsonResource
             'discount_percent' => $discountPercent,
             'stock' => $this->stock,
             'sold_count' => (int) ($this->order_items_sum_quantity ?? 0),
+            'thumb_url' => \App\Support\ImageOptimizer::thumbUrl($this->images->first()?->path),
             'image_url' => $this->images->first() ? (str_starts_with($this->images->first()->path, 'http') ? $this->images->first()->path : asset('storage/'.$this->images->first()->path)) : null,
             'promotion_ends_at' => $promotion?->ends_at,
         ];

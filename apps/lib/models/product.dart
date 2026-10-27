@@ -9,6 +9,7 @@ class Product {
     this.stock = 0,
     this.soldCount = 0,
     this.imageUrl,
+    this.thumbUrl,
     this.promotionEndsAt,
   });
 
@@ -22,6 +23,7 @@ class Product {
         stock: json['stock'] as int? ?? 0,
         soldCount: json['sold_count'] as int? ?? 0,
         imageUrl: json['image_url'] as String?,
+        thumbUrl: json['thumb_url'] as String?,
         promotionEndsAt: json['promotion_ends_at'] as String?,
       );
 
@@ -34,7 +36,11 @@ class Product {
   final int stock;
   final int soldCount;
   final String? imageUrl;
+  final String? thumbUrl;
   final String? promotionEndsAt;
+
+  /// Small image for lists/cards; falls back to the full one for images without a thumbnail.
+  String? get listImageUrl => thumbUrl ?? imageUrl;
 
   double get displayPrice => salePrice ?? regularPrice;
   bool get hasDiscount => salePrice != null && salePrice! < regularPrice;

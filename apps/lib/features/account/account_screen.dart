@@ -101,7 +101,7 @@ class AccountScreen extends ConsumerWidget {
               Positioned.fill(
                 child: InteractiveViewer(
                   child: Center(
-                    child: CachedNetworkImage(imageUrl: user.avatarUrl!),
+                    child: CachedNetworkImage(memCacheWidth: 300, imageUrl: user.avatarUrl!),
                   ),
                 ),
               ),
@@ -120,7 +120,7 @@ class AccountScreen extends ConsumerWidget {
 
     final picked = await ImagePicker().pickImage(
       source: action == 'camera' ? ImageSource.camera : ImageSource.gallery,
-      imageQuality: 90,
+      imageQuality: 80, maxWidth: 800, maxHeight: 800,
     );
     if (picked == null) return;
 

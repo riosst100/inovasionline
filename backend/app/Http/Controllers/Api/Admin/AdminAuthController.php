@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Support\ImageOptimizer;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\AdminTokenFromCookie;
 use App\Http\Resources\AdminUserResource;
@@ -147,7 +148,7 @@ class AdminAuthController extends Controller
         ]);
 
         $old = $adminUser->avatar_path;
-        $adminUser->forceFill(['avatar_path' => $request->file('avatar')->store('admin-avatars', 'public')])->save();
+        $adminUser->forceFill(['avatar_path' => ImageOptimizer::store($request->file('avatar'), 'admin-avatars', 400)])->save();
 
         if ($old) {
             Storage::disk('public')->delete($old);

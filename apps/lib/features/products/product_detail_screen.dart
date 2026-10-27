@@ -166,8 +166,7 @@ class _ProductDetailBody extends StatelessWidget {
               : PageView(
                   children: images
                       .map(
-                        (img) => CachedNetworkImage(
-                          imageUrl: img.url,
+                        (img) => CachedNetworkImage(memCacheWidth: 1000, imageUrl: img.url,
                           fit: BoxFit.cover,
                         ),
                       )

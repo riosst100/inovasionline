@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../config/theme.dart';
 import '../../providers/nav_badge_provider.dart';
-import '../cart/cart_providers.dart';
 import '../orders/active_order_bar.dart';
 import '../orders/order_providers.dart';
 import 'app_update_checker.dart';
@@ -24,7 +23,6 @@ class MainShell extends ConsumerWidget {
     final activeOrderCount =
         ref.watch(activeOrdersProvider).valueOrNull?.length ?? 0;
     final navBadge = ref.watch(navBadgeProvider).valueOrNull;
-    final cartItemCount = ref.watch(cartProvider).cart?.itemCount ?? 0;
 
     return AppUpdateChecker(
       child: PopScope(
@@ -136,15 +134,10 @@ class MainShell extends ConsumerWidget {
                       label: 'Chat',
                     ),
                     NavigationDestination(
-                      icon: _ShopNavButton(
-                        selected: false,
-                        badge: navBadge,
-                        cartCount: cartItemCount,
-                      ),
+                      icon: _ShopNavButton(selected: false, badge: navBadge),
                       selectedIcon: _ShopNavButton(
                         selected: true,
                         badge: navBadge,
-                        cartCount: cartItemCount,
                       ),
                       label: 'Belanja Online',
                     ),
@@ -179,16 +172,9 @@ class MainShell extends ConsumerWidget {
 
 /// The centre "Belanja" tab: a raised round button, always highlighted as the main menu.
 class _ShopNavButton extends StatelessWidget {
-  const _ShopNavButton({
-    required this.selected,
-    this.badge,
-    this.cartCount = 0,
-  });
+  const _ShopNavButton({required this.selected, this.badge});
 
   final bool selected;
-
-  /// Items in the cart; 0 hides the counter.
-  final int cartCount;
 
   /// Promo tag from admin (Pengaturan → Badge Menu); null hides it.
   final NavBadge? badge;
@@ -242,33 +228,6 @@ class _ShopNavButton extends StatelessWidget {
               // Sits on the circle's bottom edge, just above the "Belanja Online"
               // label, clear of the icon.
               Positioned(bottom: -4, child: _PromoBadge(label: badge.label)),
-            if (cartCount > 0)
-              Positioned(
-                top: -2,
-                right: -6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  constraints: const BoxConstraints(
-                    minWidth: 17,
-                    minHeight: 17,
-                  ),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
-                  child: Text(
-                    cartCount > 99 ? '99+' : '$cartCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

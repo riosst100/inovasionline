@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ImageOptimizer;
 use App\Models\Post;
 use App\Models\PostComment;
 use App\Models\User;
@@ -44,7 +45,7 @@ class PostService
             ]);
 
             foreach ($media as $index => $file) {
-                $path = $file->store('posts', 'public');
+                $path = ImageOptimizer::store($file, 'posts');
                 $post->media()->create([
                     'type' => PostMediaType::IMAGE,
                     'path' => $path,
