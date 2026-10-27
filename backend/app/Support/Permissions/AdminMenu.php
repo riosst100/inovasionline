@@ -36,6 +36,7 @@ final class AdminMenu
             ],
             'Operasional' => [
                 ['customers', 'Pengguna', null, true],
+                ['notifications', 'Kirim Notifikasi', null, true],
                 ['wallets', 'Saldo Pengguna', 'Saldo Belanja', true],
                 ['wallet_topups', 'Top Up Saldo', 'Saldo Belanja', false],
                 ['products', 'Produk', 'Master Data', true],

@@ -277,6 +277,16 @@ export const adminApi = {
     return apiRequest<DriverOrder[]>(`/admin/drivers/${driverId}/orders?page=${page}`);
   },
 
+  // Manual push notification (/api/admin/notifications/send)
+  async sendNotification(data: {
+    title: string;
+    body: string;
+    target: 'all' | 'users';
+    user_ids?: string[];
+  }): Promise<{ users: number; users_without_device: number } | null> {
+    return apiRequest('/admin/notifications/send', { method: 'POST', body: JSON.stringify(data) });
+  },
+
   // Customers (/api/admin/customers/*)
   async getCustomers(params?: { search?: string; page?: number }): Promise<PaginatedData<Customer>> {
     const query = new URLSearchParams();

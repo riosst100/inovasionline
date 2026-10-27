@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useInstantOrders } from '../../lib/instantOrders';
 import {
+  Bell,
   LayoutDashboard,
   ShieldCheck,
   UserCog,
@@ -86,6 +87,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Operasional',
     items: [
       { name: 'Pengguna', href: '/dashboard/customers', icon: Users2, perm: 'customers' },
+      { name: 'Kirim Notifikasi', href: '/dashboard/notifications', icon: Bell, perm: 'notifications' },
       {
         name: 'Saldo Belanja',
         href: '/dashboard/wallet',

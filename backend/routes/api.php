@@ -333,6 +333,7 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::post('/notifications/broadcast', [AdminNotificationController::class, 'broadcast'])->middleware('menu:notifications.broadcast');
+        Route::post('/notifications/send', [AdminNotificationController::class, 'send'])->middleware('menu:notifications');
 
         Route::prefix('orders')->middleware('menu:orders')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index']);
@@ -435,7 +436,7 @@ Route::prefix('admin')->group(function () {
         });
 
         // Customer Listing (users table)
-        Route::prefix('customers')->middleware('menu:customers')->group(function () {
+        Route::prefix('customers')->middleware('menu:customers,notifications')->group(function () {
             Route::get('/', [CustomerController::class, 'index']);
             Route::post('/', [CustomerController::class, 'store']);
             Route::get('/{user}', [CustomerController::class, 'show']);
@@ -653,5 +654,6 @@ Route::prefix('admin')->group(function () {
         });
 
         Route::post('/notifications/broadcast', [AdminNotificationController::class, 'broadcast'])->middleware('menu:notifications.broadcast');
+        Route::post('/notifications/send', [AdminNotificationController::class, 'send'])->middleware('menu:notifications');
     });
 });
