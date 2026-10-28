@@ -26,6 +26,7 @@ import '../wallet/wallet_providers.dart';
 import 'ad_chest.dart';
 import 'bonus_gift.dart';
 import 'delivery_address_sheet.dart';
+import 'home_popup.dart';
 import 'home_providers.dart';
 import 'welcome_message.dart';
 
@@ -54,6 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if ((offset - _offset).abs() > 0.5) setState(() => _offset = offset.clamp(0.0, 400.0));
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeSetDefaultAddress());
+    HomePopup.scheduleOn(this, ref);
   }
 
   /// First open with no saved address: default it to the user's current
@@ -244,6 +246,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     bestSellers: bestSellers.value ?? [],
                     popularProducts: popularProducts.value ?? [],
                     flashSaleProducts: flashSale.value?.slots.expand((s) => s.products).toList() ?? [],
+                    loading: [bestSellers, popularProducts, flashSale].any((p) => p.isLoading && !p.hasValue),
                   ),
 
                   const AdBanner(
@@ -1721,9 +1724,12 @@ class _InspirasiUntukmuSection extends StatelessWidget {
     required this.bestSellers,
     required this.popularProducts,
     required this.flashSaleProducts,
+    required this.loading,
   });
 
   final int selectedTab;
+  /// Product lists still on their first load: show tile skeletons, not the empty text.
+  final bool loading;
   final ValueChanged<int> onTabChanged;
   final List<Product> bestSellers;
   final List<Product> popularProducts;
@@ -1824,11 +1830,21 @@ class _InspirasiUntukmuSection extends StatelessWidget {
           const SizedBox(height: 16),
 
           // 2-Column Responsive Product Grid
-          if (activeProducts.isEmpty)
+          if (activeProducts.isEmpty && loading)
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 4,
+              gridDelegate: ProductGridDelegate(
+                textScale: MediaQuery.textScalerOf(context).scale(1),
+              ),
+              itemBuilder: (_, _) => const ProductTileSkeleton(),
+            )
+          else if (activeProducts.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(
-                child: Text('Memuat produk pilihan...'),
+                child: Text('Belum ada produk pilihan.'),
               ),
             )
           else
@@ -1885,31 +1901,37 @@ class _SectionSkeleton extends StatelessWidget {
   }
 }
 
+/// Mirrors [_CategoriesSection]'s layout (paddings, grid, tile sizes, 12 tiles)
+/// so nothing shifts when the categories arrive.
 class _CategoryGridSkeleton extends StatelessWidget {
   const _CategoryGridSkeleton();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Skeleton(height: 20, width: 130),
-          const SizedBox(height: 14),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Skeleton(height: 20, width: 130),
+          ),
+          const SizedBox(height: 15),
           GridView.builder(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: 8,
+            itemCount: 12,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.72,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 4,
+              childAspectRatio: 0.8,
             ),
             itemBuilder: (_, _) => const Column(
               children: [
-                Skeleton(width: 60, height: 60, borderRadius: 16),
+                Skeleton(width: 66, height: 66, borderRadius: 16),
                 SizedBox(height: 6),
                 Skeleton(width: 48, height: 10),
               ],

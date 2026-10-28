@@ -10,10 +10,19 @@ class Banner extends Model
 {
     use HasFactory, HasUlids;
 
+    /** Home hero carousel. */
+    public const PLACEMENT_SLIDER = 'slider';
+
+    /** Image popup shown on opening the app (at most once a day per device). */
+    public const PLACEMENT_POPUP = 'popup';
+
+    public const PLACEMENTS = [self::PLACEMENT_SLIDER, self::PLACEMENT_POPUP];
+
     protected $fillable = [
         'name',
         'image_path',
         'link_url',
+        'placement',
         'is_active',
         'sort_order',
     ];

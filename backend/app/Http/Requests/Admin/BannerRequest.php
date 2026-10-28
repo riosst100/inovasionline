@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Banner;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class BannerRequest extends FormRequest
 {
@@ -30,6 +32,7 @@ class BannerRequest extends FormRequest
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'image_url' => ['nullable', 'string', 'max:2048'],
             'link_url' => ['nullable', 'string', 'max:2048'],
+            'placement' => ['nullable', Rule::in(Banner::PLACEMENTS)],
             'is_active' => ['nullable'],
             'sort_order' => ['nullable', 'integer'],
         ];

@@ -213,11 +213,15 @@ export interface PaginatedData<T> {
   total: number;
 }
 
+/** slider = home hero carousel, popup = image popup shown once a day on opening the app. */
+export type BannerPlacement = 'slider' | 'popup';
+
 export interface Banner {
   id: string;
   name: string;
   image_url: string;
   link_url: string | null;
+  placement: BannerPlacement;
   is_active: boolean;
   sort_order: number;
   created_at?: string;
