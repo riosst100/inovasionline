@@ -1667,8 +1667,8 @@ class _SelectedPaymentTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  method.type == 'bank_transfer' && method.bankName != null
-                      ? 'Bank: ${method.bankName}'
+                  method.isManualAccount && method.manualAccountSummary != null
+                      ? method.manualAccountSummary!
                       : (method.description ??
                             'Metode pembayaran terverifikasi'),
                   style: const TextStyle(
@@ -2090,7 +2090,8 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
 
   static IconData _iconFor(PaymentMethod method) {
     if (method.isCod) return Icons.payments_rounded;
-    if (method.type == 'bank_transfer') return Icons.account_balance_rounded;
+    if (method.isBankTransfer) return Icons.account_balance_rounded;
+    if (method.isEwallet) return Icons.account_balance_wallet_rounded;
     return switch (method.group) {
       'E-Wallet & QRIS' =>
         method.gatewayChannel == 'other_qris'
@@ -2193,15 +2194,15 @@ class _PaymentMethodPickerSheet extends StatelessWidget {
                                 : const Color(0xFF7C3AED),
                             title: method.name,
                             subtitle:
-                                method.type == 'bank_transfer' &&
-                                    method.bankName != null
-                                ? method.bankName
+                                method.isManualAccount &&
+                                    method.manualAccountSummary != null
+                                ? method.manualAccountSummary
                                 : method.description,
                             badge: method.isCod
                                 ? 'COD'
-                                : (method.type == 'bank_transfer'
+                                : (method.isBankTransfer
                                       ? 'Transfer'
-                                      : null),
+                                      : (method.isEwallet ? 'E-Wallet' : null)),
                             freeShippingBadge: isFreeShipping(method),
                             selected: selected?.id == method.id,
                             onTap: () => _choose(context, method),

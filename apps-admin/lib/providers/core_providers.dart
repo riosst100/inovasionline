@@ -2,9 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api/api_client.dart';
 import '../core/storage/token_storage.dart';
+import '../models/bank_account.dart';
 import '../models/category.dart';
 import '../models/dashboard.dart';
 import '../services/auth_service.dart';
+import '../services/bank_account_service.dart';
 import '../services/catalog_service.dart';
 import '../services/cod_verification_service.dart';
 import '../services/customer_service.dart';
@@ -47,4 +49,12 @@ final customerServiceProvider = Provider<CustomerService>((ref) => CustomerServi
 
 final deliveryScheduleServiceProvider = Provider<DeliveryScheduleService>(
   (ref) => DeliveryScheduleService(ref.watch(apiClientProvider)),
+);
+
+final bankAccountServiceProvider = Provider<BankAccountService>(
+  (ref) => BankAccountService(ref.watch(apiClientProvider)),
+);
+
+final bankAccountsProvider = FutureProvider.autoDispose<List<BankAccount>>(
+  (ref) => ref.watch(bankAccountServiceProvider).list(),
 );

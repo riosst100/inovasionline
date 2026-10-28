@@ -372,6 +372,23 @@ export interface FreeShippingSettings {
   shipping_method_ids: string[];
 }
 
+export type BankAccountType = 'bank_transfer' | 'ewallet';
+
+/** Admin-owned bank or e-wallet account used for manual checkout and manual top-up transfers. */
+export interface BankAccount {
+  id: string;
+  type: BankAccountType;
+  name: string;
+  bank_name: string | null;
+  account_number: string | null;
+  account_holder_name: string | null;
+  description: string | null;
+  instructions: string | null;
+  is_enabled: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
 export interface PaymentMethodOption {
   id: string;
   name: string;

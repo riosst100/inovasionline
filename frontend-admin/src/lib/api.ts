@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, BankAccount, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -635,6 +635,25 @@ export const adminApi = {
 
   async getPaymentMethodOptions(): Promise<PaymentMethodOption[]> {
     return apiRequest<PaymentMethodOption[]>('/v1/admin/payment-methods?per_page=100');
+  },
+
+  async getBankAccounts(): Promise<BankAccount[]> {
+    return apiRequest<BankAccount[]>('/admin/bank-accounts');
+  },
+
+  async saveBankAccount(data: Partial<BankAccount>, id?: string): Promise<BankAccount> {
+    return apiRequest<BankAccount>(id ? `/admin/bank-accounts/${id}` : '/admin/bank-accounts', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async toggleBankAccount(id: string): Promise<BankAccount> {
+    return apiRequest<BankAccount>(`/admin/bank-accounts/${id}/toggle`, { method: 'POST' });
+  },
+
+  async deleteBankAccount(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/bank-accounts/${id}`, { method: 'DELETE' });
   },
 
   async getWalletBonus(): Promise<WalletBonusSettings> {

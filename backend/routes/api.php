@@ -341,7 +341,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/{order}', [AdminOrderController::class, 'show']);
         });
 
-        Route::prefix('payment-methods')->middleware('menu:free_shipping')->group(function () {
+        Route::prefix('payment-methods')->middleware('menu:free_shipping,bank_accounts')->group(function () {
+            Route::post('/', [AdminPaymentMethodController::class, 'store']);
+            Route::put('/{paymentMethod}', [AdminPaymentMethodController::class, 'update']);
+            Route::delete('/{paymentMethod}', [AdminPaymentMethodController::class, 'destroy']);
             Route::get('/', [AdminPaymentMethodController::class, 'index']);
             Route::post('/{paymentMethod}/toggle', [AdminPaymentMethodController::class, 'toggle']);
         });
@@ -552,6 +555,14 @@ Route::prefix('admin')->group(function () {
 
         Route::get('midtrans-settings', [AdminMidtransSettingController::class, 'show'])->middleware('menu:payment_gateway');
         Route::put('midtrans-settings', [AdminMidtransSettingController::class, 'update'])->middleware('menu:payment_gateway');
+
+        Route::prefix('bank-accounts')->middleware('menu:bank_accounts,free_shipping,orders,wallet_topups')->group(function () {
+            Route::get('/', [AdminPaymentMethodController::class, 'accounts']);
+            Route::post('/', [AdminPaymentMethodController::class, 'store']);
+            Route::put('/{paymentMethod}', [AdminPaymentMethodController::class, 'update']);
+            Route::delete('/{paymentMethod}', [AdminPaymentMethodController::class, 'destroy']);
+            Route::post('/{paymentMethod}/toggle', [AdminPaymentMethodController::class, 'toggle']);
+        });
 
         Route::get('free-shipping', [AdminFreeShippingController::class, 'show'])->middleware('menu:free_shipping');
         Route::put('free-shipping', [AdminFreeShippingController::class, 'update'])->middleware('menu:free_shipping');
