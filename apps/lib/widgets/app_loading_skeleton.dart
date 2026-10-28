@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../config/theme.dart';
+import 'main_nav_bar.dart';
 import 'skeleton.dart';
 
 /// The home page and bottom bar as placeholders, shown while the app still
@@ -144,7 +145,10 @@ class AppLoadingSkeleton extends StatelessWidget {
               ),
             ],
           ),
-          bottomNavigationBar: const _BottomBarPlaceholder(),
+          // The real bar, just not tappable yet.
+          bottomNavigationBar: const IgnorePointer(
+            child: MainNavBar(selectedIndex: MainNavBar.homeIndex),
+          ),
         ),
       ),
     );
@@ -158,64 +162,6 @@ class AppLoadingSkeleton extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
-}
-
-/// Same look as MainShell's bottom bar, without the tabs being usable yet.
-class _BottomBarPlaceholder extends StatelessWidget {
-  const _BottomBarPlaceholder();
-
-  static const _items = [
-    (Icons.shopping_bag_rounded, 'Belanja Online'),
-    (Icons.rss_feed_outlined, 'Postingan'),
-    (Icons.sms_outlined, 'Chat'),
-    (Icons.person_outline_rounded, 'Akun'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            children: [
-              for (final (index, (icon, label)) in _items.indexed)
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        icon,
-                        color: index == 0
-                            ? const Color(0xFF0284C7)
-                            : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: index == 0
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: index == 0
-                              ? const Color(0xFF0284C7)
-                              : const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
       ),
     );
   }
