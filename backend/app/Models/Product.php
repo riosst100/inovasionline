@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Enums\OrderStatus;
 use App\Support\Enums\ProductStatus;
 use App\Support\Enums\ProductType;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,10 +15,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Laravel\Scout\Searchable;
 
 class Product extends Model
 {
-    use HasFactory, HasUlids, SoftDeletes;
+    use HasFactory, HasUlids, Searchable, SoftDeletes;
 
     protected $fillable = [
         'category_id',
@@ -172,5 +174,43 @@ class Product extends Model
     public function posts(): BelongsToMany
     {
         return $this->belongsToMany(Post::class, 'post_products');
+    }
+
+    /** Only active products go into the search index (index settings: config/scout.php). */
+    public function shouldBeSearchable(): bool
+    {
+        return $this->status === ProductStatus::ACTIVE && ! $this->trashed();
+    }
+
+    /**
+     * Document stored in Meilisearch. sold_count is a ranking tie-breaker; it refreshes
+     * whenever the product is saved or on `php artisan scout:import "App\Models\Product"`.
+     */
+    public function toSearchableArray(): array
+    {
+        $this->loadMissing(['brand:id,name', 'category:id,name']);
+
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'brand' => $this->brand?->name,
+            'category' => $this->category?->name,
+            'sku' => $this->sku,
+            'short_description' => $this->short_description,
+            'sold_count' => (int) (array_key_exists('sold_count', $this->attributes)
+                ? $this->attributes['sold_count']
+                : $this->orderItems()
+                    ->whereHas('order', fn ($q) => $q->where('status', OrderStatus::COMPLETED))
+                    ->sum('quantity')),
+        ];
+    }
+
+    /** Eager loads for bulk `scout:import`, so it doesn't run queries per product. */
+    protected function makeAllSearchableUsing(Builder $query): Builder
+    {
+        return $query->with(['brand:id,name', 'category:id,name'])
+            ->withSum(['orderItems as sold_count' => function ($query) {
+                $query->whereHas('order', fn ($q) => $q->where('status', OrderStatus::COMPLETED));
+            }], 'quantity');
     }
 }

@@ -26,6 +26,9 @@ x-backend: &backend
     REVERB_SERVER_HOST: "0.0.0.0"
     REVERB_PORT: 8080
     REVERB_SCHEME: http
+    SCOUT_DRIVER: meilisearch
+    MEILISEARCH_HOST: http://meilisearch:7700
+    MEILISEARCH_KEY: ${MEILI_MASTER_KEY:-inovasionline-dev-master-key}
   restart: unless-stopped
 
 # Next.js dev server (hot reload). node_modules & .next live in named volumes so the
@@ -75,6 +78,24 @@ services:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.13
+    container_name: inovasionline-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-inovasionline-dev-master-key}
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "${MEILI_PORT:-7700}:7700"
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7700/health"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -152,3 +173,4 @@ volumes:
   frontend_next:
   db_data:
   redis_data:
+  meili_data:
