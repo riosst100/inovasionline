@@ -120,4 +120,36 @@ class OrderController extends Controller
 
         return ApiResponse::success(new OrderResource($order), 'Order will not be cancelled.');
     }
+
+    /**
+     * The courier's latest position for the buyer's tracking map. Only while the order is on the way:
+     * before pickup and after handover the courier's whereabouts are none of the buyer's business.
+     */
+    public function tracking(Request $request, Order $order): JsonResponse
+    {
+        if ($order->user_id !== $request->user()->id) {
+            return ApiResponse::error('This order does not belong to you.', [], 403);
+        }
+
+        $active = $order->status === OrderStatus::ON_DELIVERY && $order->driver_id !== null;
+        $driver = $active ? $order->driver : null;
+
+        return ApiResponse::success([
+            'status' => $order->status->value,
+            'active' => $driver !== null,
+            'driver' => $driver === null ? null : [
+                'name' => $driver->name,
+                'phone' => $driver->phone,
+                'vehicle_type' => $driver->vehicle_type,
+                'vehicle_plate_number' => $driver->vehicle_plate_number,
+            ],
+            'location' => $driver?->last_location_at === null ? null : [
+                'latitude' => $driver->last_latitude,
+                'longitude' => $driver->last_longitude,
+                'accuracy' => $driver->last_location_accuracy,
+                'updated_at' => $driver->last_location_at->toIso8601String(),
+                'seconds_ago' => (int) $driver->last_location_at->diffInSeconds(now(), true),
+            ],
+        ], 'Tracking retrieved successfully.');
+    }
 }
