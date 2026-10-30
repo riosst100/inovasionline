@@ -13,6 +13,7 @@ import {
   Info,
   Users2,
   Image as ImageIcon,
+  SquareStack,
   LayoutTemplate,
   FolderTree,
   ShoppingBag,
@@ -129,6 +130,7 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: LayoutTemplate,
         children: [
           { name: 'Banner', href: '/dashboard/banners', icon: ImageIcon, perm: 'banners' },
+          { name: 'Popup Beranda', href: '/dashboard/popups', icon: SquareStack, perm: 'banners' },
           { name: 'Tulisan Promosi', href: '/dashboard/display/promo-texts', icon: Info, perm: 'promo_texts' },
         ],
       },

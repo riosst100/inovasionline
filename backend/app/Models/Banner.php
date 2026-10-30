@@ -24,6 +24,7 @@ class Banner extends Model
         'link_url',
         'placement',
         'is_active',
+        'weekdays',
         'starts_on',
         'ends_on',
         'sort_order',
@@ -33,6 +34,7 @@ class Banner extends Model
     {
         return [
             'is_active' => 'boolean',
+            'weekdays' => 'array',
             'starts_on' => 'date:Y-m-d',
             'ends_on' => 'date:Y-m-d',
         ];

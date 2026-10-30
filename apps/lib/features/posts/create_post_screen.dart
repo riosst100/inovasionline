@@ -52,7 +52,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 80, maxWidth: 1600, maxHeight: 1600, limit: 10 - _media.length);
-    if (picked.isEmpty) return;
+    if (picked.isEmpty || !mounted) return;
     setState(() => _media.addAll(picked.map((x) => File(x.path))));
   }
 
@@ -65,7 +65,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     if (picked == null) return;
 
     var file = File(picked.path);
-    if (await file.length() > _maxRawVideoSizeBytes) {
+    final rawSize = await file.length();
+    if (!mounted) return;
+    if (rawSize > _maxRawVideoSizeBytes) {
       setState(() => _error = 'Ukuran video terlalu besar.');
       return;
     }
@@ -165,7 +167,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       isScrollControlled: true,
       builder: (_) => ProductTagPickerSheet(initiallySelected: _taggedProducts),
     );
-    if (selected != null) setState(() => _taggedProducts.replaceRange(0, _taggedProducts.length, selected));
+    if (selected != null && mounted) setState(() => _taggedProducts.replaceRange(0, _taggedProducts.length, selected));
   }
 
   bool get _canSubmit =>

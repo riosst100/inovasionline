@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/product.dart';
 import '../../providers/core_providers.dart';
 import '../../services/analytics.dart';
-import '../../widgets/product_grid.dart';
+import '../../widgets/product_card.dart';
 import '../../widgets/skeleton.dart';
 import '../ads/ad_banner.dart';
 import '../ads/admob.dart';
@@ -148,17 +148,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 )
               : _products.isEmpty
                   ? const Center(child: Text('Tidak ada hasil ditemukan.'))
-                  : ListView(
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Text('Produk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  : CustomScrollView(
+                      slivers: [
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('Produk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
                         ),
-                        ProductGrid(
-                          products: _products,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          onProductTap: (product) => _openProduct(product, keyword: _lastKeyword),
+                        // A sliver grid builds only the cards that are on screen.
+                        SliverPadding(
+                          padding: const EdgeInsets.all(12),
+                          sliver: SliverGrid(
+                            gridDelegate: ProductGridDelegate(
+                              textScale: MediaQuery.textScalerOf(context).scale(1),
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final product = _products[index];
+                                return ProductCard(
+                                  product: product,
+                                  compact: true,
+                                  onTap: () => _openProduct(product, keyword: _lastKeyword),
+                                );
+                              },
+                              childCount: _products.length,
+                            ),
+                          ),
                         ),
                       ],
                     ),
