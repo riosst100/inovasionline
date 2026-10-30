@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi, ApiError } from '../../../lib/api';
 import { Banner, BannerPlacement } from '../../../types';
+import LaunchPopupSettingsCard from './LaunchPopupSettingsCard';
 import {
   Image as ImageIcon,
   Plus,
@@ -38,9 +39,12 @@ const PLACEMENTS: Record<BannerPlacement, { label: string; noun: string; hint: s
   popup: {
     label: 'Popup Beranda',
     noun: 'Popup',
-    hint: 'Popup gambar muncul di tengah layar saat pelanggan membuka aplikasi, maksimal sekali sehari per perangkat, dan bisa ditutup lewat tombol X. Hanya popup Aktif urutan teratas (#1) yang ditampilkan. Ukuran gambar yang disarankan 800 × 1000 px (tegak 4:5).',
+    hint: 'Popup muncul di tengah layar saat pelanggan membuka aplikasi dan bisa ditutup lewat tombol X. Atur isi dan jadwalnya di kartu pengaturan di bawah. Pada mode "Gambar Sendiri", semua popup Aktif yang sedang dalam rentang tanggalnya tayang bergantian setiap aplikasi dibuka. Ukuran gambar yang disarankan 800 × 1000 px (tegak 4:5).',
   },
 };
+
+/** 'YYYY-MM-DD' → 'DD/MM/YYYY' without going through Date (no timezone shift). */
+const fmtDay = (d?: string | null) => (d ? d.split('-').reverse().join('/') : null);
 
 export default function AdminBannersPage() {
   const [allBanners, setAllBanners] = useState<Banner[]>([]);
@@ -71,6 +75,8 @@ export default function AdminBannersPage() {
     image_url: '',
     link_url: '',
     is_active: true,
+    starts_on: '',
+    ends_on: '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -131,6 +137,8 @@ export default function AdminBannersPage() {
       image_url: '',
       link_url: '',
       is_active: true,
+      starts_on: '',
+      ends_on: '',
     });
     setSelectedFile(null);
     setFilePreview(null);
@@ -145,6 +153,8 @@ export default function AdminBannersPage() {
       image_url: banner.image_url,
       link_url: banner.link_url || '',
       is_active: banner.is_active,
+      starts_on: banner.starts_on ?? '',
+      ends_on: banner.ends_on ?? '',
     });
     setSelectedFile(null);
     setFilePreview(banner.image_url);
@@ -189,6 +199,8 @@ export default function AdminBannersPage() {
       form.append('link_url', formData.link_url.trim());
       form.append('is_active', formData.is_active ? '1' : '0');
       form.append('placement', editingBanner?.placement ?? placement);
+      form.append('starts_on', formData.starts_on);
+      form.append('ends_on', formData.ends_on);
 
       if (imageMode === 'upload' && selectedFile) {
         form.append('image', selectedFile);
@@ -331,6 +343,8 @@ export default function AdminBannersPage() {
             <p className="text-slate-600">{placementInfo.hint}</p>
           </div>
         </div>
+
+        {placement === 'popup' && <LaunchPopupSettingsCard />}
 
         {/* Feedback Alerts */}
         {error && (
@@ -573,6 +587,12 @@ export default function AdminBannersPage() {
                             {banner.name}
                           </h4>
 
+                          {placement === 'popup' && (banner.starts_on || banner.ends_on) && (
+                            <p className="text-[11px] font-semibold text-amber-700">
+                              Tayang: {fmtDay(banner.starts_on) ?? 'sejak awal'} – {fmtDay(banner.ends_on) ?? 'seterusnya'}
+                            </p>
+                          )}
+
                           <div className="flex items-center gap-1.5 text-xs text-slate-500">
                             <LinkIcon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                             {banner.link_url ? (
@@ -804,6 +824,34 @@ export default function AdminBannersPage() {
                     : 'Jika dikosongkan, ketukan pada banner di aplikasi akan membuka mode layar penuh pratinjau foto.'}
                 </p>
               </div>
+
+              {/* Popup schedule: show only between these dates */}
+              {(editingBanner?.placement ?? placement) === 'popup' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Tanggal Tayang (Opsional)
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="date"
+                      value={formData.starts_on}
+                      onChange={(e) => setFormData({ ...formData, starts_on: e.target.value })}
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
+                    />
+                    <span className="text-xs text-slate-400">s/d</span>
+                    <input
+                      type="date"
+                      value={formData.ends_on}
+                      min={formData.starts_on || undefined}
+                      onChange={(e) => setFormData({ ...formData, ends_on: e.target.value })}
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Gambar hanya tayang pada rentang ini (WIB). Kosongkan untuk tayang terus selama Aktif.
+                  </p>
+                </div>
+              )}
 
               {/* Status Switch */}
               <div className="pt-2">

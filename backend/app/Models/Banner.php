@@ -24,6 +24,8 @@ class Banner extends Model
         'link_url',
         'placement',
         'is_active',
+        'starts_on',
+        'ends_on',
         'sort_order',
     ];
 
@@ -31,6 +33,8 @@ class Banner extends Model
     {
         return [
             'is_active' => 'boolean',
+            'starts_on' => 'date:Y-m-d',
+            'ends_on' => 'date:Y-m-d',
         ];
     }
 }

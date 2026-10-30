@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'reduce_motion_loop.dart';
+
 class Skeleton extends StatefulWidget {
   const Skeleton({
     super.key,
@@ -16,11 +18,14 @@ class Skeleton extends StatefulWidget {
   State<Skeleton> createState() => _SkeletonState();
 }
 
-class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
+class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin, ReduceMotionLoop {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1200),
-  )..repeat();
+  );
+
+  @override
+  AnimationController get loopController => _controller;
 
   @override
   void dispose() {
@@ -30,27 +35,29 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final t = _controller.value;
-        return Container(
-          width: widget.width,
-          height: widget.height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            gradient: LinearGradient(
-              begin: Alignment(-1 + t * 3, 0),
-              end: Alignment(0 + t * 3, 0),
-              colors: [
-                Colors.grey.shade300,
-                Colors.grey.shade100,
-                Colors.grey.shade300,
-              ],
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final t = _controller.value;
+          return Container(
+            width: widget.width,
+            height: widget.height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(widget.borderRadius),
+              gradient: LinearGradient(
+                begin: Alignment(-1 + t * 3, 0),
+                end: Alignment(0 + t * 3, 0),
+                colors: [
+                  Colors.grey.shade300,
+                  Colors.grey.shade100,
+                  Colors.grey.shade300,
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

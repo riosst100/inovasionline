@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
   UserCog,
+  Info,
   Users2,
   Image as ImageIcon,
   LayoutTemplate,
@@ -125,7 +126,10 @@ export const NAV_SECTIONS: NavSection[] = [
         name: 'Tampilan',
         href: '/dashboard/display',
         icon: LayoutTemplate,
-        children: [{ name: 'Banner', href: '/dashboard/banners', icon: ImageIcon, perm: 'banners' }],
+        children: [
+          { name: 'Banner', href: '/dashboard/banners', icon: ImageIcon, perm: 'banners' },
+          { name: 'Tulisan Promosi', href: '/dashboard/display/promo-texts', icon: Info, perm: 'promo_texts' },
+        ],
       },
       {
         name: 'Promosi',

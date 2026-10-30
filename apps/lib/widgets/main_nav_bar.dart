@@ -246,7 +246,7 @@ class _PromoBadgeState extends State<_PromoBadge>
       ),
     );
 
-    return AnimatedBuilder(
+    return RepaintBoundary(child: AnimatedBuilder(
       animation: _controller,
       child: pill,
       builder: (context, child) {
@@ -267,7 +267,7 @@ class _PromoBadgeState extends State<_PromoBadge>
           child: child,
         );
       },
-    );
+    ));
   }
 }
 

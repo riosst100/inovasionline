@@ -50,6 +50,7 @@ final class AdminMenu
                 ['search_suggestions', 'Kueri Pencarian', 'Laporan', true],
                 ['wallet_report', 'Laporan Saldo Belanja', 'Laporan', false],
                 ['banners', 'Banner', 'Tampilan', true],
+                ['promo_texts', 'Tulisan Promosi', 'Tampilan', true],
                 ['vouchers', 'Voucher', 'Promosi', true],
                 ['discounts', 'Diskon', 'Promosi', true],
                 ['flash_sales', 'Flash Sale', 'Promosi', true],

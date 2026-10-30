@@ -10,6 +10,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
+import '../../widgets/reduce_motion_loop.dart';
 import '../ads/admob.dart';
 import '../wallet/reward_effects.dart';
 import '../wallet/wallet_providers.dart';
@@ -92,11 +93,14 @@ class BonusGiftBanner extends ConsumerStatefulWidget {
 }
 
 class _BonusGiftBannerState extends ConsumerState<BonusGiftBanner>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, ReduceMotionLoop {
   late final _wiggle = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2200),
-  )..repeat();
+  );
+
+  @override
+  AnimationController get loopController => _wiggle;
 
   bool _opening = false;
 
@@ -241,15 +245,17 @@ class _BonusGiftBannerState extends ConsumerState<BonusGiftBanner>
                       padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
                       child: Row(
                         children: [
-                          AnimatedBuilder(
-                            animation: _wiggle,
-                            builder: (_, child) {
-                              // A quick wiggle at the start of every cycle, then rest.
-                              final t = _wiggle.value;
-                              final angle = t < 0.25 ? math.sin(t * 4 * math.pi * 4) * 0.14 * (1 - t * 4) : 0.0;
-                              return Transform.rotate(angle: angle, child: child);
-                            },
-                            child: const SizedBox(width: 50, height: 50, child: _GiftBox(scale: 0.42)),
+                          RepaintBoundary(
+                            child: AnimatedBuilder(
+                              animation: _wiggle,
+                              builder: (_, child) {
+                                // A quick wiggle at the start of every cycle, then rest.
+                                final t = _wiggle.value;
+                                final angle = t < 0.25 ? math.sin(t * 4 * math.pi * 4) * 0.14 * (1 - t * 4) : 0.0;
+                                return Transform.rotate(angle: angle, child: child);
+                              },
+                              child: const SizedBox(width: 50, height: 50, child: _GiftBox(scale: 0.42)),
+                            ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(

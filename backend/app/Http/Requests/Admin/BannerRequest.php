@@ -18,6 +18,11 @@ class BannerRequest extends FormRequest
         if ($this->input('link_url') === '') {
             $this->merge(['link_url' => null]);
         }
+        foreach (['starts_on', 'ends_on'] as $date) {
+            if ($this->input($date) === '') {
+                $this->merge([$date => null]);
+            }
+        }
         if ($this->input('image_url') === '') {
             $this->merge(['image_url' => null]);
         }
@@ -34,6 +39,8 @@ class BannerRequest extends FormRequest
             'link_url' => ['nullable', 'string', 'max:2048'],
             'placement' => ['nullable', Rule::in(Banner::PLACEMENTS)],
             'is_active' => ['nullable'],
+            'starts_on' => ['nullable', 'date_format:Y-m-d'],
+            'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
             'sort_order' => ['nullable', 'integer'],
         ];
     }

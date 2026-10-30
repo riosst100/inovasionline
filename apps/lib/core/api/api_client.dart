@@ -4,6 +4,7 @@ import '../storage/token_storage.dart';
 import 'account_block.dart';
 import 'api_exception.dart';
 import 'connectivity.dart';
+import 'response_cache.dart';
 
 class ApiClient {
   ApiClient(this._tokenStorage) : dio = Dio(
@@ -42,11 +43,23 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          if (ResponseCache.applies(options)) await ResponseCache.prepare(options);
           handler.next(options);
+        },
+        onResponse: (response, handler) async {
+          if (ResponseCache.applies(response.requestOptions)) await ResponseCache.store(response);
+          handler.next(response);
         },
         onError: (error, handler) async {
           final retried = await _retryOnce(error);
           if (retried != null) return handler.resolve(retried);
+          final network = error.type == DioExceptionType.connectionTimeout ||
+              error.type == DioExceptionType.receiveTimeout ||
+              error.type == DioExceptionType.connectionError;
+          if (network && ResponseCache.applies(error.requestOptions)) {
+            final saved = await ResponseCache.offline(error.requestOptions);
+            if (saved != null) return handler.resolve(saved);
+          }
           handler.next(_mapError(error));
         },
       ),

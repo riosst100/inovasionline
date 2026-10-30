@@ -6,19 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../models/banner.dart';
+import '../ads/launch_ad_popup.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/banner_carousel.dart';
 
-/// Promo image popup over home after opening the app, at most once a day per
-/// device. The image is set in admin (Banner → Popup Beranda); only the first
-/// active one shows.
+/// Popup over home after opening the app. Admin (Banner → Popup Beranda) picks
+/// what it shows (an AdMob native ad or the popup images, which rotate) and when
+/// (weekdays, date range, max times per day per device).
 ///
 /// Waits for [startupSettledProvider] so it never covers the intro or the
 /// permission prompts, and only counts as shown once it actually appears.
 class HomePopup {
   HomePopup._();
 
-  static const _lastShownKey = 'home_popup_last_shown';
+  static const _shownKey = 'home_popup_shown';
+  static const _cursorKey = 'home_popup_cursor';
 
   /// Once per process: home can be rebuilt (e.g. after logging in again).
   static bool _handledThisLaunch = false;
@@ -35,11 +37,22 @@ class HomePopup {
   static Future<void> _maybeShow(State state, WidgetRef ref) async {
     const storage = FlutterSecureStorage();
     final today = _dateKey(DateTime.now());
-    if (await storage.read(key: _lastShownKey) == today) return;
+    final shownToday = await _shownToday(storage, today);
 
-    final popups = await ref.read(bannerServiceProvider).popupBanners();
-    if (popups.isEmpty) return;
-    final banner = popups.first;
+    // The server applies the admin's schedule (days, date range) and says what to show.
+    final config = await ref.read(bannerServiceProvider).launchPopup();
+    if (config.mode == 'off' || shownToday >= config.maxPerDay || !state.mounted) return;
+
+    if (config.mode == 'admob') {
+      if (ModalRoute.of(state.context)?.isCurrent == false) return;
+      if (await LaunchAdPopup.show(state.context, ref)) await _markShown(storage, today, shownToday);
+      return;
+    }
+
+    // Image mode: rotate through the images that are due today.
+    if (config.items.isEmpty) return;
+    final cursor = int.tryParse(await storage.read(key: _cursorKey) ?? '') ?? 0;
+    final banner = config.items[cursor % config.items.length];
 
     // Load the image first so the popup never opens empty, and size it to the
     // image's own aspect ratio.
@@ -49,7 +62,8 @@ class HomePopup {
     // than stack over it; it tries again next launch.
     if (ModalRoute.of(state.context)?.isCurrent == false) return;
 
-    await storage.write(key: _lastShownKey, value: today);
+    await _markShown(storage, today, shownToday);
+    await storage.write(key: _cursorKey, value: '${cursor + 1}');
     if (!state.mounted) return;
     await showGeneralDialog<void>(
       context: state.context,
@@ -75,8 +89,21 @@ class HomePopup {
     );
   }
 
-  static String _dateKey(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  /// WIB date, to match the server's schedule whatever the device timezone.
+  static String _dateKey(DateTime now) {
+    final d = now.toUtc().add(const Duration(hours: 7));
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  /// How many times a popup already showed today; stored as "date|count".
+  static Future<int> _shownToday(FlutterSecureStorage storage, String today) async {
+    final parts = (await storage.read(key: _shownKey))?.split('|');
+    if (parts == null || parts.length != 2 || parts[0] != today) return 0;
+    return int.tryParse(parts[1]) ?? 0;
+  }
+
+  static Future<void> _markShown(FlutterSecureStorage storage, String today, int shownToday) =>
+      storage.write(key: _shownKey, value: '$today|${shownToday + 1}');
 
   /// Downloads (and caches) the image; null if it fails or takes too long.
   static Future<Size?> _imageSize(ImageProvider provider) {

@@ -67,7 +67,7 @@ class AppLoadingSkeleton extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      const Skeleton(height: 156, borderRadius: 16),
+                      const Skeleton(height: 120, borderRadius: 16),
                     ],
                   ),
                 ),

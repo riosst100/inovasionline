@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, BankAccount, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, LaunchPopupSettings, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, BankAccount, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -345,6 +345,17 @@ export const adminApi = {
     return apiRequest<Banner[]>('/admin/banners');
   },
 
+  async getLaunchPopup(): Promise<LaunchPopupSettings> {
+    return apiRequest<LaunchPopupSettings>('/admin/launch-popup');
+  },
+
+  async updateLaunchPopup(data: LaunchPopupSettings): Promise<LaunchPopupSettings> {
+    return apiRequest<LaunchPopupSettings>('/admin/launch-popup', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   async createBanner(data: FormData | { name: string; image_url?: string; link_url?: string; is_active?: boolean }): Promise<Banner> {
     const isForm = typeof FormData !== 'undefined' && data instanceof FormData;
     return apiRequest<Banner>('/admin/banners', {
@@ -620,6 +631,19 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
+  },
+
+  async getPromoTexts(): Promise<string[]> {
+    const res = await apiRequest<{ promo_texts: string[] }>('/admin/promo-texts');
+    return res.promo_texts;
+  },
+
+  async savePromoTexts(promo_texts: string[]): Promise<string[]> {
+    const res = await apiRequest<{ promo_texts: string[] }>('/admin/promo-texts', {
+      method: 'PUT',
+      body: JSON.stringify({ promo_texts }),
+    });
+    return res.promo_texts;
   },
 
   async getFreeShipping(): Promise<FreeShippingSettings> {

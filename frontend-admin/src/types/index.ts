@@ -223,9 +223,23 @@ export interface Banner {
   link_url: string | null;
   placement: BannerPlacement;
   is_active: boolean;
+  /** Popup images only: show from/until these dates (YYYY-MM-DD, WIB); null = no limit. */
+  starts_on?: string | null;
+  ends_on?: string | null;
   sort_order: number;
   created_at?: string;
   updated_at?: string;
+}
+
+export type LaunchPopupMode = 'off' | 'admob' | 'image';
+
+export interface LaunchPopupSettings {
+  mode: LaunchPopupMode;
+  /** ISO weekdays 1 (Senin) – 7 (Minggu); null = every day. */
+  weekdays: number[] | null;
+  max_per_day: number;
+  starts_on: string | null;
+  ends_on: string | null;
 }
 
 export interface AdminSession {

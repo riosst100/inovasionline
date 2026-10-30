@@ -99,7 +99,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        height: 156,
+        height: 120,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: const Color(0xFFF8FAFC),

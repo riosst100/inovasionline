@@ -25,6 +25,8 @@ class BannerService
             'link_url' => $data['link_url'] ?? null,
             'placement' => $placement,
             'is_active' => isset($data['is_active']) ? filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN) : true,
+            'starts_on' => $data['starts_on'] ?? null,
+            'ends_on' => $data['ends_on'] ?? null,
             'sort_order' => $data['sort_order'] ?? $nextSortOrder,
         ]);
     }

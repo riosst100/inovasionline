@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../api/response_cache.dart';
 
 class TokenStorage {
   TokenStorage() : _storage = const FlutterSecureStorage();
@@ -10,5 +11,8 @@ class TokenStorage {
 
   Future<void> saveToken(String token) => _storage.write(key: _tokenKey, value: token);
 
-  Future<void> clearToken() => _storage.delete(key: _tokenKey);
+  Future<void> clearToken() async {
+    await _storage.delete(key: _tokenKey);
+    await ResponseCache.clearPrivate();
+  }
 }

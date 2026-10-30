@@ -9,6 +9,14 @@ final bannersProvider = FutureProvider.autoDispose<List<AppBanner>>((ref) {
   return ref.watch(bannerServiceProvider).banners();
 });
 
+/// Admin-managed texts for the home promo strip (Promosi > Gratis Ongkir).
+final promoTextsProvider = FutureProvider.autoDispose<List<String>>((ref) async {
+  final config = await ref.watch(checkoutServiceProvider).freeShippingConfig();
+  final texts = config['promo_texts'];
+  if (texts is! List) return const [];
+  return texts.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+});
+
 final rootCategoriesProvider = FutureProvider.autoDispose<List<Category>>((ref) async {
   final all = await ref.watch(catalogServiceProvider).categories();
   return all.where((c) => c.parentId == null).toList();

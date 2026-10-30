@@ -1254,6 +1254,83 @@ class _OutOfAreaScreen extends ConsumerWidget {
 }
 
 /// Explains why the app needs location before anything is asked of the user.
+/// Non-dismissible card over the loading skeleton. The home page is not built behind it, so
+/// no API calls start until location is on.
+class _LocationPopup extends StatelessWidget {
+  const _LocationPopup({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.buttonText,
+    required this.onPressed,
+    this.secondary,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String buttonText;
+  final VoidCallback? onPressed;
+  final Widget? secondary;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Stack(
+        children: [
+          const AppLoadingSkeleton(),
+          const ModalBarrier(dismissible: false, color: Colors.black54),
+          Center(
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 320,
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.fromLTRB(22, 24, 22, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 32, color: const Color(0xFF0284C7)),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.foreground),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.mutedForeground, height: 1.4, fontSize: 13),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: FilledButton(onPressed: onPressed, child: Text(buttonText)),
+                    ),
+                    if (secondary != null) ...[const SizedBox(height: 2), secondary!],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LocationIntroScreen extends StatelessWidget {
   const _LocationIntroScreen({
     required this.onEnable,
@@ -1267,75 +1344,20 @@ class _LocationIntroScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.location_on_rounded,
-                          size: 44,
-                          color: Color(0xFF0284C7),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Nyalakan Lokasi',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Aplikasi perlu menyalakan lokasi untuk menentukan posisi '
-                        'kamu, agar katalog produk dan pengiriman sesuai '
-                        'dengan tempat kamu berada.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.mutedForeground,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: busy ? null : onEnable,
-                    child: Text(
-                      busy
-                          ? 'Menunggu...'
-                          : permanentlyDenied
-                          ? 'Buka Pengaturan'
-                          : 'Nyalakan Lokasi',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TextButton(
-                  onPressed: () => SystemNavigator.pop(),
-                  child: const Text('Keluar Aplikasi'),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return _LocationPopup(
+      icon: Icons.location_on_rounded,
+      title: 'Nyalakan Lokasi',
+      message: 'Aplikasi perlu menyalakan lokasi untuk menentukan posisi kamu, agar katalog produk '
+          'dan pengiriman sesuai dengan tempat kamu berada.',
+      buttonText: busy
+          ? 'Menunggu...'
+          : permanentlyDenied
+          ? 'Buka Pengaturan'
+          : 'Nyalakan Lokasi',
+      onPressed: busy ? null : onEnable,
+      secondary: TextButton(
+        onPressed: () => SystemNavigator.pop(),
+        child: const Text('Keluar Aplikasi'),
       ),
     );
   }
@@ -1349,56 +1371,13 @@ class _GpsOffScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.location_off_rounded,
-                    size: 44,
-                    color: Color(0xFF0284C7),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Lokasi Belum Aktif',
-                  style: Theme.of(context).textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Nyalakan lokasi di HP kamu untuk menentukan alamat pengiriman. '
-                  'Aplikasi akan lanjut otomatis setelah lokasi aktif.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.mutedForeground),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: busy ? null : onEnable,
-                    child: Text(busy ? 'Menyalakan lokasi...' : 'Nyalakan Lokasi'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return _LocationPopup(
+      icon: Icons.location_off_rounded,
+      title: 'Lokasi Belum Aktif',
+      message: 'Nyalakan lokasi di HP kamu untuk menentukan alamat pengiriman. '
+          'Aplikasi akan lanjut otomatis setelah lokasi aktif.',
+      buttonText: busy ? 'Menyalakan lokasi...' : 'Nyalakan Lokasi',
+      onPressed: busy ? null : onEnable,
     );
   }
 }
