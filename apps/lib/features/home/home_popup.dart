@@ -173,7 +173,7 @@ class _PopupContent extends StatelessWidget {
                 child: Semantics(
                   label: banner.name,
                   image: true,
-                  child: CachedNetworkImage(imageUrl: banner.imageUrl, fit: BoxFit.cover),
+                  child: CachedNetworkImage(memCacheWidth: 900, imageUrl: banner.imageUrl, fit: BoxFit.cover),
                 ),
               ),
             ),

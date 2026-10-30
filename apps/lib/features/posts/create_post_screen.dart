@@ -245,7 +245,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(_media[index], width: 90, height: 90, fit: BoxFit.cover),
+                      child: Image.file(_media[index], width: 90, height: 90, cacheWidth: 270, fit: BoxFit.cover),
                     ),
                     Positioned(
                       top: 2,

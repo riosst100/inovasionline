@@ -1531,7 +1531,8 @@ class _WalletFreeShippingPromoState extends ConsumerState<_WalletFreeShippingPro
     if (count > 1) {
       _timer = Timer.periodic(const Duration(seconds: 4), (_) {
         final c = _controller;
-        if (c == null || !c.hasClients) return;
+        // Skip while another page covers this one: nobody sees the slide.
+        if (!mounted || !TickerMode.of(context) || c == null || !c.hasClients) return;
         c.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
       });
     }

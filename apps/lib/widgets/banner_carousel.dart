@@ -68,7 +68,8 @@ class _BannerCarouselState extends State<BannerCarousel> {
     _timer?.cancel();
     if (widget.banners.length <= 1) return;
     _timer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!_controller.hasClients) return;
+      // Skip while another page covers this one: nobody sees the slide.
+      if (!mounted || !TickerMode.of(context) || !_controller.hasClients) return;
       _controller.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
