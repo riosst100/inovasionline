@@ -88,6 +88,12 @@ final admobProvider = FutureProvider<AdmobConfig?>((ref) async {
     final response = await ref.watch(apiClientProvider).dio.get('/admob-config');
     final data = response.data['data'];
     if (data is! Map<String, dynamic>) return null;
+    // Starting the SDK is heavy (threads, native init). Wait until the first screen is up and the
+    // welcome animation has played, instead of competing with them.
+    for (var i = 0; i < 40 && !ref.read(startupSettledProvider); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    await Future<void>.delayed(const Duration(seconds: 3));
     await MobileAds.instance.initialize();
     return AdmobConfig.fromJson(data);
   } catch (e) {

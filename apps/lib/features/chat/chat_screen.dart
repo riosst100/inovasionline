@@ -292,7 +292,7 @@ class _ChatListHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
+    final topPadding = MediaQuery.paddingOf(context).top;
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, topPadding + 14, 16, 14),
@@ -586,7 +586,7 @@ class _ThreadList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentUserId = ref.watch(authProvider).user?.id;
+    final currentUserId = ref.watch(authProvider.select((s) => s.user?.id));
 
     return RefreshIndicator(
       onRefresh: () => ref.refresh(chatThreadsProvider.future),
@@ -945,7 +945,7 @@ class _GuestGlobalPreviewView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final topPadding = MediaQuery.of(context).padding.top;
+    final topPadding = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

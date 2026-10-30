@@ -336,7 +336,7 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
+    final topPadding = MediaQuery.paddingOf(context).top;
     final user = this.user;
     final avatarUrl = user?.avatarUrl;
 

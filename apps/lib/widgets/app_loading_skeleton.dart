@@ -16,7 +16,7 @@ class AppLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
+    final topPadding = MediaQuery.paddingOf(context).top;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -173,7 +173,7 @@ class AppLoadingSkeleton extends StatelessWidget {
             16,
             10,
             16,
-            10 + MediaQuery.of(context).padding.bottom,
+            10 + MediaQuery.paddingOf(context).bottom,
           ),
           decoration: const BoxDecoration(
             color: Colors.white,

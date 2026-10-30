@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -58,8 +59,45 @@ class ResponseCache {
   static const _privatePrefix = 'api_cache_p_';
   static const _publicPrefix = 'api_cache_';
 
+  /// Most recently used copies kept in memory. Every product page adds an entry, so without a
+  /// limit a long session keeps growing.
+  static const _memoryLimit = 60;
   static final Map<String, _Entry> _memory = {};
   static Directory? _dir;
+
+  /// Saved copies on disk: removed after [_maxAge], and only the newest [_maxFiles] are kept.
+  static const _maxAge = Duration(days: 14);
+  static const _maxFiles = 150;
+  static bool _trimScheduled = false;
+
+  static void _remember(String key, _Entry entry) {
+    _memory.remove(key);
+    _memory[key] = entry;
+    while (_memory.length > _memoryLimit) {
+      _memory.remove(_memory.keys.first);
+    }
+  }
+
+  /// Deletes stale and surplus public copies; run once per launch, well after start-up.
+  static Future<void> _trim() async {
+    try {
+      final dir = _dir;
+      if (dir == null) return;
+      final cutoff = DateTime.now().subtract(_maxAge);
+      final files = <(File, DateTime)>[];
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.last;
+        // Private copies (per account) are handled by logout, not here.
+        if (!name.startsWith(_publicPrefix) || name.startsWith(_privatePrefix)) continue;
+        files.add((entity, (await entity.stat()).modified));
+      }
+      files.sort((a, b) => b.$2.compareTo(a.$2));
+      for (var i = 0; i < files.length; i++) {
+        if (i >= _maxFiles || files[i].$2.isBefore(cutoff)) await files[i].$1.delete();
+      }
+    } catch (_) {}
+  }
 
   static bool _isPrivate(RequestOptions options) => _private.any((r) => r.hasMatch(options.path));
 
@@ -84,6 +122,10 @@ class ResponseCache {
   static Future<File?> _file(String key, {required bool private}) async {
     try {
       _dir ??= await getApplicationSupportDirectory();
+      if (!_trimScheduled) {
+        _trimScheduled = true;
+        Timer(const Duration(seconds: 45), _trim);
+      }
       final name = base64Url.encode(utf8.encode(key)).replaceAll('=', '');
       return File('${_dir!.path}/${private ? _privatePrefix : _publicPrefix}$name.json');
     } catch (_) {
@@ -94,17 +136,22 @@ class ResponseCache {
   static Future<_Entry?> _read(RequestOptions options) async {
     final key = _key(options);
     final cached = _memory[key];
-    if (cached != null) return cached;
+    if (cached != null) {
+      _remember(key, cached);
+      return cached;
+    }
     try {
       final file = await _file(key, private: _isPrivate(options));
       if (file == null || !await file.exists()) return null;
       final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-      return _memory[key] = _Entry(
+      final entry = _Entry(
         json['etag'] as String,
         json['data'],
         version: json['v'] as int?,
         savedAt: json['t'] as int?,
       );
+      _remember(key, entry);
+      return entry;
     } catch (_) {
       return null;
     }
@@ -112,7 +159,7 @@ class ResponseCache {
 
   static Future<void> _write(RequestOptions options, _Entry entry) async {
     final key = _key(options);
-    _memory[key] = entry;
+    _remember(key, entry);
     try {
       final file = await _file(key, private: _isPrivate(options));
       await file?.writeAsString(jsonEncode({

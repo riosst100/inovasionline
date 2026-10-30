@@ -57,7 +57,7 @@ class _SheetFrame extends StatelessWidget {
         ),
       ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.9,

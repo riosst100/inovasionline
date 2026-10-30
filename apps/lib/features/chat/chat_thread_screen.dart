@@ -377,7 +377,7 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen>
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = ref.watch(authProvider).user?.id;
+    final currentUserId = ref.watch(authProvider.select((s) => s.user?.id));
 
     return Scaffold(
       backgroundColor: _threadBackground,

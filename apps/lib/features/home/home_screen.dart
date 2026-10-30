@@ -135,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       activeOrdersProvider.select((orders) => (orders.valueOrNull ?? const []).isNotEmpty),
     );
 
-    final topPadding = MediaQuery.of(context).padding.top;
+    final topPadding = MediaQuery.paddingOf(context).top;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _measureHeader();
     });
