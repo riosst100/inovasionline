@@ -78,6 +78,9 @@
 		<!-- AdMob App ID. This is Google's sample ID (test ads only); replace with the real iOS App ID before release. -->
 		<key>GADApplicationIdentifier</key>
 		<string>ca-app-pub-3940256099942544~1458002511</string>
+		<!-- Google Maps SDK for iOS key (order tracking map), read in AppDelegate. Empty = blank map. -->
+		<key>GMSApiKey</key>
+		<string></string>
 		<key>SKAdNetworkItems</key>
 		<array>
 			<dict>

@@ -151,6 +151,17 @@ class OrderDetailScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  if (order.canTrack) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => context.push('/orders/$orderId/track'),
+                        icon: const Icon(Icons.location_on_outlined, size: 18),
+                        label: const Text('Lacak Pengiriman'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

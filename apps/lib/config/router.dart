@@ -15,6 +15,7 @@ import '../features/home/ad_chest.dart';
 import '../features/home/home_screen.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
+import '../features/orders/order_tracking_screen.dart';
 import '../features/orders/payment_webview_screen.dart';
 import '../features/posts/posts_screen.dart';
 import '../features/products/product_detail_screen.dart';
@@ -129,6 +130,11 @@ final router = GoRouter(
       path: '/orders/:id',
       builder: (context, state) =>
           OrderDetailScreen(orderId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/orders/:id/track',
+      builder: (context, state) =>
+          OrderTrackingScreen(orderId: state.pathParameters['id']!),
     ),
     GoRoute(
       path: '/orders/:id/pay',

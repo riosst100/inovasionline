@@ -44,6 +44,10 @@ class AdminUser extends Authenticatable
         return [
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'last_latitude' => 'float',
+            'last_longitude' => 'float',
+            'last_location_accuracy' => 'float',
+            'last_location_at' => 'datetime',
         ];
     }
 

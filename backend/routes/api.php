@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Admin\AdminStaffController;
 use App\Http\Controllers\Api\Admin\CustomerController;
 use App\Http\Controllers\Api\Admin\DriverController;
 use App\Http\Controllers\Api\Admin\DriverDeliveryController;
+use App\Http\Controllers\Api\Admin\DriverLocationController;
 use App\Http\Controllers\Api\V1\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\V1\Admin\CodVerificationController as AdminCodVerificationController;
 use App\Http\Controllers\Api\V1\CodVerificationController;
@@ -246,6 +247,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/{order}/cancel', [OrderController::class, 'cancel']);
         Route::post('/{order}/cancel-hold', [OrderController::class, 'holdCancel']);
         Route::post('/{order}/cancel-decline', [OrderController::class, 'declineCancel']);
+        Route::get('/{order}/tracking', [OrderController::class, 'tracking']);
         Route::post('/{order}/pay', [PaymentController::class, 'pay'])->middleware('feature.ban:purchase');
         Route::get('/{order}/payment-status', [PaymentController::class, 'status']);
     });
@@ -430,6 +432,7 @@ Route::prefix('admin')->group(function () {
             Route::post('/scan', [DriverDeliveryController::class, 'scan']);
             Route::post('/orders/{order}/ship', [DriverDeliveryController::class, 'ship']);
             Route::post('/orders/{order}/deliver', [DriverDeliveryController::class, 'deliver']);
+            Route::post('/location', [DriverLocationController::class, 'update'])->middleware('throttle:30,1');
         });
 
         // Role & Permissions Management

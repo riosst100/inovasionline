@@ -14,4 +14,10 @@ class DatabaseIsolationTest extends TestCase
 
         $this->assertStringEndsWith('_testing', $database, "Tests are pointed at '$database', not a *_testing database.");
     }
+
+    public function test_tests_do_not_write_to_the_search_index(): void
+    {
+        // env() turns "null" into null, which Scout treats as the null driver.
+        $this->assertSame('null', config('scout.driver') ?? 'null', 'Tests would sync models into the development Meilisearch index.');
+    }
 }

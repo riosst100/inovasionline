@@ -17,6 +17,10 @@ composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 php artisan migrate --force
 php artisan optimize:clear
 php artisan optimize
+# Applies config/scout.php index settings once Meilisearch is set up (scripts/setup-meilisearch.sh).
+if grep -q '^SCOUT_DRIVER=meilisearch' .env; then
+  php artisan scout:sync-index-settings
+fi
 chown -R www-data:www-data storage bootstrap/cache
 php artisan queue:restart
 systemctl reload "$PHP_FPM_SERVICE"
