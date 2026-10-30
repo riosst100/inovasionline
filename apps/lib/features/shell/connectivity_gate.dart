@@ -10,8 +10,9 @@ import '../../core/api/connectivity.dart';
 /// green "Koneksi kembali." for a moment.
 /// The app stays usable: screens with data already loaded still work, and
 /// [ApiClient] refuses anything that has to be sent to the server
-/// (POST/PUT/PATCH/DELETE). Checked at start, on resume, and every few seconds
-/// while offline.
+/// (POST/PUT/PATCH/DELETE). Checked at start, on resume, and while offline at
+/// growing intervals (4s up to a minute), not at all while the app is in the
+/// background: each check opens two sockets, which keeps the radio awake.
 class ConnectivityGate extends StatefulWidget {
   const ConnectivityGate({super.key, required this.child});
 
@@ -23,12 +24,14 @@ class ConnectivityGate extends StatefulWidget {
 
 class _ConnectivityGateState extends State<ConnectivityGate>
     with WidgetsBindingObserver {
-  static const _retryEvery = Duration(seconds: 4);
+  static const _retryFirst = 4; // seconds
+  static const _retryMax = 60; // seconds
   static const _restoredFor = Duration(seconds: 2);
 
   Timer? _retryTimer;
   Timer? _hideTimer;
   bool _popupVisible = false;
+  int _attempt = 0;
 
   /// Showing the green "connected again" state instead of the red one.
   bool _restored = false;
@@ -52,7 +55,33 @@ class _ConnectivityGateState extends State<ConnectivityGate>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) Connectivity.check();
+    if (state == AppLifecycleState.resumed) {
+      _checkNow();
+    } else if (state == AppLifecycleState.paused) {
+      _retryTimer?.cancel();
+    }
+  }
+
+  Future<void> _checkNow() async {
+    final online = await Connectivity.check();
+    // The notifier only fires on a change, so keep retrying if we are still offline.
+    if (mounted && !online) {
+      _attempt = 0;
+      _scheduleRetry();
+    }
+  }
+
+  /// One check after a growing pause (4s, 8s, 16s, ... capped at a minute), then the next.
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    final seconds = (_retryFirst << _attempt).clamp(_retryFirst, _retryMax);
+    _retryTimer = Timer(Duration(seconds: seconds), () async {
+      if (!mounted) return;
+      final online = await Connectivity.check();
+      if (!mounted || online) return;
+      if (_attempt < 4) _attempt++;
+      _scheduleRetry();
+    });
   }
 
   void _onOnlineChanged() {
@@ -74,7 +103,8 @@ class _ConnectivityGateState extends State<ConnectivityGate>
         _restored = false;
         _popupVisible = true;
       });
-      _retryTimer = Timer.periodic(_retryEvery, (_) => Connectivity.check());
+      _attempt = 0;
+      _scheduleRetry();
     }
   }
 

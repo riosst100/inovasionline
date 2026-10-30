@@ -41,6 +41,10 @@ class _AdChestWalletStripState extends ConsumerState<AdChestWalletStrip> with Si
   @override
   AnimationController get loopController => _wiggle;
 
+  /// The rattle is the first quarter of the cycle (see [_rattleAngle]); the rest is idle.
+  @override
+  double get loopActiveFraction => 0.25;
+
   @override
   void dispose() {
     _wiggle.dispose();

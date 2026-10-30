@@ -498,14 +498,44 @@ class _PostVideoPlayer extends StatefulWidget {
   State<_PostVideoPlayer> createState() => _PostVideoPlayerState();
 }
 
-class _PostVideoPlayerState extends State<_PostVideoPlayer> {
+class _PostVideoPlayerState extends State<_PostVideoPlayer> with WidgetsBindingObserver {
+  /// The video that is playing now. Starting another one releases this one, so only a single
+  /// decoder runs at a time (several looping videos at once is a big battery and CPU cost).
+  static _PostVideoPlayerState? _active;
+
   VideoPlayerController? _controller;
   bool _loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (_active == this) _active = null;
     _controller?.dispose();
     super.dispose();
+  }
+
+  /// Nothing plays while the app is in the background; tap to resume.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _controller?.pause();
+      if (mounted) setState(() {});
+    }
+  }
+
+  /// Another video took over: free this decoder and go back to the poster.
+  void _release() {
+    final controller = _controller;
+    if (controller == null) return;
+    if (mounted) setState(() => _controller = null);
+    // After the frame, so the VideoPlayer widget is gone before its controller is disposed.
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
   }
 
   Future<void> _play() async {
@@ -519,6 +549,9 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
         controller.dispose();
         return;
       }
+      final previous = _active;
+      _active = this;
+      previous?._release();
       setState(() {
         _controller = controller;
         _loading = false;
@@ -576,6 +609,11 @@ class _PostVideoPlayerState extends State<_PostVideoPlayer> {
                         ? controller.pause()
                         : controller.play();
                   }),
+                  child: controller.value.isPlaying
+                      ? null
+                      : const Center(
+                          child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 56),
+                        ),
                 ),
               ),
           ],

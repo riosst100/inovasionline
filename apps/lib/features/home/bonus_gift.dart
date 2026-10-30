@@ -102,6 +102,10 @@ class _BonusGiftBannerState extends ConsumerState<BonusGiftBanner>
   @override
   AnimationController get loopController => _wiggle;
 
+  /// The wiggle is the first quarter of the cycle; the rest is idle.
+  @override
+  double get loopActiveFraction => 0.25;
+
   bool _opening = false;
 
   @override
