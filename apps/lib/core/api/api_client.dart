@@ -3,7 +3,9 @@ import '../../config/env.dart';
 import '../storage/token_storage.dart';
 import 'account_block.dart';
 import 'api_exception.dart';
+import 'cache_versions.dart';
 import 'connectivity.dart';
+import 'response_cache.dart';
 
 class ApiClient {
   ApiClient(this._tokenStorage) : dio = Dio(
@@ -42,11 +44,28 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          if (ResponseCache.applies(options)) {
+            // Still current according to the server's version: answer from the phone, no request.
+            final saved = await ResponseCache.fresh(options, _versions);
+            if (saved != null) return handler.resolve(saved);
+            await ResponseCache.prepare(options);
+          }
           handler.next(options);
+        },
+        onResponse: (response, handler) async {
+          if (ResponseCache.applies(response.requestOptions)) await ResponseCache.store(response, _versions);
+          handler.next(response);
         },
         onError: (error, handler) async {
           final retried = await _retryOnce(error);
           if (retried != null) return handler.resolve(retried);
+          final network = error.type == DioExceptionType.connectionTimeout ||
+              error.type == DioExceptionType.receiveTimeout ||
+              error.type == DioExceptionType.connectionError;
+          if (network && ResponseCache.applies(error.requestOptions)) {
+            final saved = await ResponseCache.offline(error.requestOptions);
+            if (saved != null) return handler.resolve(saved);
+          }
           handler.next(_mapError(error));
         },
       ),
@@ -55,6 +74,17 @@ class ApiClient {
 
   final Dio dio;
   final TokenStorage _tokenStorage;
+
+  /// What the server says about each cached data group; asked once on first use.
+  late final CacheVersions _versions = CacheVersions(() async {
+    final response = await dio.get<dynamic>('/cache-versions');
+    final body = response.data;
+    return (body is Map ? body['data'] : null) as Map<String, dynamic>;
+  });
+
+  /// Asks the server again which cached data changed (throttled), e.g. when the app returns to
+  /// the foreground. Screens that reload afterwards pick up whatever was invalidated.
+  Future<void> refreshCacheVersions() => _versions.refresh();
 
   /// One automatic retry for GET requests that failed on the network itself (flaky mobile data).
   /// Never for writes: a timed-out POST may have gone through on the server.

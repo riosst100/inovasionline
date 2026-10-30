@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class FreeShippingSetting extends Model
 {
-    protected $fillable = ['is_active', 'min_subtotal', 'payment_method_ids', 'shipping_method_ids'];
+    protected $fillable = ['is_active', 'min_subtotal', 'payment_method_ids', 'shipping_method_ids', 'promo_texts'];
 
     protected function casts(): array
     {
@@ -20,6 +20,7 @@ class FreeShippingSetting extends Model
             'min_subtotal' => 'float',
             'payment_method_ids' => 'array',
             'shipping_method_ids' => 'array',
+            'promo_texts' => 'array',
         ];
     }
 
@@ -30,6 +31,7 @@ class FreeShippingSetting extends Model
             'min_subtotal' => null,
             'payment_method_ids' => [],
             'shipping_method_ids' => [],
+            'promo_texts' => ['Gratis Ongkir untuk pembayaran pakai Saldo Belanja'],
         ]);
     }
 
@@ -49,6 +51,7 @@ class FreeShippingSetting extends Model
             'min_subtotal' => $this->min_subtotal,
             'payment_method_ids' => array_values($this->payment_method_ids ?? []),
             'shipping_method_ids' => array_values($this->shipping_method_ids ?? []),
+            'promo_texts' => array_values($this->promo_texts ?? []),
         ];
     }
 }

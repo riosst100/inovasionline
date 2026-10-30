@@ -9,6 +9,7 @@ import '../../core/utils/formatters.dart';
 import '../../models/wallet.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
+import '../../widgets/reduce_motion_loop.dart';
 import '../ads/admob.dart';
 import '../wallet/reward_effects.dart';
 import '../wallet/wallet_providers.dart';
@@ -34,8 +35,11 @@ class AdChestWalletStrip extends ConsumerStatefulWidget {
   ConsumerState<AdChestWalletStrip> createState() => _AdChestWalletStripState();
 }
 
-class _AdChestWalletStripState extends ConsumerState<AdChestWalletStrip> with SingleTickerProviderStateMixin {
-  late final _wiggle = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat();
+class _AdChestWalletStripState extends ConsumerState<AdChestWalletStrip> with SingleTickerProviderStateMixin, ReduceMotionLoop {
+  late final _wiggle = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
+
+  @override
+  AnimationController get loopController => _wiggle;
 
   @override
   void dispose() {
@@ -61,13 +65,15 @@ class _AdChestWalletStripState extends ConsumerState<AdChestWalletStrip> with Si
             padding: const EdgeInsets.fromLTRB(10, 4, 6, 4),
             child: Row(
               children: [
-                AnimatedBuilder(
-                  animation: _wiggle,
-                  builder: (_, child) => Transform.rotate(
-                    angle: left > 0 ? _rattleAngle(_wiggle.value) : 0,
-                    child: child,
+                RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _wiggle,
+                    builder: (_, child) => Transform.rotate(
+                      angle: left > 0 ? _rattleAngle(_wiggle.value) : 0,
+                      child: child,
+                    ),
+                    child: const SizedBox(width: 24, height: 20, child: FittedBox(child: TreasureChest())),
                   ),
-                  child: const SizedBox(width: 24, height: 20, child: FittedBox(child: TreasureChest())),
                 ),
                 const SizedBox(width: 8),
                 const Text(

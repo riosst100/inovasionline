@@ -7,6 +7,21 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../models/banner.dart';
 
+/// Opens a tapped banner: an app route (`/flash-sale`) is pushed, a web link
+/// opens in the in-app browser, and a banner without a link opens full screen.
+void openBanner(BuildContext context, List<AppBanner> banners, int index) {
+  final link = banners[index].linkUrl?.trim();
+  if (link != null && link.startsWith('/')) {
+    context.push(link);
+    return;
+  }
+  showDialog(
+    context: context,
+    barrierColor: Colors.black,
+    builder: (context) => _BannerPreviewDialog(banners: banners, initialIndex: index),
+  );
+}
+
 class BannerCarousel extends StatefulWidget {
   const BannerCarousel({super.key, required this.banners});
 
@@ -63,27 +78,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
 
   void _handleTap(int index) {
     if (index >= widget.banners.length) return;
-    final banner = widget.banners[index];
-    final link = banner.linkUrl?.trim();
-    if (link != null && link.isNotEmpty) {
-      if (link.startsWith('/')) {
-        context.push(link);
-        return;
-      }
-      if (link.startsWith('http://') || link.startsWith('https://')) {
-        showDialog(
-          context: context,
-          barrierColor: Colors.black,
-          builder: (context) => _BannerPreviewDialog(banners: widget.banners, initialIndex: index),
-        );
-        return;
-      }
-    }
-    showDialog(
-      context: context,
-      barrierColor: Colors.black,
-      builder: (context) => _BannerPreviewDialog(banners: widget.banners, initialIndex: index),
-    );
+    openBanner(context, widget.banners, index);
   }
 
   @override
@@ -104,7 +99,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        height: 156,
+        height: 120,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: const Color(0xFFF8FAFC),

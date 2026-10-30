@@ -11,8 +11,10 @@ use App\Support\Enums\OrderStatus;
 use App\Support\Enums\ProductStatus;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class SearchController extends Controller
 {
@@ -36,6 +38,37 @@ class SearchController extends Controller
         });
 
         return $query->orderByRaw("case when {$column} ilike ? then 0 else 1 end", ['%'.$keyword.'%']);
+    }
+
+    private function withListingData(Builder $query): Builder
+    {
+        return $query->withStock()
+            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0)])
+            ->withSum(['orderItems as order_items_sum_quantity' => function ($query) {
+                $query->whereHas('order', fn ($q) => $q->where('status', OrderStatus::COMPLETED));
+            }], 'quantity');
+    }
+
+    /**
+     * Ranked results from Meilisearch (typo tolerant, also matches brand/category/SKU),
+     * or null when it isn't configured or can't be reached so the database search runs instead.
+     */
+    private function searchEngineResults(string $keyword, int $limit): ?Collection
+    {
+        if (config('scout.driver') !== 'meilisearch') {
+            return null;
+        }
+
+        try {
+            return Product::search($keyword)
+                ->query(fn (Builder $query) => $this->withListingData($query->where('status', ProductStatus::ACTIVE)))
+                ->take($limit)
+                ->get();
+        } catch (Throwable $e) {
+            report($e);
+
+            return null;
+        }
     }
 
     public function suggestions(Request $request): JsonResponse
@@ -70,19 +103,15 @@ class SearchController extends Controller
 
         SearchLog::record($keyword);
 
-        $products = $this->applyNameSearch(
-            Product::query()->where('status', ProductStatus::ACTIVE),
-            'name',
-            $keyword
-        )
-            ->withStock()
-            ->with(['images' => fn ($query) => $query->where('is_primary', true)->orWhere('sort_order', 0)])
-            ->withSum(['orderItems as order_items_sum_quantity' => function ($query) {
-                $query->whereHas('order', fn ($q) => $q->where('status', OrderStatus::COMPLETED));
-            }], 'quantity')
-            ->orderByDesc('order_items_sum_quantity')
-            ->limit($limit)
-            ->get();
+        $products = $this->searchEngineResults($keyword, $limit)
+            ?? $this->applyNameSearch(
+                $this->withListingData(Product::query()->where('status', ProductStatus::ACTIVE)),
+                'name',
+                $keyword
+            )
+                ->orderByDesc('order_items_sum_quantity')
+                ->limit($limit)
+                ->get();
 
         return ApiResponse::success([
             'products' => PublicProductResource::collection($products),

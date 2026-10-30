@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
   UserCog,
+  Info,
   Users2,
   Image as ImageIcon,
   LayoutTemplate,
@@ -56,6 +57,7 @@ import {
   Scale,
   Code,
   X,
+  RefreshCw,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -125,7 +127,10 @@ export const NAV_SECTIONS: NavSection[] = [
         name: 'Tampilan',
         href: '/dashboard/display',
         icon: LayoutTemplate,
-        children: [{ name: 'Banner', href: '/dashboard/banners', icon: ImageIcon, perm: 'banners' }],
+        children: [
+          { name: 'Banner', href: '/dashboard/banners', icon: ImageIcon, perm: 'banners' },
+          { name: 'Tulisan Promosi', href: '/dashboard/display/promo-texts', icon: Info, perm: 'promo_texts' },
+        ],
       },
       {
         name: 'Promosi',
@@ -157,8 +162,10 @@ export const NAV_SECTIONS: NavSection[] = [
           { name: 'Cakupan Kota', href: '/dashboard/settings/service-cities', icon: MapPinned, perm: 'service_cities' },
           { name: 'Biaya Layanan', href: '/dashboard/settings/service-fee', icon: Receipt, perm: 'service_fee' },
           { name: 'Payment Gateway', href: '/dashboard/settings/payment-gateway', icon: CreditCard, perm: 'payment_gateway' },
+          { name: 'Bank & E-Wallet', href: '/dashboard/settings/bank-accounts', icon: Landmark, perm: 'bank_accounts' },
           { name: 'Badge Menu', href: '/dashboard/settings/nav-badge', icon: Tag, perm: 'nav_badge' },
           { name: 'Update Aplikasi', href: '/dashboard/settings/app-update', icon: Smartphone, perm: 'app_update' },
+          { name: 'Cache Aplikasi', href: '/dashboard/settings/app-cache', icon: RefreshCw, perm: 'app_cache' },
           { name: 'Status Pesanan', href: '/dashboard/order-statuses', icon: ListChecks, perm: 'order_statuses' },
           { name: 'Metode Pengiriman', href: '/dashboard/shipping-methods', icon: PackageCheck, perm: 'shipping_methods' },
           { name: 'Pembatalan Pesanan', href: '/dashboard/settings/order-cancellation', icon: Timer, perm: 'order_cancellation' },

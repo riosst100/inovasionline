@@ -33,7 +33,13 @@ class CheckoutOptionsController extends Controller
 
     public function paymentMethods(Request $request, PaylaterService $paylater): JsonResponse
     {
-        $methods = PaymentMethod::query()->where('is_enabled', true)->orderBy('sort_order')->get();
+        $methods = PaymentMethod::query()
+            ->where('is_enabled', true)
+            ->when($request->boolean('manual_only'), fn ($q) => $q->whereIn('type', PaymentMethodType::MANUAL_ACCOUNT_TYPES))
+            ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')->toString()))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
 
         // Route is public; attach Paylater eligibility when a valid token is sent.
         $user = $request->user('sanctum');

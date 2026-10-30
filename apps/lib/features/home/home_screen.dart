@@ -16,6 +16,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/delivery_address_provider.dart';
 import '../../widgets/banner_carousel.dart';
 import '../../widgets/product_card.dart';
+import '../../widgets/reduce_motion_loop.dart';
 import '../../widgets/skeleton.dart';
 import '../ads/ad_banner.dart';
 import '../ads/admob.dart';
@@ -26,6 +27,7 @@ import '../wallet/wallet_providers.dart';
 import 'ad_chest.dart';
 import 'bonus_gift.dart';
 import 'delivery_address_sheet.dart';
+import 'home_popup.dart';
 import 'home_providers.dart';
 import 'welcome_message.dart';
 
@@ -44,7 +46,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _defaultAddressAttempted = false;
   double _offset = 0;
   double _locationHeight = 50;
-  double _searchHeight = 42;
+  double _searchHeight = 36;
 
   @override
   void initState() {
@@ -54,6 +56,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if ((offset - _offset).abs() > 0.5) setState(() => _offset = offset.clamp(0.0, 400.0));
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeSetDefaultAddress());
+    HomePopup.scheduleOn(this, ref);
   }
 
   /// First open with no saved address: default it to the user's current
@@ -149,6 +152,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 await Future.wait([
                   silent(ref.read(authProvider.notifier).checkBlockStatus()),
                   silent(ref.refresh(bannersProvider.future)),
+                  silent(ref.refresh(promoTextsProvider.future)),
                   silent(ref.refresh(rootCategoriesProvider.future)),
                   silent(ref.refresh(flashSaleProvider.future)),
                   silent(ref.refresh(bestSellersProvider.future)),
@@ -157,12 +161,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   silent(ref.refresh(adChestProvider.future).then((_) {})),
                 ]);
               },
-              child: ListView(
+              child: CustomScrollView(
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
-                // Room for the floating active-order card only while it shows.
-                padding: EdgeInsets.only(bottom: hasActiveOrder ? 90 : 16),
-                children: [
+                slivers: [
+                  SliverList(
+                    delegate: SliverChildListDelegate([
                   // Top Header Backdrop (Brand green gradient + Petal pattern)
                   _HomeTopBackdrop(
                     child: Column(
@@ -170,7 +174,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       children: [
                         SizedBox(height: topPadding + 6),
                         KeyedSubtree(key: _locationKey, child: _TopLocationHeader()),
-                        SizedBox(height: 6 + _searchHeight + 6),
+                        SizedBox(height: 12 + _searchHeight + 6),
 
                         // 3. Hero Promo Banner Carousel
                         banners.when(
@@ -179,7 +183,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               : BannerCarousel(banners: items),
                           loading: () => const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Skeleton(height: 156, borderRadius: 16),
+                            child: Skeleton(height: 120, borderRadius: 16),
                           ),
                           error: (_, _) => const SizedBox.shrink(),
                         ),
@@ -237,19 +241,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     emptyHeight: 28,
                   ),
 
-                  // 7. Inspirasi Untukmu / Curated Product Feed with Tabs
+                    ]),
+                  ),
+
+                  // 7. Inspirasi Untukmu / Curated Product Feed with Tabs. A sliver, so the
+                  // product grid only builds the cards that are on screen.
                   _InspirasiUntukmuSection(
                     selectedTab: _selectedTab,
                     onTabChanged: (index) => setState(() => _selectedTab = index),
                     bestSellers: bestSellers.value ?? [],
                     popularProducts: popularProducts.value ?? [],
                     flashSaleProducts: flashSale.value?.slots.expand((s) => s.products).toList() ?? [],
+                    loading: [bestSellers, popularProducts, flashSale].any((p) => p.isLoading && !p.hasValue),
                   ),
 
-                  const AdBanner(
-                    placement: AdPlacement.homeBottom,
-                    padding: EdgeInsets.only(top: 16),
+                  const SliverToBoxAdapter(
+                    child: AdBanner(
+                      placement: AdPlacement.homeBottom,
+                      padding: EdgeInsets.only(top: 16),
+                    ),
                   ),
+                  // Room for the floating active-order card only while it shows.
+                  SliverToBoxAdapter(child: SizedBox(height: hasActiveOrder ? 90 : 16)),
                 ],
               ),
             ),
@@ -277,7 +290,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                   Padding(
-                    padding: EdgeInsets.only(top: topPadding + 6, bottom: 10),
+                    padding: EdgeInsets.only(top: topPadding + 12, bottom: 6),
                     child: KeyedSubtree(
                       key: _searchKey,
                       child: _TopSearchBar(cartItemCount: cartItemCount),
@@ -319,7 +332,7 @@ class _TopLocationHeader extends ConsumerWidget {
             (failureLabel ?? 'Pilih Alamat Pengiriman'));
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -604,7 +617,7 @@ class _ExpressCarIcon extends StatefulWidget {
 }
 
 class _ExpressCarIconState extends State<_ExpressCarIcon>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, ReduceMotionLoop {
   static const _ink = Color(0xFF78350F);
   // (vertical offset, line width, phase offset 0..1)
   static const _lines = [
@@ -616,7 +629,10 @@ class _ExpressCarIconState extends State<_ExpressCarIcon>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 900),
-  )..repeat();
+  );
+
+  @override
+  AnimationController get loopController => _controller;
 
   @override
   void dispose() {
@@ -629,7 +645,7 @@ class _ExpressCarIconState extends State<_ExpressCarIcon>
     return SizedBox(
       width: 30,
       height: 18,
-      child: AnimatedBuilder(
+      child: RepaintBoundary(child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
           final t = _controller.value;
@@ -664,7 +680,7 @@ class _ExpressCarIconState extends State<_ExpressCarIcon>
             ],
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -690,8 +706,8 @@ class _TopSearchBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: Image.asset(
                 'assets/images/logo_mark.png',
-                width: 38,
-                height: 38,
+                width: 34,
+                height: 34,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
               ),
@@ -703,7 +719,7 @@ class _TopSearchBar extends StatelessWidget {
               onTap: () => context.push('/search'),
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                height: 42,
+                height: 36,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -742,40 +758,40 @@ class _TopSearchBar extends StatelessWidget {
             onTap: () => context.push('/cart'),
             borderRadius: BorderRadius.circular(22),
             child: Container(
-              height: 42,
-              width: 42,
+              height: 36,
+              width: 36,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.2),
               ),
               child: Stack(
                 alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 children: [
-                  const Icon(Icons.shopping_bag_rounded, size: 22, color: Color(0xFF115E59)),
+                  const Icon(Icons.shopping_bag_outlined, size: 23, color: Colors.white),
                   if (cartItemCount > 0)
                     Positioned(
-                      top: 4,
-                      right: 4,
+                      top: -7,
+                      right: -6,
                       child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEF4444),
-                          shape: BoxShape.circle,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444),
+                          borderRadius: BorderRadius.circular(9),
                         ),
-                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                         child: Text(
                           cartItemCount > 99 ? '99+' : '$cartItemCount',
                           textAlign: TextAlign.center,
+                          textHeightBehavior: const TextHeightBehavior(
+                            applyHeightToFirstAscent: false,
+                            applyHeightToLastDescent: false,
+                          ),
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 9,
+                            fontSize: 8,
                             fontWeight: FontWeight.bold,
                             height: 1,
                           ),
@@ -976,7 +992,7 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
                   authenticated
                       ? _signedIn(wallet)
                       : Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                          padding: const EdgeInsets.fromLTRB(12, 6, 10, 6),
                           child: _signedOut(),
                         ),
                 ],
@@ -1142,13 +1158,13 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
                   ),
                 ),
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 3),
               const Text(
                 'Daftar untuk mendapatkan bonus Saldo Belanja!',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                   height: 1.3,
@@ -1158,17 +1174,36 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
           ),
         ),
         const SizedBox(width: 10),
-        FilledButton(
-          onPressed: () => context.push('/account/register'),
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: _gradient.last,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            minimumSize: const Size(0, 36),
-            shape: const StadiumBorder(),
-            elevation: 0,
-          ),
-          child: const Text('Daftar', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton(
+              onPressed: () => context.push('/account/register'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: _gradient.last,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                minimumSize: const Size(76, 24),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: const StadiumBorder(),
+                elevation: 0,
+              ),
+              child: const Text('Daftar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(height: 4),
+            OutlinedButton(
+              onPressed: () => context.push('/account/login'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white, width: 1.2),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                minimumSize: const Size(76, 24),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: const StadiumBorder(),
+              ),
+              child: const Text('Masuk', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+            ),
+          ],
         ),
       ],
     );
@@ -1291,7 +1326,7 @@ class _WalletAction extends StatelessWidget {
 // ==========================================
 // 4. PROMO GERCEP (Flash Sale with Countdown)
 // ==========================================
-class _PromoGercepSection extends StatefulWidget {
+class _PromoGercepSection extends StatelessWidget {
   const _PromoGercepSection({
     required this.slotLabel,
     required this.products,
@@ -1303,50 +1338,7 @@ class _PromoGercepSection extends StatefulWidget {
   final DateTime? endsAt;
 
   @override
-  State<_PromoGercepSection> createState() => _PromoGercepSectionState();
-}
-
-class _PromoGercepSectionState extends State<_PromoGercepSection> {
-  Timer? _countdownTimer;
-  Duration _timeLeft = const Duration(hours: 1, minutes: 24, seconds: 35);
-
-  @override
-  void initState() {
-    super.initState();
-    _initTime();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      if (_timeLeft.inSeconds > 0) {
-        setState(() => _timeLeft = _timeLeft - const Duration(seconds: 1));
-      }
-    });
-  }
-
-  void _initTime() {
-    if (widget.endsAt != null) {
-      final diff = widget.endsAt!.difference(DateTime.now());
-      if (diff.isNegative) {
-        _timeLeft = Duration.zero;
-      } else {
-        _timeLeft = diff;
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _countdownTimer?.cancel();
-    super.dispose();
-  }
-
-  String _formatDigit(int n) => n.toString().padLeft(2, '0');
-
-  @override
   Widget build(BuildContext context) {
-    final hours = _formatDigit(_timeLeft.inHours % 24);
-    final minutes = _formatDigit(_timeLeft.inMinutes % 60);
-    final seconds = _formatDigit(_timeLeft.inSeconds % 60);
-
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: const BoxDecoration(
@@ -1375,22 +1367,7 @@ class _PromoGercepSectionState extends State<_PromoGercepSection> {
                     ),
                     const SizedBox(width: 8),
                     // Live Countdown Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '$hours : $minutes : $seconds',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
+                    _CountdownPill(endsAt: endsAt),
                   ],
                 ),
                 InkWell(
@@ -1419,10 +1396,10 @@ class _PromoGercepSectionState extends State<_PromoGercepSection> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: widget.products.length,
+              itemCount: products.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                final product = widget.products[index];
+                final product = products[index];
                 return SizedBox(
                   width: 154,
                   child: ProductCard(
@@ -1440,40 +1417,154 @@ class _PromoGercepSectionState extends State<_PromoGercepSection> {
   }
 }
 
-// ==========================================
-// PROMO GRATIS ONGKIR (Bayar pakai Saldo Belanja)
-// ==========================================
-class _WalletFreeShippingPromo extends StatelessWidget {
-  const _WalletFreeShippingPromo();
+/// The red "hh : mm : ss" pill. Ticks on its own so the product list beside it is not rebuilt
+/// every second.
+class _CountdownPill extends StatefulWidget {
+  const _CountdownPill({this.endsAt});
+
+  final DateTime? endsAt;
+
+  @override
+  State<_CountdownPill> createState() => _CountdownPillState();
+}
+
+class _CountdownPillState extends State<_CountdownPill> {
+  Timer? _timer;
+  Duration _timeLeft = const Duration(hours: 1, minutes: 24, seconds: 35);
+
+  @override
+  void initState() {
+    super.initState();
+    _initTime();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_timeLeft.inSeconds > 0) {
+        setState(() => _timeLeft = _timeLeft - const Duration(seconds: 1));
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(_CountdownPill oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.endsAt != widget.endsAt) _initTime();
+  }
+
+  void _initTime() {
+    final endsAt = widget.endsAt;
+    if (endsAt == null) return;
+    final diff = endsAt.difference(DateTime.now());
+    _timeLeft = diff.isNegative ? Duration.zero : diff;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _digit(int n) => n.toString().padLeft(2, '0');
 
   @override
   Widget build(BuildContext context) {
+    final hours = _digit(_timeLeft.inHours % 24);
+    final minutes = _digit(_timeLeft.inMinutes % 60);
+    final seconds = _digit(_timeLeft.inSeconds % 60);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEF4444),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$hours : $minutes : $seconds',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// PROMO GRATIS ONGKIR (Bayar pakai Saldo Belanja)
+// ==========================================
+class _WalletFreeShippingPromo extends ConsumerStatefulWidget {
+  const _WalletFreeShippingPromo();
+
+  @override
+  ConsumerState<_WalletFreeShippingPromo> createState() => _WalletFreeShippingPromoState();
+}
+
+/// Promo strip whose texts come from the admin (Promosi > Gratis Ongkir);
+/// several texts slide automatically like the banner carousel.
+class _WalletFreeShippingPromoState extends ConsumerState<_WalletFreeShippingPromo> {
+  static const int _infiniteMultiplier = 10000;
+  PageController? _controller;
+  Timer? _timer;
+  int _count = 0;
+
+  void _sync(int count) {
+    if (count == _count) return;
+    _count = count;
+    _timer?.cancel();
+    _controller?.dispose();
+    _controller = null;
+    if (count == 0) return;
+    _controller = PageController(initialPage: count > 1 ? (_infiniteMultiplier ~/ 2) * count : 0);
+    if (count > 1) {
+      _timer = Timer.periodic(const Duration(seconds: 4), (_) {
+        final c = _controller;
+        if (c == null || !c.hasClients) return;
+        c.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = ref.watch(promoTextsProvider).value ?? const <String>[];
+    _sync(texts.length);
+    final controller = _controller;
+    if (texts.isEmpty || controller == null) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: const Color(0xFFF97316),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.local_shipping_rounded, color: Colors.white, size: 13),
-            SizedBox(width: 6),
+            const Icon(Icons.info_outline_rounded, color: Colors.white, size: 13),
+            const SizedBox(width: 6),
             Expanded(
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Gratis Ongkir ',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    TextSpan(text: 'untuk pembayaran pakai Saldo Belanja'),
-                  ],
+              child: PageView.builder(
+                controller: controller,
+                itemCount: texts.length > 1 ? null : 1,
+                itemBuilder: (context, index) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    texts[index % texts.length],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 10, color: Colors.white),
               ),
             ),
           ],
@@ -1721,9 +1812,12 @@ class _InspirasiUntukmuSection extends StatelessWidget {
     required this.bestSellers,
     required this.popularProducts,
     required this.flashSaleProducts,
+    required this.loading,
   });
 
   final int selectedTab;
+  /// Product lists still on their first load: show tile skeletons, not the empty text.
+  final bool loading;
   final ValueChanged<int> onTabChanged;
   final List<Product> bestSellers;
   final List<Product> popularProducts;
@@ -1756,11 +1850,18 @@ class _InspirasiUntukmuSection extends StatelessWidget {
         break;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final gridDelegate = ProductGridDelegate(
+      textScale: MediaQuery.textScalerOf(context).scale(1),
+    );
+
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           const Text(
             'Inspirasi Untukmu',
             style: TextStyle(
@@ -1822,35 +1923,50 @@ class _InspirasiUntukmuSection extends StatelessWidget {
           ),
 
           const SizedBox(height: 16),
-
-          // 2-Column Responsive Product Grid
-          if (activeProducts.isEmpty)
-            const Padding(
+              ],
+            ),
+          ),
+        ),
+        if (activeProducts.isEmpty && loading)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverGrid(
+              gridDelegate: gridDelegate,
+              delegate: SliverChildBuilderDelegate(
+                (_, _) => const ProductTileSkeleton(),
+                childCount: 4,
+              ),
+            ),
+          )
+        else if (activeProducts.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(
-                child: Text('Memuat produk pilihan...'),
+                child: Text('Belum ada produk pilihan.'),
               ),
-            )
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: activeProducts.length,
-              gridDelegate: ProductGridDelegate(
-                textScale: MediaQuery.textScalerOf(context).scale(1),
-              ),
-              itemBuilder: (context, index) {
-                final product = activeProducts[index];
-                return ProductCard(
-                  product: product,
-                  compact: true,
-                  badgeText: selectedTab == 1 ? 'Terlaris' : 'Premium',
-                  onTap: () => context.push('/products/${product.slug}'),
-                );
-              },
             ),
-        ],
-      ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverGrid(
+              gridDelegate: gridDelegate,
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final product = activeProducts[index];
+                  return ProductCard(
+                    product: product,
+                    compact: true,
+                    badgeText: selectedTab == 1 ? 'Terlaris' : 'Premium',
+                    onTap: () => context.push('/products/${product.slug}'),
+                  );
+                },
+                childCount: activeProducts.length,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -1885,31 +2001,37 @@ class _SectionSkeleton extends StatelessWidget {
   }
 }
 
+/// Mirrors [_CategoriesSection]'s layout (paddings, grid, tile sizes, 12 tiles)
+/// so nothing shifts when the categories arrive.
 class _CategoryGridSkeleton extends StatelessWidget {
   const _CategoryGridSkeleton();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Skeleton(height: 20, width: 130),
-          const SizedBox(height: 14),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Skeleton(height: 20, width: 130),
+          ),
+          const SizedBox(height: 15),
           GridView.builder(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: 8,
+            itemCount: 12,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.72,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 4,
+              childAspectRatio: 0.8,
             ),
             itemBuilder: (_, _) => const Column(
               children: [
-                Skeleton(width: 60, height: 60, borderRadius: 16),
+                Skeleton(width: 66, height: 66, borderRadius: 16),
                 SizedBox(height: 6),
                 Skeleton(width: 48, height: 10),
               ],

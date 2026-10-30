@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import { adminApi, ApiError } from '../../../lib/api';
-import { Banner } from '../../../types';
+import { Banner, BannerPlacement } from '../../../types';
+import LaunchPopupSettingsCard from './LaunchPopupSettingsCard';
 import {
   Image as ImageIcon,
   Plus,
@@ -24,14 +25,42 @@ import {
   EyeOff,
   Link as LinkIcon,
   Smartphone,
-  Info
+  Info,
+  GalleryHorizontal,
+  SquareStack
 } from 'lucide-react';
 
+const PLACEMENTS: Record<BannerPlacement, { label: string; noun: string; hint: string }> = {
+  slider: {
+    label: 'Slider Beranda',
+    noun: 'Banner',
+    hint: 'Hanya banner berstatus Aktif yang muncul di hero slider beranda aplikasi, sesuai urutan. Ukuran gambar yang disarankan 1200 × 520 px (melebar).',
+  },
+  popup: {
+    label: 'Popup Beranda',
+    noun: 'Popup',
+    hint: 'Popup muncul di tengah layar saat pelanggan membuka aplikasi dan bisa ditutup lewat tombol X. Atur isi dan jadwalnya di kartu pengaturan di bawah. Pada mode "Gambar Sendiri", semua popup Aktif yang sedang dalam rentang tanggalnya tayang bergantian setiap aplikasi dibuka. Ukuran gambar yang disarankan 800 × 1000 px (tegak 4:5).',
+  },
+};
+
+/** 'YYYY-MM-DD' → 'DD/MM/YYYY' without going through Date (no timezone shift). */
+const fmtDay = (d?: string | null) => (d ? d.split('-').reverse().join('/') : null);
+
 export default function AdminBannersPage() {
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const [allBanners, setAllBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Slider and popup banners are listed (and ordered) separately.
+  const [placement, setPlacement] = useState<BannerPlacement>('slider');
+  const placementInfo = PLACEMENTS[placement];
+  const banners = useMemo(
+    () => allBanners.filter((b) => (b.placement ?? 'slider') === placement),
+    [allBanners, placement]
+  );
+  const setBanners = (next: Banner[]) =>
+    setAllBanners((prev) => [...prev.filter((b) => (b.placement ?? 'slider') !== placement), ...next]);
 
   // Filter & Search
   const [search, setSearch] = useState('');
@@ -46,6 +75,8 @@ export default function AdminBannersPage() {
     image_url: '',
     link_url: '',
     is_active: true,
+    starts_on: '',
+    ends_on: '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -64,7 +95,7 @@ export default function AdminBannersPage() {
       setLoading(true);
       setError(null);
       const data = await adminApi.getBanners();
-      setBanners(data || []);
+      setAllBanners(data || []);
     } catch (err: any) {
       setError(err?.message || 'Gagal memuat data banner.');
     } finally {
@@ -106,6 +137,8 @@ export default function AdminBannersPage() {
       image_url: '',
       link_url: '',
       is_active: true,
+      starts_on: '',
+      ends_on: '',
     });
     setSelectedFile(null);
     setFilePreview(null);
@@ -120,6 +153,8 @@ export default function AdminBannersPage() {
       image_url: banner.image_url,
       link_url: banner.link_url || '',
       is_active: banner.is_active,
+      starts_on: banner.starts_on ?? '',
+      ends_on: banner.ends_on ?? '',
     });
     setSelectedFile(null);
     setFilePreview(banner.image_url);
@@ -163,6 +198,9 @@ export default function AdminBannersPage() {
       form.append('name', formData.name.trim());
       form.append('link_url', formData.link_url.trim());
       form.append('is_active', formData.is_active ? '1' : '0');
+      form.append('placement', editingBanner?.placement ?? placement);
+      form.append('starts_on', formData.starts_on);
+      form.append('ends_on', formData.ends_on);
 
       if (imageMode === 'upload' && selectedFile) {
         form.append('image', selectedFile);
@@ -192,7 +230,7 @@ export default function AdminBannersPage() {
     try {
       setTogglingId(banner.id);
       await adminApi.toggleBannerStatus(banner.id);
-      setBanners((prev) =>
+      setAllBanners((prev) =>
         prev.map((b) => (b.id === banner.id ? { ...b, is_active: !b.is_active } : b))
       );
       setSuccessMsg(
@@ -259,7 +297,7 @@ export default function AdminBannersPage() {
                   Manajemen Banner Promo Aplikasi
                 </h1>
                 <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-                  Konfigurasikan carousel banner promosi yang tampil di beranda aplikasi mobile pelanggan.
+                  Konfigurasikan carousel banner dan popup promosi yang tampil di beranda aplikasi mobile pelanggan.
                 </p>
               </div>
             </div>
@@ -270,9 +308,29 @@ export default function AdminBannersPage() {
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-emerald-500 hover:to-teal-500 transition-all focus:ring-2 focus:ring-emerald-500/20 active:scale-95"
             >
               <Plus className="h-4 w-4" />
-              <span>Tambah Banner</span>
+              <span>Tambah {placementInfo.noun}</span>
             </button>
           </div>
+        </div>
+
+        {/* Placement Tabs */}
+        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100/80 p-1 text-sm">
+          {(Object.keys(PLACEMENTS) as BannerPlacement[]).map((key) => {
+            const Icon = key === 'slider' ? GalleryHorizontal : SquareStack;
+            const count = allBanners.filter((b) => (b.placement ?? 'slider') === key).length;
+            return (
+              <button
+                key={key}
+                onClick={() => setPlacement(key)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                  placement === key ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {PLACEMENTS[key].label} ({count})
+              </button>
+            );
+          })}
         </div>
 
         {/* Sync Info Notification */}
@@ -280,13 +338,13 @@ export default function AdminBannersPage() {
           <Smartphone className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
           <div className="text-xs md:text-sm text-slate-700 space-y-1">
             <p className="font-semibold text-emerald-950">
-              Sinkronisasi Langsung ke Aplikasi Mobile
+              {placementInfo.label} di Aplikasi Mobile
             </p>
-            <p className="text-slate-600">
-              Hanya banner berstatus <span className="font-semibold text-emerald-700">Aktif</span> yang akan muncul di hero slider aplikasi. Pengguna dapat me-refresh beranda aplikasi untuk langsung melihat urutan dan materi banner terbaru.
-            </p>
+            <p className="text-slate-600">{placementInfo.hint}</p>
           </div>
         </div>
+
+        {placement === 'popup' && <LaunchPopupSettingsCard />}
 
         {/* Feedback Alerts */}
         {error && (
@@ -461,11 +519,11 @@ export default function AdminBannersPage() {
                     >
                       {/* Card Image Banner */}
                       <div>
-                        <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
+                        <div className={`relative w-full overflow-hidden bg-slate-100 ${placement === 'popup' ? 'aspect-[4/5]' : 'aspect-[16/9]'}`}>
                           <img
                             src={banner.image_url}
                             alt={banner.name}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            className={`h-full w-full transition-transform duration-300 group-hover:scale-105 ${placement === 'popup' ? 'object-contain' : 'object-cover'}`}
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
@@ -528,6 +586,12 @@ export default function AdminBannersPage() {
                           <h4 className="font-extrabold text-slate-900 text-sm leading-snug line-clamp-1">
                             {banner.name}
                           </h4>
+
+                          {placement === 'popup' && (banner.starts_on || banner.ends_on) && (
+                            <p className="text-[11px] font-semibold text-amber-700">
+                              Tayang: {fmtDay(banner.starts_on) ?? 'sejak awal'} – {fmtDay(banner.ends_on) ?? 'seterusnya'}
+                            </p>
+                          )}
 
                           <div className="flex items-center gap-1.5 text-xs text-slate-500">
                             <LinkIcon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
@@ -610,7 +674,7 @@ export default function AdminBannersPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900">
-                    {editingBanner ? 'Edit Materi Banner' : 'Tambah Banner Promo Baru'}
+                    {editingBanner ? `Edit Materi ${placementInfo.noun}` : `Tambah ${placementInfo.noun} Promo Baru`}
                   </h3>
                   <p className="text-xs text-slate-500">
                     Sesuaikan judul, gambar, dan navigasi klik banner di aplikasi.
@@ -708,11 +772,11 @@ export default function AdminBannersPage() {
 
                 {/* Image Preview Box */}
                 {filePreview && (
-                  <div className="mt-3 relative rounded-xl border border-slate-200 overflow-hidden aspect-[16/9] bg-slate-100">
+                  <div className={`mt-3 relative rounded-xl border border-slate-200 overflow-hidden bg-slate-100 ${placement === 'popup' ? 'aspect-[4/5] max-h-80 mx-auto' : 'aspect-[16/9]'}`}>
                     <img
                       src={filePreview}
                       alt="Preview"
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full ${placement === 'popup' ? 'object-contain' : 'object-cover'}`}
                       onError={() => setFilePreview(null)}
                     />
                     <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded">
@@ -755,9 +819,39 @@ export default function AdminBannersPage() {
                   ))}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Jika dikosongkan, ketukan pada banner di aplikasi akan membuka mode layar penuh pratinjau foto.
+                  {placement === 'popup'
+                    ? 'Jika dikosongkan, ketukan pada gambar popup tidak membuka apa pun (popup hanya bisa ditutup).'
+                    : 'Jika dikosongkan, ketukan pada banner di aplikasi akan membuka mode layar penuh pratinjau foto.'}
                 </p>
               </div>
+
+              {/* Popup schedule: show only between these dates */}
+              {(editingBanner?.placement ?? placement) === 'popup' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Tanggal Tayang (Opsional)
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="date"
+                      value={formData.starts_on}
+                      onChange={(e) => setFormData({ ...formData, starts_on: e.target.value })}
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
+                    />
+                    <span className="text-xs text-slate-400">s/d</span>
+                    <input
+                      type="date"
+                      value={formData.ends_on}
+                      min={formData.starts_on || undefined}
+                      onChange={(e) => setFormData({ ...formData, ends_on: e.target.value })}
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Gambar hanya tayang pada rentang ini (WIB). Kosongkan untuk tayang terus selama Aktif.
+                  </p>
+                </div>
+              )}
 
               {/* Status Switch */}
               <div className="pt-2">

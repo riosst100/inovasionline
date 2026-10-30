@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
 
@@ -10,7 +11,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../config/theme.dart';
-import '../../models/nearest_address.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/delivery_address_provider.dart';
@@ -19,6 +19,7 @@ import '../../services/location_service.dart';
 import '../../services/push_notification_handler.dart';
 import '../../widgets/app_loading_skeleton.dart';
 import 'manual_address_screen.dart';
+import 'welcome_burst.dart';
 
 /// First thing that happens once the native splash is gone.
 ///
@@ -52,6 +53,16 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
 
   bool _notificationGranted = false;
   bool _notificationPermanentlyDenied = false;
+
+  /// The system notification dialog has been shown once. It comes last, only
+  /// for someone who is in the service area and about to enter the app.
+  bool _notificationAsked = false;
+
+  /// The one-off welcome animation: queued when the app is first shown,
+  /// removed by itself when it ends.
+  bool _welcomeQueued = false;
+  bool _welcomeVisible = false;
+  bool _askingNotification = false;
   bool _locationGranted = false;
   bool _locationPermanentlyDenied = false;
 
@@ -85,14 +96,6 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   /// The user chose to pick a served area by hand from the out-of-area screen.
   bool _pickingManually = false;
 
-  /// Where the device is now, when that differs from the default address;
-  /// offered as an alternative over the app.
-  NearestAddress? _currentLocation;
-  bool _applyingCurrentLocation = false;
-
-  /// The quiet current-location lookup has finished (or is not going to
-  /// happen), so no choice will pop up over the app any more.
-  bool _locationSuggestionDone = false;
 
   /// Completes once the logo + wordmark intro has finished playing, so the
   /// permission dialogs never pop up mid-animation.
@@ -118,6 +121,10 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Back from the background: learn whether the admin refreshed any cached data meanwhile.
+    if (state == AppLifecycleState.resumed) {
+      unawaited(ref.read(apiClientProvider).refreshCacheVersions());
+    }
     // Catches the user granting a permission from system Settings and coming
     // back. This only re-reads the status: a system dialog closing also fires
     // "resumed", and re-asking here would stack a second Android dialog on top
@@ -139,7 +146,6 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
         _notificationGranted = true;
         _permissionsDone = true;
         _locatingDone = true;
-        _locationSuggestionDone = true;
       });
       return;
     }
@@ -165,14 +171,6 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     await _readStatuses();
     if (!mounted) return;
 
-    // The checks run alongside the intro; only the system dialogs wait for it
-    // so they never pop up mid-animation.
-    if (!_notificationGranted && !_notificationPermanentlyDenied) {
-      await _introPlayed.future;
-      if (!mounted) return;
-      await _requestNotification();
-    }
-
     // Location is only needed to pick the default address. Once one exists
     // the GPS is never touched again (the user changes it by hand instead).
     _locationNeeded = await _needsDefaultAddress();
@@ -188,55 +186,6 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     _evaluate();
     if (!_locationStepDone) Analytics.locationIntroShown();
 
-    if (_locationNeeded) {
-      _locationSuggestionDone = true;
-    } else {
-      _offerCurrentLocation();
-    }
-  }
-
-  /// A default address exists, so nothing is prompted here: only when
-  /// location is already allowed and GPS already on, look up where the device
-  /// is and offer it if that is somewhere else.
-  Future<void> _offerCurrentLocation() async {
-    try {
-      if (!_locationGranted || !await LocationService.isServiceEnabled()) {
-        return;
-      }
-      final result = await ref.read(deliveryAddressActionsProvider).locate();
-      final found = result.address;
-      if (!mounted || found == null) return;
-      final current = ref.read(deliveryAddressProvider);
-      if (current == null || current.villageCode == found.villageCode) return;
-      setState(() => _currentLocation = found);
-    } catch (_) {
-      // Purely a suggestion; the default address stays in place.
-    } finally {
-      if (mounted) setState(() => _locationSuggestionDone = true);
-    }
-  }
-
-  Future<void> _useCurrentLocation() async {
-    final found = _currentLocation;
-    if (found == null) return;
-    setState(() => _applyingCurrentLocation = true);
-    final saved = await ref.read(deliveryAddressActionsProvider).apply(found);
-    if (!mounted) return;
-    setState(() {
-      _applyingCurrentLocation = false;
-      _currentLocation = null;
-    });
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        content: Text(
-          saved
-              ? 'Alamat pengiriman diatur sesuai lokasi kamu.'
-              : 'Gagal menyimpan alamat, alamat utama tetap dipakai.',
-        ),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
-    );
   }
 
   /// Waits for auth and the saved guest address to load, then reports whether
@@ -292,6 +241,17 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
       setState(() => _locationStepDone = true);
     }
     setState(() => _requesting = false);
+  }
+
+  /// The one automatic system dialog; after that only the popup's button asks.
+  Future<void> _askNotification() async {
+    if (_notificationAsked) return;
+    _notificationAsked = true;
+    setState(() => _askingNotification = true);
+    await _requestNotification();
+    if (!mounted) return;
+    setState(() => _askingNotification = false);
+    _evaluate();
   }
 
   Future<void> _requestNotification() async {
@@ -358,7 +318,7 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   Future<void> _ensureGpsOn() async {
     if (await LocationService.isServiceEnabled()) return;
 
-    if (mounted) setState(() => _locatingText = 'Menyalakan lokasi...');
+    if (mounted) setState(() => _locatingText = 'Mengaktifkan lokasi...');
     final enabled = await _requestGps();
     if (enabled || !mounted) return;
 
@@ -434,17 +394,6 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     });
   }
 
-  void _retryLocating() {
-    ref.read(locationFailureProvider.notifier).state = null;
-    setState(() {
-      _outOfArea = false;
-      _pickingManually = false;
-      _locatingDone = false;
-      _locatingStarted = false;
-      _locatingText = null;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     // Always a Stack so the intro fading out never remounts what is beneath.
@@ -486,15 +435,6 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     // shows as loading until it knows who the user is and where they are.
     if (_checking) return const AppLoadingSkeleton();
 
-    if (!_permissionsDone) {
-      return _PermissionScreen(
-        notificationGranted: _notificationGranted,
-        notificationPermanentlyDenied: _notificationPermanentlyDenied,
-        requesting: _requesting,
-        onRequestNotification: _onNotificationAction,
-      );
-    }
-
     if (!_locationStepDone) {
       return _LocationIntroScreen(
         busy: _requesting,
@@ -529,221 +469,72 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
     if (_outOfArea) {
       if (_pickingManually) {
         // Own Navigator: this gate sits above the app's router, and dropdown
-        // menus need a Navigator to open into.
-        return Navigator(
-          onGenerateRoute: (_) => MaterialPageRoute<void>(
-            builder: (_) => ManualAddressScreen(
-              onBack: () => setState(() => _pickingManually = false),
-              onSaved: () => setState(() {
-                _outOfArea = false;
-                _pickingManually = false;
-              }),
+        // menus need a Navigator to open into. The popup route is see-through,
+        // so the loading skeleton sits behind it.
+        return Stack(
+          children: [
+            const AppLoadingSkeleton(animated: false),
+            Navigator(
+              onGenerateRoute: (_) => manualAddressRoute(
+                onBack: () => setState(() => _pickingManually = false),
+                onSaved: () => setState(() {
+                  _outOfArea = false;
+                  _pickingManually = false;
+                }),
+              ),
             ),
-          ),
+          ],
         );
       }
       return _OutOfAreaScreen(
-        onRetry: _retryLocating,
         onPickManually: () => setState(() => _pickingManually = true),
       );
     }
 
-    // Always a Stack so showing / hiding the choice never remounts the app.
-    final current = ref.watch(deliveryAddressProvider);
-    final found = _currentLocation;
-    if (_locationSuggestionDone &&
-        (found == null || current == null) &&
-        !ref.read(startupSettledProvider)) {
+    // Last gate before the app: notifications. Out-of-area users never get
+    // here. The system dialog goes first; the popup only shows once it was
+    // refused.
+    if (!_permissionsDone) {
+      if (!_notificationAsked && !_notificationPermanentlyDenied ||
+          _askingNotification) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _askNotification();
+        });
+        return const AppLoadingSkeleton();
+      }
+      return _PermissionScreen(
+        notificationPermanentlyDenied: _notificationPermanentlyDenied,
+        requesting: _requesting,
+        onRequestNotification: _onNotificationAction,
+      );
+    }
+
+    // Everything the app waits on at startup is settled once it is shown.
+    if (!ref.read(startupSettledProvider)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) ref.read(startupSettledProvider.notifier).state = true;
+      });
+    }
+    // Only for someone whose address was just set up on this launch; with an
+    // address saved from before there is nothing new to welcome.
+    if (_locationNeeded && !_welcomeQueued) {
+      _welcomeQueued = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _welcomeVisible = true);
       });
     }
     return Stack(
       children: [
         widget.child,
-        if (found != null && current != null)
-          _LocationChoiceOverlay(
-            defaultAddress: current,
-            currentLocation: found,
-            busy: _applyingCurrentLocation,
-            onUseCurrent: _useCurrentLocation,
-            onKeepDefault: () => setState(() => _currentLocation = null),
-          ),
+        if (_welcomeVisible)
+          WelcomeBurst(onDone: () => setState(() => _welcomeVisible = false)),
       ],
     );
   }
 }
 
-/// Default address vs. current location, shown over the app. Drawn without
-/// a route: this gate sits above the app's Navigator.
-class _LocationChoiceOverlay extends StatelessWidget {
-  const _LocationChoiceOverlay({
-    required this.defaultAddress,
-    required this.currentLocation,
-    required this.busy,
-    required this.onUseCurrent,
-    required this.onKeepDefault,
-  });
-
-  final NearestAddress defaultAddress;
-  final NearestAddress currentLocation;
-  final bool busy;
-  final VoidCallback onUseCurrent;
-  final VoidCallback onKeepDefault;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: Material(
-        color: Colors.black54,
-        child: SafeArea(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Mau dikirim ke mana?',
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.foreground,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Lokasi kamu sekarang berbeda dari alamat utama.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: AppColors.mutedForeground,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _ChoiceOption(
-                    icon: Icons.my_location_rounded,
-                    title: 'Pakai lokasi saya',
-                    label: currentLocation.label,
-                    onTap: busy ? null : onUseCurrent,
-                    busy: busy,
-                  ),
-                  const SizedBox(height: 10),
-                  _ChoiceOption(
-                    icon: Icons.home_rounded,
-                    title: 'Pakai alamat utama',
-                    label: defaultAddress.label,
-                    onTap: busy ? null : onKeepDefault,
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Kamu tetap bisa ganti alamat kapan saja dari bagian '
-                    '"Dikirim ke" di beranda.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.mutedForeground,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ChoiceOption extends StatelessWidget {
-  const _ChoiceOption({
-    required this.icon,
-    required this.title,
-    required this.label,
-    required this.onTap,
-    this.busy = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String label;
-  final VoidCallback? onTap;
-  final bool busy;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFF8FAFC),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: busy
-                    ? const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : Icon(icon, color: AppColors.primary, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.mutedForeground,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.mutedForeground,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 const _splashColor = Color(0xFF0F9B8E);
+
 /// Just the logo out of the native splash image (logo_splash.png is a 1152px
 /// canvas read as 4x, i.e. 288dp, by flutter_native_splash, with the logo
 /// 64dp in the middle); small so it decodes quickly.
@@ -880,218 +671,32 @@ class _SplashIntroState extends State<_SplashIntro>
   }
 }
 
+/// Notification permission, as the same popup card the location steps use.
+/// Shown over the loading skeleton once the system dialog was refused.
 class _PermissionScreen extends StatelessWidget {
   const _PermissionScreen({
-    required this.notificationGranted,
     required this.notificationPermanentlyDenied,
     required this.requesting,
     required this.onRequestNotification,
   });
 
-  final bool notificationGranted;
   final bool notificationPermanentlyDenied;
   final bool requesting;
   final VoidCallback onRequestNotification;
 
   @override
   Widget build(BuildContext context) {
-    final primaryLabel = requesting
-        ? 'Menunggu...'
-        : notificationPermanentlyDenied
-        ? 'Buka Pengaturan'
-        : 'Izinkan Notifikasi';
-
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.verified_user_rounded,
-                            size: 44,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'Izin Dibutuhkan',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Izinkan notifikasi untuk melanjutkan.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.mutedForeground),
-                        ),
-                        const SizedBox(height: 28),
-                        _PermissionTile(
-                          icon: Icons.notifications_active_rounded,
-                          color: const Color(0xFFF59E0B),
-                          title: 'Notifikasi',
-                          description:
-                              'Kabar status pesanan dan pesan chat kamu.',
-                          badge: 'Wajib',
-                          granted: notificationGranted,
-                          actionLabel: notificationPermanentlyDenied
-                              ? 'Pengaturan'
-                              : 'Izinkan',
-                          onAction: requesting ? null : onRequestNotification,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: requesting ? null : onRequestNotification,
-                    child: Text(primaryLabel),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TextButton(
-                  onPressed: () => SystemNavigator.pop(),
-                  child: const Text('Keluar Aplikasi'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PermissionTile extends StatelessWidget {
-  const _PermissionTile({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.description,
-    required this.badge,
-    required this.granted,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String description;
-  final String badge;
-  final bool granted;
-  final String actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: granted ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: granted ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.foreground,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1.5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        badge,
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          color: color,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.mutedForeground,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (granted)
-            const Icon(
-              Icons.check_circle_rounded,
-              color: Color(0xFF22C55E),
-              size: 26,
-            )
-          else
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                foregroundColor: AppColors.primary,
-              ),
-              child: Text(
-                actionLabel,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-        ],
-      ),
+    return _LocationPopup(
+      icon: Icons.notifications_active_rounded,
+      title: 'Izinkan Notifikasi',
+      message: 'Izinkan notifikasi agar kamu tidak ketinggalan kabar status '
+          'pesanan dan pesan chat.',
+      buttonText: requesting
+          ? 'Menunggu...'
+          : notificationPermanentlyDenied
+          ? 'Buka Pengaturan'
+          : 'Izinkan Notifikasi',
+      onPressed: requesting ? null : onRequestNotification,
     );
   }
 }
@@ -1115,9 +720,8 @@ String _titleCase(String value) => value
     .join(' ');
 
 class _OutOfAreaScreen extends ConsumerWidget {
-  const _OutOfAreaScreen({required this.onRetry, required this.onPickManually});
+  const _OutOfAreaScreen({required this.onPickManually});
 
-  final VoidCallback onRetry;
   final VoidCallback onPickManually;
 
   @override
@@ -1234,15 +838,10 @@ class _OutOfAreaScreen extends ConsumerWidget {
                   width: double.infinity,
                   height: 48,
                   child: OutlinedButton.icon(
-                    onPressed: onRetry,
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Coba Lagi'),
+                    onPressed: () => SystemNavigator.pop(),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Keluar Aplikasi'),
                   ),
-                ),
-                const SizedBox(height: 4),
-                TextButton(
-                  onPressed: () => SystemNavigator.pop(),
-                  child: const Text('Keluar Aplikasi'),
                 ),
               ],
             ),
@@ -1254,6 +853,131 @@ class _OutOfAreaScreen extends ConsumerWidget {
 }
 
 /// Explains why the app needs location before anything is asked of the user.
+/// Non-dismissible card over the loading skeleton. The home page is not built behind it, so
+/// no API calls start until location is on.
+class _LocationPopup extends StatelessWidget {
+  const _LocationPopup({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.buttonText,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String buttonText;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Stack(
+        children: [
+          const AppLoadingSkeleton(animated: false),
+          const ModalBarrier(dismissible: false, color: Colors.black54),
+          _PopupShell(
+            header: _PulsingLocationIcon(icon: icon),
+            title: title,
+            message: message,
+            button: SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  elevation: 0,
+                  shape: const StadiumBorder(),
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onPressed: onPressed,
+                child: Text(buttonText),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Location icon with radar-style rings spreading out and the pin bobbing.
+class _PulsingLocationIcon extends StatefulWidget {
+  const _PulsingLocationIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  State<_PulsingLocationIcon> createState() => _PulsingLocationIconState();
+}
+
+class _PulsingLocationIconState extends State<_PulsingLocationIcon>
+    with SingleTickerProviderStateMixin {
+  static const _color = AppColors.primary;
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget _ring(double t) {
+    return Opacity(
+      opacity: (1 - t) * 0.45,
+      child: Container(
+        width: 64 + 56 * t,
+        height: 64 + 56 * t,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: _color, width: 2),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 120,
+      height: 120,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final v = _controller.value;
+          final bob = -6 * (0.5 - (v * 2 % 1 - 0.5).abs()) * 2;
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              _ring(v),
+              _ring((v + 0.5) % 1),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: _color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Transform.translate(
+                offset: Offset(0, bob),
+                child: Icon(widget.icon, size: 34, color: _color),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _LocationIntroScreen extends StatelessWidget {
   const _LocationIntroScreen({
     required this.onEnable,
@@ -1267,76 +991,17 @@ class _LocationIntroScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.location_on_rounded,
-                          size: 44,
-                          color: Color(0xFF0284C7),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Nyalakan Lokasi',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Aplikasi perlu menyalakan lokasi untuk menentukan posisi '
-                        'kamu, agar katalog produk dan pengiriman sesuai '
-                        'dengan tempat kamu berada.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.mutedForeground,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: busy ? null : onEnable,
-                    child: Text(
-                      busy
-                          ? 'Menunggu...'
-                          : permanentlyDenied
-                          ? 'Buka Pengaturan'
-                          : 'Nyalakan Lokasi',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TextButton(
-                  onPressed: () => SystemNavigator.pop(),
-                  child: const Text('Keluar Aplikasi'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return _LocationPopup(
+      icon: Icons.location_on_rounded,
+      title: 'Aktifkan Lokasi',
+      message: 'Izinkan akses lokasi agar kami bisa menampilkan produk '
+          'yang sesuai dengan tempatmu.',
+      buttonText: busy
+          ? 'Menunggu...'
+          : permanentlyDenied
+          ? 'Buka Pengaturan'
+          : 'Aktifkan Lokasi',
+      onPressed: busy ? null : onEnable,
     );
   }
 }
@@ -1349,58 +1014,203 @@ class _GpsOffScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.location_off_rounded,
-                    size: 44,
-                    color: Color(0xFF0284C7),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Lokasi Belum Aktif',
-                  style: Theme.of(context).textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Nyalakan lokasi di HP kamu untuk menentukan alamat pengiriman. '
-                  'Aplikasi akan lanjut otomatis setelah lokasi aktif.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.mutedForeground),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: busy ? null : onEnable,
-                    child: Text(busy ? 'Menyalakan lokasi...' : 'Nyalakan Lokasi'),
-                  ),
+    return _LocationPopup(
+      icon: Icons.location_off_rounded,
+      title: 'Lokasi Belum Aktif',
+      message: 'Aktifkan GPS di HP-mu untuk menentukan alamat pengiriman. '
+          'Kami akan lanjut otomatis begitu lokasi aktif.',
+      buttonText: busy ? 'Mengaktifkan lokasi...' : 'Aktifkan Lokasi',
+      onPressed: busy ? null : onEnable,
+    );
+  }
+}
+
+/// Rounded card shared by the location popups: tinted header with an
+/// animation, then title, message and an optional button.
+class _PopupShell extends StatelessWidget {
+  const _PopupShell({
+    required this.header,
+    required this.title,
+    required this.message,
+    this.button,
+  });
+
+  final Widget header;
+  final String title;
+  final String message;
+  final Widget? button;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 32,
+                  offset: const Offset(0, 12),
                 ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Material(
+                color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppColors.primary.withValues(alpha: 0.14),
+                            AppColors.primary.withValues(alpha: 0.02),
+                          ],
+                        ),
+                      ),
+                      child: Center(child: RepaintBoundary(child: header)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.foreground,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            message,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.mutedForeground,
+                              height: 1.5,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                          if (button != null) ...[
+                            const SizedBox(height: 22),
+                            button!,
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// Sonar-style search: a radar arm sweeping over rings while the pin hops,
+/// for the "finding your location" step.
+class _RadarLocatingIcon extends StatefulWidget {
+  const _RadarLocatingIcon();
+
+  @override
+  State<_RadarLocatingIcon> createState() => _RadarLocatingIconState();
+}
+
+class _RadarLocatingIconState extends State<_RadarLocatingIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 120,
+      height: 120,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final v = _controller.value;
+          // The pin hops during the first half of the loop, then rests.
+          final hop = v < 0.5 ? (1 - (v * 4 - 1).abs()) : 0.0;
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              CustomPaint(
+                size: const Size(120, 120),
+                painter: _RadarPainter(v * 2 * math.pi),
+              ),
+              Transform.translate(
+                offset: Offset(0, -10 * hop),
+                child: const Icon(
+                  Icons.location_on_rounded,
+                  size: 34,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RadarPainter extends CustomPainter {
+  _RadarPainter(this.angle);
+
+  final double angle;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width / 2;
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = AppColors.primary.withValues(alpha: 0.25);
+    for (final f in [0.35, 0.65, 1.0]) {
+      canvas.drawCircle(c, r * f - 1, ring);
+    }
+    final rect = Rect.fromCircle(center: c, radius: r - 1);
+    final sweep = Paint()
+      ..shader = SweepGradient(
+        startAngle: 0,
+        endAngle: math.pi / 2,
+        colors: [
+          AppColors.primary.withValues(alpha: 0),
+          AppColors.primary.withValues(alpha: 0.4),
+        ],
+        transform: GradientRotation(angle - math.pi / 2),
+      ).createShader(rect);
+    canvas.drawCircle(c, r - 1, sweep);
+  }
+
+  @override
+  bool shouldRepaint(_RadarPainter old) => old.angle != angle;
 }
 
 class _LocatingScreen extends StatelessWidget {
@@ -1412,39 +1222,17 @@ class _LocatingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 44,
-                height: 44,
-                child: CircularProgressIndicator(strokeWidth: 3.5),
-              ),
-              if (text != null) ...[
-                const SizedBox(height: 22),
-                Text(
-                  text!,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.foreground,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Untuk mengatur alamat pengiriman',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: AppColors.mutedForeground,
-                  ),
-                ),
-              ],
-            ],
+      child: Stack(
+        children: [
+          const AppLoadingSkeleton(animated: false),
+          const ModalBarrier(dismissible: false, color: Colors.black54),
+          _PopupShell(
+            header: const _RadarLocatingIcon(),
+            title: text ?? 'Menentukan lokasi...',
+            message: 'Sebentar ya, kami sedang mencari posisimu untuk '
+                'mengatur alamat pengiriman.',
           ),
-        ),
+        ],
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../core/api/api_client.dart';
 import '../core/device/device_details.dart';
 import '../core/storage/install_id.dart';
+import 'location_service.dart';
 
 /// Reports this install to the backend so the admin dashboard can count
 /// installs, users online and who is on the checkout screen. Pings on
@@ -73,6 +74,8 @@ class AppPresence with WidgetsBindingObserver {
     final screen = _currentScreen();
     _lastScreen = screen;
     final device = _device;
+    // Cached OS position; never prompts. Null without permission.
+    final position = await LocationService.lastKnownPosition();
     try {
       await _api.dio.post(
         '/app/heartbeat',
@@ -83,6 +86,13 @@ class AppPresence with WidgetsBindingObserver {
           'build_number': _buildNumber,
           'screen': screen,
           'device': ?device,
+          if (position != null)
+            'location': {
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+              'accuracy': position.accuracy,
+              'at': position.timestamp.toUtc().toIso8601String(),
+            },
         },
       );
       if (device != null) _device = null;

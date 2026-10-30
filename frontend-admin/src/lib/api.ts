@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { AppCacheGroup, ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, GuestInstall, GuestInstallDetail, CustomerDetail, PermissionCatalog, PaginatedData, Banner, LaunchPopupSettings, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, BankAccount, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -296,6 +296,18 @@ export const adminApi = {
     return apiRequest<PaginatedData<Customer>>(`/admin/customers?${query.toString()}`);
   },
 
+  /** App installs that never registered/logged in. */
+  async getGuests(params?: { search?: string }): Promise<GuestInstall[]> {
+    const query = new URLSearchParams({ per_page: '200' });
+    if (params?.search) query.append('search', params.search);
+
+    return apiRequest<GuestInstall[]>(`/admin/customers/guests?${query.toString()}`);
+  },
+
+  async getGuest(id: string): Promise<GuestInstallDetail> {
+    return apiRequest<GuestInstallDetail>(`/admin/customers/guests/${id}`);
+  },
+
   async createCustomer(data: { name: string; email: string; phone?: string; password: string }): Promise<Customer> {
     return apiRequest<Customer>('/admin/customers', {
       method: 'POST',
@@ -343,6 +355,17 @@ export const adminApi = {
   // Operational & Banners
   async getBanners(): Promise<Banner[]> {
     return apiRequest<Banner[]>('/admin/banners');
+  },
+
+  async getLaunchPopup(): Promise<LaunchPopupSettings> {
+    return apiRequest<LaunchPopupSettings>('/admin/launch-popup');
+  },
+
+  async updateLaunchPopup(data: LaunchPopupSettings): Promise<LaunchPopupSettings> {
+    return apiRequest<LaunchPopupSettings>('/admin/launch-popup', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   async createBanner(data: FormData | { name: string; image_url?: string; link_url?: string; is_active?: boolean }): Promise<Banner> {
@@ -585,6 +608,12 @@ export const adminApi = {
     const data = await apiRequest<ServiceCityOptions>('/admin/service-cities');
     return {
       selected: data.selected.map((c) => c.trim()),
+      areas: (data.areas ?? []).map((a) => ({
+        ...a,
+        code: a.code.trim(),
+        city_code: a.city_code.trim(),
+        district_code: a.district_code.trim(),
+      })),
       provinces: data.provinces.map((p) => ({
         ...p,
         code: p.code.trim(),
@@ -593,11 +622,32 @@ export const adminApi = {
     };
   },
 
-  async saveServiceCities(cities: string[]): Promise<void> {
+  async saveServiceCities(cities: string[], areas: { level: 'district' | 'village'; code: string }[]): Promise<void> {
     return apiRequest<void>('/admin/service-cities', {
       method: 'PUT',
-      body: JSON.stringify({ cities }),
+      body: JSON.stringify({ cities, areas }),
     });
+  },
+
+  async getServiceDistricts(cityCode: string): Promise<RegionItem[]> {
+    return trimCodes(await apiRequest<RegionItem[]>(`/admin/service-cities/${cityCode}/districts`));
+  },
+
+  async getServiceVillages(districtCode: string): Promise<RegionItem[]> {
+    return trimCodes(await apiRequest<RegionItem[]>(`/admin/service-cities/districts/${districtCode}/villages`));
+  },
+
+  async getAppCache(): Promise<AppCacheGroup[]> {
+    const data = await apiRequest<{ groups: AppCacheGroup[] }>('/admin/app-cache');
+    return data.groups;
+  },
+
+  async invalidateAppCache(groups: string[]): Promise<AppCacheGroup[]> {
+    const data = await apiRequest<{ groups: AppCacheGroup[] }>('/admin/app-cache/invalidate', {
+      method: 'POST',
+      body: JSON.stringify({ groups }),
+    });
+    return data.groups;
   },
 
   async getServiceFee(): Promise<ServiceFeeSettings> {
@@ -622,6 +672,19 @@ export const adminApi = {
     });
   },
 
+  async getPromoTexts(): Promise<string[]> {
+    const res = await apiRequest<{ promo_texts: string[] }>('/admin/promo-texts');
+    return res.promo_texts;
+  },
+
+  async savePromoTexts(promo_texts: string[]): Promise<string[]> {
+    const res = await apiRequest<{ promo_texts: string[] }>('/admin/promo-texts', {
+      method: 'PUT',
+      body: JSON.stringify({ promo_texts }),
+    });
+    return res.promo_texts;
+  },
+
   async getFreeShipping(): Promise<FreeShippingSettings> {
     return apiRequest<FreeShippingSettings>('/admin/free-shipping');
   },
@@ -635,6 +698,25 @@ export const adminApi = {
 
   async getPaymentMethodOptions(): Promise<PaymentMethodOption[]> {
     return apiRequest<PaymentMethodOption[]>('/v1/admin/payment-methods?per_page=100');
+  },
+
+  async getBankAccounts(): Promise<BankAccount[]> {
+    return apiRequest<BankAccount[]>('/admin/bank-accounts');
+  },
+
+  async saveBankAccount(data: Partial<BankAccount>, id?: string): Promise<BankAccount> {
+    return apiRequest<BankAccount>(id ? `/admin/bank-accounts/${id}` : '/admin/bank-accounts', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async toggleBankAccount(id: string): Promise<BankAccount> {
+    return apiRequest<BankAccount>(`/admin/bank-accounts/${id}/toggle`, { method: 'POST' });
+  },
+
+  async deleteBankAccount(id: string): Promise<void> {
+    return apiRequest<void>(`/admin/bank-accounts/${id}`, { method: 'DELETE' });
   },
 
   async getWalletBonus(): Promise<WalletBonusSettings> {

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\Warehouse;
+use App\Support\AppCache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -27,6 +28,8 @@ class ProductStockService
         $detach
             ? $product->warehouses()->sync($rows)
             : $product->warehouses()->syncWithoutDetaching($rows);
+
+        AppCache::bump('products');
     }
 
     /**
@@ -91,6 +94,9 @@ class ProductStockService
             $remaining -= $take;
         }
 
+        // Another checkout just took stock: phones must not keep showing the old number.
+        AppCache::bump('products');
+
         return $allocations;
     }
 
@@ -129,6 +135,8 @@ class ProductStockService
                 ]);
             }
         }
+
+        AppCache::bump('products');
     }
 
     public function defaultWarehouseId(): ?string

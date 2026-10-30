@@ -81,7 +81,7 @@ class _CompleteAddressScreenState extends ConsumerState<CompleteAddressScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-              AddressPicker(onChanged: (address) => setState(() => _address = address)),
+              AddressPicker(autoSelectSingle: true, onChanged: (address) => setState(() => _address = address)),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _loading ? null : _submit,

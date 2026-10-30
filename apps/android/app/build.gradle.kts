@@ -20,6 +20,10 @@ val admobSampleAppId = "ca-app-pub-3940256099942544~3347511713"
 val admobProdAppId = (findProperty("admobAppIdAndroid") as String?)?.takeIf { it.isNotBlank() }
     ?: admobSampleAppId.also { logger.warn("admobAppIdAndroid is not set; prod builds use the AdMob sample App ID.") }
 
+// Without a key the order tracking map renders blank (the rest of the app works).
+val googleMapsApiKey = (findProperty("googleMapsApiKeyAndroid") as String?)?.takeIf { it.isNotBlank() }
+    ?: "".also { logger.warn("googleMapsApiKeyAndroid is not set; the order tracking map will be blank.") }
+
 android {
     namespace = "com.inovasionline.app"
     compileSdk = flutter.compileSdkVersion
@@ -48,6 +52,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
     }
 
     flavorDimensions += "env"

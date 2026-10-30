@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Admin\AdminStaffController;
 use App\Http\Controllers\Api\Admin\CustomerController;
 use App\Http\Controllers\Api\Admin\DriverController;
 use App\Http\Controllers\Api\Admin\DriverDeliveryController;
+use App\Http\Controllers\Api\Admin\DriverLocationController;
 use App\Http\Controllers\Api\V1\Admin\BannerController as AdminBannerController;
 use App\Http\Controllers\Api\V1\Admin\CodVerificationController as AdminCodVerificationController;
 use App\Http\Controllers\Api\V1\CodVerificationController;
@@ -34,6 +35,7 @@ use App\Http\Controllers\Api\V1\Admin\AdChestController as AdminAdChestControlle
 use App\Http\Controllers\Api\V1\Admin\AdmobController as AdminAdmobController;
 use App\Http\Controllers\Api\V1\Admin\AppUpdateController as AdminAppUpdateController;
 use App\Http\Controllers\Api\V1\Admin\FreeShippingController as AdminFreeShippingController;
+use App\Http\Controllers\Api\V1\Admin\PromoTextController as AdminPromoTextController;
 use App\Http\Controllers\Api\V1\Admin\WalletBonusController as AdminWalletBonusController;
 use App\Http\Controllers\Api\V1\Admin\WalletController as AdminWalletController;
 use App\Http\Controllers\Api\V1\Admin\WalletReportController as AdminWalletReportController;
@@ -55,6 +57,8 @@ use App\Http\Controllers\Api\V1\Admin\SupplierBillController as AdminSupplierBil
 use App\Http\Controllers\Api\V1\AppPresenceController;
 use App\Http\Controllers\Api\V1\UserContactController;
 use App\Http\Controllers\Api\V1\AppVersionController;
+use App\Http\Controllers\Api\V1\CacheVersionController;
+use App\Http\Controllers\Api\V1\Admin\AppCacheController as AdminAppCacheController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BannerController;
 use App\Http\Controllers\Api\V1\CartController;
@@ -68,6 +72,8 @@ use App\Http\Controllers\Api\V1\FlashSaleSlotController;
 use App\Http\Controllers\Api\V1\MatchedPhotoController;
 use App\Http\Controllers\Api\V1\NavBadgeController;
 use App\Http\Controllers\Api\V1\AdmobConfigController;
+use App\Http\Controllers\Api\V1\Admin\LaunchPopupController as AdminLaunchPopupController;
+use App\Http\Controllers\Api\V1\LaunchPopupController;
 use App\Http\Controllers\Api\V1\AdmobSsvController;
 use App\Http\Controllers\Api\V1\WalletController;
 use App\Http\Controllers\Api\V1\OrderController;
@@ -106,13 +112,13 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
-            Route::get('/user', [AuthController::class, 'user']);
+            Route::get('/user', [AuthController::class, 'user'])->middleware('cache.headers:private;max_age=0;etag');
             Route::put('/user', [AuthController::class, 'updateProfile']);
             Route::post('/user', [AuthController::class, 'updateProfile']);
             Route::put('/user/address', [AuthController::class, 'updateAddress']);
             Route::post('/user/address/from-location', [AuthController::class, 'setAddressFromLocation'])
                 ->middleware('throttle:6,1');
-            Route::get('/user/addresses', [UserAddressController::class, 'index']);
+            Route::get('/user/addresses', [UserAddressController::class, 'index'])->middleware('cache.headers:private;max_age=0;etag');
             Route::post('/user/addresses', [UserAddressController::class, 'store']);
             Route::put('/user/addresses/{address}', [UserAddressController::class, 'update']);
             Route::delete('/user/addresses/{address}', [UserAddressController::class, 'destroy']);
@@ -140,36 +146,37 @@ Route::prefix('v1')->group(function () {
 
         Route::prefix('verifications')->group(function () {
             Route::post('/', [UserVerificationController::class, 'store']);
-            Route::get('/me', [UserVerificationController::class, 'show']);
+            Route::get('/me', [UserVerificationController::class, 'show'])->middleware('cache.headers:private;max_age=0;etag');
         });
 
         Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
     });
 
-    Route::get('/categories', [CategoryController::class, 'index']);
-    Route::get('/categories/{slug}', [CategoryController::class, 'show']);
+    Route::get('/categories', [CategoryController::class, 'index'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/categories/{slug}', [CategoryController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
 
     // Public on purpose: the app registers its push token before login too. A signed-in caller
     // (bearer token) gets the token linked to their account; see DeviceTokenController.
     Route::post('/device-tokens', [DeviceTokenController::class, 'store'])->middleware('throttle:30,1');
 
-    Route::get('/app-version', [AppVersionController::class, 'show']);
+    Route::get('/app-version', [AppVersionController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/cache-versions', [CacheVersionController::class, 'show']);
 
     Route::prefix('products')->group(function () {
-        Route::get('/flash-sale', [PublicProductController::class, 'flashSale']);
-        Route::get('/best-sellers', [PublicProductController::class, 'bestSellers']);
-        Route::get('/{product:slug}', [PublicProductController::class, 'show']);
+        Route::get('/flash-sale', [PublicProductController::class, 'flashSale'])->middleware('cache.headers:public;max_age=60;etag');
+        Route::get('/best-sellers', [PublicProductController::class, 'bestSellers'])->middleware('cache.headers:public;max_age=60;etag');
+        Route::get('/{product:slug}', [PublicProductController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
     });
 
-    Route::get('/payment-methods', [CheckoutOptionsController::class, 'paymentMethods']);
-    Route::get('/shipping-methods', [CheckoutOptionsController::class, 'shippingMethods']);
-    Route::get('/delivery-schedules', [CheckoutOptionsController::class, 'deliverySchedules']);
-    Route::get('/service-fee', [CheckoutOptionsController::class, 'serviceFee']);
-    Route::get('/free-shipping', [CheckoutOptionsController::class, 'freeShipping']);
-    Route::get('/nav-badge', [NavBadgeController::class, 'show']);
+    Route::get('/payment-methods', [CheckoutOptionsController::class, 'paymentMethods'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/shipping-methods', [CheckoutOptionsController::class, 'shippingMethods'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/delivery-schedules', [CheckoutOptionsController::class, 'deliverySchedules'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/service-fee', [CheckoutOptionsController::class, 'serviceFee'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/free-shipping', [CheckoutOptionsController::class, 'freeShipping'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/nav-badge', [NavBadgeController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
     Route::post('/app/heartbeat', [AppPresenceController::class, 'heartbeat'])->middleware('throttle:30,1');
     Route::post('/contacts/sync', [UserContactController::class, 'sync'])->middleware('throttle:30,1');
-    Route::get('/admob-config', [AdmobConfigController::class, 'show']);
+    Route::get('/admob-config', [AdmobConfigController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
     Route::get('/admob/ssv', AdmobSsvController::class)->name('admob.ssv')->middleware('throttle:120,1');
 
     Route::prefix('search')->group(function () {
@@ -181,15 +188,16 @@ Route::prefix('v1')->group(function () {
 
     Route::prefix('regions')->group(function () {
         Route::get('/nearest', [RegionController::class, 'nearest'])->middleware('throttle:20,1');
-        Route::get('/provinces', [RegionController::class, 'provinces']);
-        Route::get('/provinces/{provinceCode}/cities', [RegionController::class, 'cities']);
-        Route::get('/cities/{cityCode}/districts', [RegionController::class, 'districts']);
-        Route::get('/districts/{districtCode}/villages', [RegionController::class, 'villages']);
+        Route::get('/provinces', [RegionController::class, 'provinces'])->middleware('cache.headers:public;max_age=3600;etag');
+        Route::get('/provinces/{provinceCode}/cities', [RegionController::class, 'cities'])->middleware('cache.headers:public;max_age=3600;etag');
+        Route::get('/cities/{cityCode}/districts', [RegionController::class, 'districts'])->middleware('cache.headers:public;max_age=3600;etag');
+        Route::get('/districts/{districtCode}/villages', [RegionController::class, 'villages'])->middleware('cache.headers:public;max_age=3600;etag');
     });
 
-    Route::get('/flash-sale-slots', [FlashSaleSlotController::class, 'index']);
+    Route::get('/flash-sale-slots', [FlashSaleSlotController::class, 'index'])->middleware('cache.headers:public;max_age=60;etag');
 
-    Route::get('/banners', [BannerController::class, 'index']);
+    Route::get('/banners', [BannerController::class, 'index'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/launch-popup', [LaunchPopupController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
 
     Route::prefix('posts')->group(function () {
         Route::get('/', [PostController::class, 'index']);
@@ -221,7 +229,7 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::prefix('cart')->middleware(['auth:sanctum', 'not.blocked', 'feature.ban:purchase'])->group(function () {
-        Route::get('/', [CartController::class, 'index']);
+        Route::get('/', [CartController::class, 'index'])->middleware('cache.headers:private;max_age=0;etag');
         Route::post('/items', [CartController::class, 'store']);
         Route::patch('/items/{cartItem}', [CartController::class, 'update']);
         Route::delete('/items/{cartItem}', [CartController::class, 'destroy']);
@@ -237,18 +245,19 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::prefix('orders')->middleware(['auth:sanctum', 'not.blocked'])->group(function () {
-        Route::get('/', [OrderController::class, 'index']);
-        Route::get('/{order}', [OrderController::class, 'show']);
+        Route::get('/', [OrderController::class, 'index'])->middleware('cache.headers:private;max_age=0;etag');
+        Route::get('/{order}', [OrderController::class, 'show'])->middleware('cache.headers:private;max_age=0;etag');
         Route::post('/{order}/cancel', [OrderController::class, 'cancel']);
         Route::post('/{order}/cancel-hold', [OrderController::class, 'holdCancel']);
         Route::post('/{order}/cancel-decline', [OrderController::class, 'declineCancel']);
+        Route::get('/{order}/tracking', [OrderController::class, 'tracking']);
         Route::post('/{order}/pay', [PaymentController::class, 'pay'])->middleware('feature.ban:purchase');
         Route::get('/{order}/payment-status', [PaymentController::class, 'status']);
     });
 
     Route::prefix('wallet')->middleware(['auth:sanctum', 'not.blocked'])->group(function () {
-        Route::get('/', [WalletController::class, 'show']);
-        Route::get('/transactions', [WalletController::class, 'transactions']);
+        Route::get('/', [WalletController::class, 'show'])->middleware('cache.headers:private;max_age=0;etag');
+        Route::get('/transactions', [WalletController::class, 'transactions'])->middleware('cache.headers:private;max_age=0;etag');
         // Retried every couple of seconds while AdMob's reward callback is pending.
         Route::post('/bonus/claim', [WalletController::class, 'claimBonus'])->middleware('throttle:20,1');
         Route::post('/bonus/test-ad-view', [WalletController::class, 'testAdView'])->middleware('throttle:10,1');
@@ -341,7 +350,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/{order}', [AdminOrderController::class, 'show']);
         });
 
-        Route::prefix('payment-methods')->middleware('menu:free_shipping')->group(function () {
+        Route::prefix('payment-methods')->middleware('menu:free_shipping,bank_accounts')->group(function () {
+            Route::post('/', [AdminPaymentMethodController::class, 'store']);
+            Route::put('/{paymentMethod}', [AdminPaymentMethodController::class, 'update']);
+            Route::delete('/{paymentMethod}', [AdminPaymentMethodController::class, 'destroy']);
             Route::get('/', [AdminPaymentMethodController::class, 'index']);
             Route::post('/{paymentMethod}/toggle', [AdminPaymentMethodController::class, 'toggle']);
         });
@@ -423,6 +435,7 @@ Route::prefix('admin')->group(function () {
             Route::post('/scan', [DriverDeliveryController::class, 'scan']);
             Route::post('/orders/{order}/ship', [DriverDeliveryController::class, 'ship']);
             Route::post('/orders/{order}/deliver', [DriverDeliveryController::class, 'deliver']);
+            Route::post('/location', [DriverLocationController::class, 'update'])->middleware('throttle:30,1');
         });
 
         // Role & Permissions Management
@@ -439,7 +452,9 @@ Route::prefix('admin')->group(function () {
         Route::prefix('customers')->middleware('menu:customers,notifications')->group(function () {
             Route::get('/', [CustomerController::class, 'index']);
             Route::post('/', [CustomerController::class, 'store']);
-            Route::get('/{user}', [CustomerController::class, 'show']);
+            Route::get('/guests', [CustomerController::class, 'guests']);
+            Route::get('/guests/{install}', [CustomerController::class, 'guestShow']);
+            Route::get('/{user}',[CustomerController::class, 'show']);
             Route::post('/{user}/block', [CustomerController::class, 'block']);
             Route::post('/{user}/unblock', [CustomerController::class, 'unblock']);
             Route::post('/{user}/ban', [CustomerController::class, 'ban']);
@@ -544,14 +559,30 @@ Route::prefix('admin')->group(function () {
             Route::delete('/{deliverySchedule}', [AdminDeliveryScheduleController::class, 'destroy']);
         });
 
+        Route::get('app-cache', [AdminAppCacheController::class, 'index'])->middleware('menu:app_cache');
+        Route::post('app-cache/invalidate', [AdminAppCacheController::class, 'invalidate'])->middleware('menu:app_cache');
+
         Route::get('service-cities', [AdminServiceCityController::class, 'index'])->middleware('menu:service_cities');
         Route::put('service-cities', [AdminServiceCityController::class, 'update'])->middleware('menu:service_cities');
+        Route::get('service-cities/{cityCode}/districts', [AdminServiceCityController::class, 'districts'])->middleware('menu:service_cities');
+        Route::get('service-cities/districts/{districtCode}/villages', [AdminServiceCityController::class, 'villages'])->middleware('menu:service_cities');
 
         Route::get('service-fee', [AdminServiceFeeController::class, 'show'])->middleware('menu:service_fee');
         Route::put('service-fee', [AdminServiceFeeController::class, 'update'])->middleware('menu:service_fee');
 
         Route::get('midtrans-settings', [AdminMidtransSettingController::class, 'show'])->middleware('menu:payment_gateway');
         Route::put('midtrans-settings', [AdminMidtransSettingController::class, 'update'])->middleware('menu:payment_gateway');
+
+        Route::prefix('bank-accounts')->middleware('menu:bank_accounts,free_shipping,orders,wallet_topups')->group(function () {
+            Route::get('/', [AdminPaymentMethodController::class, 'accounts']);
+            Route::post('/', [AdminPaymentMethodController::class, 'store']);
+            Route::put('/{paymentMethod}', [AdminPaymentMethodController::class, 'update']);
+            Route::delete('/{paymentMethod}', [AdminPaymentMethodController::class, 'destroy']);
+            Route::post('/{paymentMethod}/toggle', [AdminPaymentMethodController::class, 'toggle']);
+        });
+
+        Route::get('promo-texts', [AdminPromoTextController::class, 'show'])->middleware('menu:promo_texts');
+        Route::put('promo-texts', [AdminPromoTextController::class, 'update'])->middleware('menu:promo_texts');
 
         Route::get('free-shipping', [AdminFreeShippingController::class, 'show'])->middleware('menu:free_shipping');
         Route::put('free-shipping', [AdminFreeShippingController::class, 'update'])->middleware('menu:free_shipping');
@@ -611,6 +642,9 @@ Route::prefix('admin')->group(function () {
 
         Route::get('admob', [AdminAdmobController::class, 'show'])->middleware('menu:admob');
         Route::put('admob', [AdminAdmobController::class, 'update'])->middleware('menu:admob');
+
+        Route::get('launch-popup', [AdminLaunchPopupController::class, 'show'])->middleware('menu:banners');
+        Route::put('launch-popup', [AdminLaunchPopupController::class, 'update'])->middleware('menu:banners');
 
         Route::prefix('flash-sales')->middleware('menu:flash_sales')->group(function () {
             Route::get('/', [AdminFlashSaleController::class, 'index']);

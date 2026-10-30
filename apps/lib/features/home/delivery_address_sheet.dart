@@ -10,12 +10,7 @@ import '../shell/manual_address_screen.dart';
 /// navigation) and closes it again once saved or backed out of.
 Future<void> _pushManualAddress(NavigatorState navigator) {
   return navigator.push(
-    MaterialPageRoute<void>(
-      builder: (_) => ManualAddressScreen(
-        onBack: navigator.pop,
-        onSaved: navigator.pop,
-      ),
-    ),
+    manualAddressRoute(onBack: navigator.pop, onSaved: navigator.pop),
   );
 }
 

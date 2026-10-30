@@ -2,6 +2,7 @@
 
 use App\Models\AdminUser;
 use App\Models\ChatThread;
+use App\Models\Order;
 use App\Models\User;
 use App\Services\ChatService;
 use App\Support\Permissions\AdminMenu;
@@ -13,6 +14,10 @@ Broadcast::channel('admin.dashboard', fn ($user) => $user instanceof AdminUser &
 
 // A user's own channel: signals that one of their direct-message threads changed.
 Broadcast::channel('user.{userId}', fn ($user, string $userId) => $user instanceof User && (string) $user->id === $userId);
+
+// The buyer's tracking map (App\Events\OrderTrackingUpdated): signals that the courier moved.
+Broadcast::channel('order-tracking.{orderId}', fn ($user, string $orderId) => $user instanceof User
+    && Order::whereKey($orderId)->where('user_id', $user->id)->exists());
 
 Broadcast::channel('chat-thread.{threadId}', function (User $user, string $threadId) {
     $thread = ChatThread::find($threadId);

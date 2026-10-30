@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Http\Controllers\Api\V1\RegionController;
+use App\Models\ServiceArea;
 use App\Models\ServiceCity;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -24,46 +26,77 @@ class RegionLocator
      */
     public function nearest(float $lat, float $lng): ?array
     {
-        $cityCodes = ServiceCity::activeCodes() ?? RegionController::defaultCityCodes();
-
-        $rows = DB::table('indonesia_villages as v')
-            ->join('indonesia_districts as d', 'd.code', '=', 'v.district_code')
-            ->join('indonesia_cities as c', 'c.code', '=', 'd.city_code')
-            ->whereIn('c.code', $cityCodes)
-            ->get([
-                'v.code as village_code',
-                'v.name as village_name',
-                'v.meta',
-                'd.code as district_code',
-                'd.name as district_name',
-                'c.code as city_code',
-                'c.name as city_name',
-                'c.province_code',
-            ]);
-
         $best = null;
         $bestDistance = self::MAX_DISTANCE_KM;
 
-        foreach ($rows as $row) {
-            $meta = json_decode($row->meta ?? '', true);
-            if (! is_array($meta) || ! is_numeric($meta['lat'] ?? null) || ! is_numeric($meta['long'] ?? null)) {
-                continue;
-            }
-
-            $distance = $this->haversineKm($lat, $lng, (float) $meta['lat'], (float) $meta['long']);
+        foreach ($this->candidates() as $c) {
+            $distance = $this->haversineKm($lat, $lng, $c['lat'], $c['lng']);
             if ($distance < $bestDistance) {
                 $bestDistance = $distance;
-                $best = [
-                    'province_code' => trim($row->province_code),
-                    'city_code' => trim($row->city_code),
-                    'district_code' => trim($row->district_code),
-                    'village_code' => trim($row->village_code),
-                    'label' => $this->label($row->village_name, $row->district_name, $row->city_name),
-                ];
+                $best = $c['address'];
             }
         }
 
         return $best;
+    }
+
+    /**
+     * Every served village with usable coordinates. Building this means a
+     * join over all villages plus a JSON decode per row, so it is cached; the
+     * key carries the coverage, so saving Cakupan Wilayah picks a fresh list.
+     *
+     * @return list<array{lat: float, lng: float, address: array<string, string>}>
+     */
+    private function candidates(): array
+    {
+        $cityCodes = ServiceCity::activeCodes() ?? RegionController::defaultCityCodes();
+        $restrictions = ServiceArea::restrictions();
+
+        $key = 'region_locator:'.md5(json_encode([$cityCodes, $restrictions]));
+
+        return Cache::remember($key, now()->addHours(12), function () use ($cityCodes, $restrictions) {
+            $rows = DB::table('indonesia_villages as v')
+                ->join('indonesia_districts as d', 'd.code', '=', 'v.district_code')
+                ->join('indonesia_cities as c', 'c.code', '=', 'd.city_code')
+                ->whereIn('c.code', $cityCodes)
+                ->get([
+                    'v.code as village_code',
+                    'v.name as village_name',
+                    'v.meta',
+                    'd.code as district_code',
+                    'd.name as district_name',
+                    'c.code as city_code',
+                    'c.name as city_name',
+                    'c.province_code',
+                ]);
+
+            $list = [];
+
+            foreach ($rows as $row) {
+                if (! ServiceArea::allows($restrictions, $row->city_code, $row->district_code, $row->village_code)) {
+                    continue;
+                }
+
+                $meta = json_decode($row->meta ?? '', true);
+                if (! is_array($meta) || ! is_numeric($meta['lat'] ?? null) || ! is_numeric($meta['long'] ?? null)) {
+                    continue;
+                }
+
+                $list[] = [
+                    'lat' => (float) $meta['lat'],
+                    'lng' => (float) $meta['long'],
+                    'address' => [
+                        'province_code' => trim($row->province_code),
+                        'city_code' => trim($row->city_code),
+                        'district_code' => trim($row->district_code),
+                        'village_code' => trim($row->village_code),
+                        'label' => $this->label($row->village_name, $row->district_name, $row->city_name),
+                    ],
+                ];
+            }
+
+            return $list;
+        });
     }
 
     /** "Village, District, City", or null when the village is unknown. */

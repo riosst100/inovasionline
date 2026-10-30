@@ -1,5 +1,6 @@
 import '../core/api/api_client.dart';
 import '../models/order.dart';
+import '../models/order_tracking.dart';
 
 class OrderService {
   OrderService(this._apiClient);
@@ -19,6 +20,11 @@ class OrderService {
   Future<Order> cancel(String orderId) async {
     final response = await _apiClient.dio.post('/orders/$orderId/cancel');
     return Order.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<OrderTracking> tracking(String orderId) async {
+    final response = await _apiClient.dio.get('/orders/$orderId/tracking');
+    return OrderTracking.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
   /// Pauses the cancel countdown while the buyer reads the confirmation.

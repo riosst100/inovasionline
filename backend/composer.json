@@ -8,13 +8,16 @@
     "require": {
         "php": "^8.2",
         "google/apiclient": "^2.18",
+        "http-interop/http-factory-guzzle": "^1.2",
         "intervention/image": "*",
         "kreait/laravel-firebase": "^6.2",
         "laravel/framework": "^12.0",
         "laravel/reverb": "^1.11",
         "laravel/sanctum": "^4.0",
+        "laravel/scout": "^10.13",
         "laravel/tinker": "^2.10.1",
         "laravolt/indonesia": "^0.41.0",
+        "meilisearch/meilisearch-php": "^1.12",
         "phpoffice/phpspreadsheet": "^5.9"
     },
     "require-dev": {

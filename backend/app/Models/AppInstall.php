@@ -24,6 +24,11 @@ class AppInstall extends Model
         'device_details',
         'first_ip_address',
         'ip_address',
+        'latitude',
+        'longitude',
+        'location_accuracy',
+        'location_at',
+        'user_agent',
         'user_id',
         'platform',
         'app_version',
@@ -38,6 +43,10 @@ class AppInstall extends Model
         return [
             'is_emulator' => 'boolean',
             'device_details' => 'array',
+            'latitude' => 'float',
+            'longitude' => 'float',
+            'location_accuracy' => 'float',
+            'location_at' => 'datetime',
             'first_seen_at' => 'datetime',
             'last_seen_at' => 'datetime',
         ];

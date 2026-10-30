@@ -178,6 +178,9 @@ class Order {
 
   bool get isStorePickup => deliveryMethod == 'store_pickup';
 
+  /// A courier is carrying it: the buyer can follow the courier on the map.
+  bool get canTrack => status == 'on_delivery' && !isStorePickup;
+
   /// New orders start as processing; only unpaid online payments sit in pending.
   String get statusLabel => switch (status) {
         'pending' => 'Menunggu Pembayaran',

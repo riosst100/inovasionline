@@ -15,14 +15,18 @@ class BannerService
      */
     public function create(array $data, ?UploadedFile $image = null): Banner
     {
-        $nextSortOrder = ((int) Banner::query()->max('sort_order')) + 1;
+        $placement = $data['placement'] ?? Banner::PLACEMENT_SLIDER;
+        $nextSortOrder = ((int) Banner::query()->where('placement', $placement)->max('sort_order')) + 1;
         $imagePath = $image !== null ? ImageOptimizer::store($image, 'banners', 1600) : ($data['image_url'] ?? '');
 
         return Banner::create([
             'name' => $data['name'],
             'image_path' => $imagePath,
             'link_url' => $data['link_url'] ?? null,
+            'placement' => $placement,
             'is_active' => isset($data['is_active']) ? filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN) : true,
+            'starts_on' => $data['starts_on'] ?? null,
+            'ends_on' => $data['ends_on'] ?? null,
             'sort_order' => $data['sort_order'] ?? $nextSortOrder,
         ]);
     }

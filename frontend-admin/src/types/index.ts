@@ -65,6 +65,41 @@ export interface DriverOrder {
 
 export type BannableFeature = 'chat' | 'posts' | 'purchase';
 
+/** An app install with no linked account (never registered / logged in). */
+export interface GuestInstall {
+  id: string;
+  install_id: string;
+  device_name: string | null;
+  device_brand: string | null;
+  device_model: string | null;
+  os_version: string | null;
+  is_emulator: boolean;
+  platform: string;
+  app_version: string | null;
+  ip_address: string | null;
+  current_screen: string | null;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+}
+
+export interface GuestInstallDetail extends GuestInstall {
+  device_id: string | null;
+  first_ip_address: string | null;
+  build_number: number | null;
+  user_agent: string | null;
+  device_details: Record<string, unknown> | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_accuracy: number | null;
+  location_at: string | null;
+  user: { id: string; name: string } | null;
+  contacts_count: number;
+  contacts: { name: string | null; phone: string }[];
+  same_device_installs: { id: string; install_id: string; user_id: string | null; last_seen_at: string | null }[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -126,6 +161,7 @@ export interface CustomerDetail {
     registered_at: string | null;
     updated_at: string | null;
   }[];
+  app_installs: GuestInstallDetail[];
   ip_addresses: {
     ip_address: string;
     login_count: number;
@@ -213,15 +249,33 @@ export interface PaginatedData<T> {
   total: number;
 }
 
+/** slider = home hero carousel, popup = image popup shown once a day on opening the app. */
+export type BannerPlacement = 'slider' | 'popup';
+
 export interface Banner {
   id: string;
   name: string;
   image_url: string;
   link_url: string | null;
+  placement: BannerPlacement;
   is_active: boolean;
+  /** Popup images only: show from/until these dates (YYYY-MM-DD, WIB); null = no limit. */
+  starts_on?: string | null;
+  ends_on?: string | null;
   sort_order: number;
   created_at?: string;
   updated_at?: string;
+}
+
+export type LaunchPopupMode = 'off' | 'admob' | 'image';
+
+export interface LaunchPopupSettings {
+  mode: LaunchPopupMode;
+  /** ISO weekdays 1 (Senin) – 7 (Minggu); null = every day. */
+  weekdays: number[] | null;
+  max_per_day: number;
+  starts_on: string | null;
+  ends_on: string | null;
 }
 
 export interface AdminSession {
@@ -370,6 +424,23 @@ export interface FreeShippingSettings {
   min_subtotal: number | null;
   payment_method_ids: string[];
   shipping_method_ids: string[];
+}
+
+export type BankAccountType = 'bank_transfer' | 'ewallet';
+
+/** Admin-owned bank or e-wallet account used for manual checkout and manual top-up transfers. */
+export interface BankAccount {
+  id: string;
+  type: BankAccountType;
+  name: string;
+  bank_name: string | null;
+  account_number: string | null;
+  account_holder_name: string | null;
+  description: string | null;
+  instructions: string | null;
+  is_enabled: boolean;
+  sort_order: number;
+  created_at?: string;
 }
 
 export interface PaymentMethodOption {
@@ -685,10 +756,29 @@ export interface AdmobSettings {
   ssv_callback_url?: string;
 }
 
+export interface AppCacheGroup {
+  key: string;
+  label: string;
+  description: string;
+  /** Naik setiap kali datanya berubah atau cache disegarkan */
+  version: number;
+  /** Terakhir kali versinya naik; null bila belum pernah */
+  updated_at: string | null;
+}
+
 export interface ServiceCityOptions {
   /** Kode kota yang dijangkau aplikasi */
   selected: string[];
+  /** Kecamatan / desa yang mempersempit kota terpilih; kota tanpa baris di sini dijangkau seluruhnya */
+  areas: ServiceAreaEntry[];
   provinces: { code: string; name: string; cities: RegionItem[] }[];
+}
+
+export interface ServiceAreaEntry {
+  level: 'district' | 'village';
+  code: string;
+  city_code: string;
+  district_code: string;
 }
 
 export type FlashSaleStatus = 'running' | 'upcoming' | 'ended' | 'inactive';

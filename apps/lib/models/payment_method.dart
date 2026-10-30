@@ -51,6 +51,9 @@ class PaymentMethod {
   /// Section heading in the checkout picker.
   bool get isWallet => type == 'wallet';
   bool get isPaylater => type == 'paylater';
+  bool get isBankTransfer => type == 'bank_transfer';
+  bool get isEwallet => type == 'ewallet';
+  bool get isManualAccount => isBankTransfer || isEwallet;
 
   /// COD and Paylater share the one-time face check.
   bool get needsFaceVerification => isCod || isPaylater;
@@ -58,9 +61,23 @@ class PaymentMethod {
   /// Cash on delivery; the backend calls it cash_on_delivery.
   bool get isCod => type == 'cod' || type == 'cash_on_delivery';
 
+  /// Formatted account number & holder name for manual bank/e-wallet accounts.
+  String? get manualAccountSummary {
+    if (!isManualAccount) return null;
+    final parts = <String>[
+      if (accountNumber != null && accountNumber!.isNotEmpty) accountNumber!,
+      if (accountHolderName != null && accountHolderName!.isNotEmpty)
+        'a.n. $accountHolderName',
+    ];
+    if (parts.isNotEmpty) return parts.join(' · ');
+    return bankName ?? description;
+  }
+
   String get group {
     if (isWallet) return 'Saldo';
     if (isCod) return 'Bayar di Tempat';
+    if (isBankTransfer) return 'Transfer Bank (Manual)';
+    if (isEwallet) return 'E-Wallet (Manual)';
     if (type != 'payment_gateway') return 'Lainnya';
     final channel = gatewayChannel;
     if (channel == null) return 'Pembayaran Online';

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common.dart';
+import '../bank_accounts/bank_account_list_screen.dart';
 import '../cod/cod_verification_screen.dart';
 import '../customers/customer_list_screen.dart';
 import '../delivery/delivery_schedule_screen.dart';
@@ -75,6 +76,15 @@ class AccountScreen extends ConsumerWidget {
                     context,
                   ).push(MaterialPageRoute<void>(builder: (_) => const DeliveryScheduleScreen())),
                 ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.account_balance_outlined),
+                  title: const Text('Bank & E-Wallet'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => const BankAccountListScreen())),
+                ),
               ],
             ),
           ),
@@ -91,7 +101,7 @@ class AccountScreen extends ConsumerWidget {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.logout,color: AppColors.destructive),
+                  leading: const Icon(Icons.logout, color: AppColors.destructive),
                   title: const Text('Keluar', style: TextStyle(color: AppColors.destructive)),
                   onTap: () async {
                     final ok = await confirm(
