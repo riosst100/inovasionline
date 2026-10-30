@@ -44,7 +44,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _searchKey = GlobalKey();
   int _selectedTab = 0;
   bool _defaultAddressAttempted = false;
-  double _offset = 0;
+  /// Scroll position (0..400). Only the sticky search bar follows it, through a
+  /// [ValueListenableBuilder], so scrolling does not rebuild the whole page.
+  final _offset = ValueNotifier<double>(0);
   double _locationHeight = 50;
   double _searchHeight = 36;
 
@@ -53,7 +55,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     _scrollController.addListener(() {
       final offset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-      if ((offset - _offset).abs() > 0.5) setState(() => _offset = offset.clamp(0.0, 400.0));
+      final clamped = offset.clamp(0.0, 400.0);
+      if ((clamped - _offset.value).abs() > 0.5) _offset.value = clamped;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeSetDefaultAddress());
     HomePopup.scheduleOn(this, ref);
@@ -99,6 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _offset.dispose();
     super.dispose();
   }
 
@@ -125,12 +129,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final flashSale = ref.watch(flashSaleProvider);
     final bestSellers = ref.watch(bestSellersProvider);
     final popularProducts = ref.watch(popularProductsProvider);
-    final cartState = ref.watch(cartProvider);
-    final cartItemCount = cartState.cart?.itemCount ?? 0;
-    final hasActiveOrder = (ref.watch(activeOrdersProvider).valueOrNull ?? const []).isNotEmpty;
+    // Only the numbers the page shows, so unrelated cart/order changes do not rebuild it.
+    final cartItemCount = ref.watch(cartProvider.select((state) => state.cart?.itemCount ?? 0));
+    final hasActiveOrder = ref.watch(
+      activeOrdersProvider.select((orders) => (orders.valueOrNull ?? const []).isNotEmpty),
+    );
 
     final topPadding = MediaQuery.of(context).padding.top;
-    final headerOpacity = ((_offset - (_locationHeight - 20)) / 40).clamp(0.0, 1.0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _measureHeader();
     });
@@ -267,37 +272,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             // Search bar: scrolls up with the page, then sticks to the top and turns solid
-            Positioned(
-              top: (_locationHeight - _offset).clamp(0.0, _locationHeight),
-              left: 0,
-              right: 0,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: headerOpacity),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15 * headerOpacity),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+            ValueListenableBuilder<double>(
+              valueListenable: _offset,
+              child: Padding(
+                padding: EdgeInsets.only(top: topPadding + 12, bottom: 6),
+                child: KeyedSubtree(
+                  key: _searchKey,
+                  child: _TopSearchBar(cartItemCount: cartItemCount),
+                ),
+              ),
+              builder: (context, offset, searchBar) {
+                final headerOpacity = ((offset - (_locationHeight - 20)) / 40).clamp(0.0, 1.0);
+                return Positioned(
+                  top: (_locationHeight - offset).clamp(0.0, _locationHeight),
+                  left: 0,
+                  right: 0,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: headerOpacity),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15 * headerOpacity),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                      searchBar!,
+                    ],
                   ),
-                  Padding(
-                    padding: EdgeInsets.only(top: topPadding + 12, bottom: 6),
-                    child: KeyedSubtree(
-                      key: _searchKey,
-                      child: _TopSearchBar(cartItemCount: cartItemCount),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),

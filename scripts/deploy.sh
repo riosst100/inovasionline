@@ -25,22 +25,35 @@ chown -R www-data:www-data storage bootstrap/cache
 php artisan queue:restart
 systemctl reload "$PHP_FPM_SERVICE"
 
-# Build a Next.js app in $1 and (re)start it under pm2 as $2 on 127.0.0.1:$3.
+# Install deps in $1 and (re)start it under pm2 as $2 on 127.0.0.1:$3.
+# With PREBUILT_DIR set, the .next build comes from CI ($PREBUILT_DIR/$4.tgz) instead of being built here;
+# no bundle there means the app didn't change, so it is skipped.
 deploy_next_app() {
-  local dir="$1" name="$2" port="$3"
+  local dir="$1" name="$2" port="$3" bundle="$4"
+  if [ -n "${PREBUILT_DIR:-}" ] && [ ! -f "$PREBUILT_DIR/$bundle.tgz" ]; then
+    echo "==> $dir unchanged, skipping"
+    return
+  fi
   cd "$ROOT/$dir"
   export NEXT_TELEMETRY_DISABLED=1
-  npm ci --no-audit --no-fund
-  # Keep the last good build so a failed build doesn't leave the running app without one.
-  rm -rf .next.prev
-  [ -d .next ] && cp -a .next .next.prev
-  if ! npm run build; then
-    echo "!! Build failed, restoring previous .next" >&2
+  # Incremental install (keeps node_modules); devDependencies stay because next.config.ts needs typescript.
+  npm install --no-audit --no-fund
+  if [ -n "${PREBUILT_DIR:-}" ] && [ -f "$PREBUILT_DIR/$bundle.tgz" ]; then
     rm -rf .next
-    [ -d .next.prev ] && mv .next.prev .next
-    exit 1
+    tar -xzf "$PREBUILT_DIR/$bundle.tgz"
+    rm -f "$PREBUILT_DIR/$bundle.tgz"
+  else
+    # Keep the last good build so a failed build doesn't leave the running app without one.
+    rm -rf .next.prev
+    [ -d .next ] && cp -a .next .next.prev
+    if ! npm run build; then
+      echo "!! Build failed, restoring previous .next" >&2
+      rm -rf .next
+      [ -d .next.prev ] && mv .next.prev .next
+      exit 1
+    fi
+    rm -rf .next.prev
   fi
-  rm -rf .next.prev
   if pm2 describe "$name" >/dev/null 2>&1; then
     pm2 restart "$name" --update-env
   else
@@ -49,12 +62,12 @@ deploy_next_app() {
 }
 
 echo "==> Frontend admin"
-deploy_next_app frontend-admin "$PM2_APP_NAME" "$ADMIN_PORT"
+deploy_next_app frontend-admin "$PM2_APP_NAME" "$ADMIN_PORT" frontend-admin-next
 
 echo "==> Frontend (inovasionline.com)"
 NEXT_PUBLIC_SITE_URL=https://inovasionline.com \
 NEXT_PUBLIC_API_URL=https://api.inovasionline.com/api/v1 \
-  deploy_next_app frontend "$WEB_PM2_APP_NAME" "$WEB_PORT"
+  deploy_next_app frontend "$WEB_PM2_APP_NAME" "$WEB_PORT" frontend-next
 
 pm2 save
 

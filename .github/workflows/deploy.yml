@@ -11,8 +11,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Which frontends changed in this push? Unchanged ones are neither built nor redeployed.
+  # Manual runs, new branches and unreadable history build everything.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      admin: ${{ steps.diff.outputs.admin }}
+      web: ${{ steps.diff.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          before="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" != "push" ] || [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]              || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+            echo "admin=true" >> "$GITHUB_OUTPUT"; echo "web=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          changed() { git diff --quiet "$before" "${{ github.sha }}" -- "$1" && echo false || echo true; }
+          echo "admin=$(changed frontend-admin)" >> "$GITHUB_OUTPUT"
+          echo "web=$(changed frontend)" >> "$GITHUB_OUTPUT"
+
   frontend-admin:
     name: Frontend admin build
+    needs: changes
+    if: needs.changes.outputs.admin == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -29,9 +53,17 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
           NEXT_PUBLIC_API_URL: https://api.inovasionline.com/api
+      - run: tar -czf ../frontend-admin-next.tgz .next
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-admin-next
+          path: frontend-admin-next.tgz
+          retention-days: 1
 
   frontend:
     name: Frontend build
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,6 +81,12 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
           NEXT_PUBLIC_SITE_URL: https://inovasionline.com
           NEXT_PUBLIC_API_URL: https://api.inovasionline.com/api/v1
+      - run: tar -czf ../frontend-next.tgz .next
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-next
+          path: frontend-next.tgz
+          retention-days: 1
 
   backend:
     name: Backend install check
@@ -69,8 +107,25 @@ jobs:
   deploy:
     name: Deploy to VPS
     needs: [frontend-admin, frontend, backend]
+    # Skipped frontend builds are fine; failed or cancelled ones are not.
+    if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
+      - run: mkdir builds && date > builds/manifest.txt
+      - uses: actions/download-artifact@v4
+        with:
+          path: builds
+          pattern: "*-next"
+          merge-multiple: true
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "builds/*"
+          strip_components: 1
+          target: /tmp/inovasionline-builds
       - uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -83,4 +138,4 @@ jobs:
             cd /var/www/html/inovasionline
             git fetch --prune origin main
             git reset --hard origin/main
-            bash scripts/deploy.sh
+            PREBUILT_DIR=/tmp/inovasionline-builds bash scripts/deploy.sh
