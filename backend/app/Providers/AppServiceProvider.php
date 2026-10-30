@@ -44,5 +44,8 @@ class AppServiceProvider extends ServiceProvider
             $model::saved(fn () => AdminDataChanged::signal($topic));
             $model::deleted(fn () => AdminDataChanged::signal($topic));
         }
+
+        // Data the mobile app keeps on the phone: bump its version when the source models change.
+        \App\Support\AppCache::listen();
     }
 }

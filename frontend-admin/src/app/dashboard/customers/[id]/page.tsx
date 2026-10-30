@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import AdminLayout from '../../../../components/layout/AdminLayout';
 import VerificationStatus from '../../../../components/customers/VerificationStatus';
+import InstallDetailView from '../../../../components/customers/InstallDetail';
 import LastSeen from '../../../../components/customers/LastSeen';
 import { adminApi, ApiError } from '../../../../lib/api';
 import { CustomerDetail, LoginMethod } from '../../../../types';
@@ -279,6 +280,19 @@ function CustomerDetailPageContent() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </Card>
+
+            {/* Every app install linked to this customer, with all device / network / location info */}
+            <Card title={`Perangkat & Aplikasi (${data.app_installs.length})`} icon={Smartphone}>
+              {data.app_installs.length === 0 ? (
+                <Empty text="Belum ada install aplikasi tercatat." />
+              ) : (
+                <div className="space-y-6 p-5">
+                  {data.app_installs.map((inst) => (
+                    <InstallDetailView key={inst.id} g={inst} />
+                  ))}
                 </div>
               )}
             </Card>

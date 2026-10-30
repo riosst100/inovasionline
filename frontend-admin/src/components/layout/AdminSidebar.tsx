@@ -57,6 +57,7 @@ import {
   Scale,
   Code,
   X,
+  RefreshCw,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -164,6 +165,7 @@ export const NAV_SECTIONS: NavSection[] = [
           { name: 'Bank & E-Wallet', href: '/dashboard/settings/bank-accounts', icon: Landmark, perm: 'bank_accounts' },
           { name: 'Badge Menu', href: '/dashboard/settings/nav-badge', icon: Tag, perm: 'nav_badge' },
           { name: 'Update Aplikasi', href: '/dashboard/settings/app-update', icon: Smartphone, perm: 'app_update' },
+          { name: 'Cache Aplikasi', href: '/dashboard/settings/app-cache', icon: RefreshCw, perm: 'app_cache' },
           { name: 'Status Pesanan', href: '/dashboard/order-statuses', icon: ListChecks, perm: 'order_statuses' },
           { name: 'Metode Pengiriman', href: '/dashboard/shipping-methods', icon: PackageCheck, perm: 'shipping_methods' },
           { name: 'Pembatalan Pesanan', href: '/dashboard/settings/order-cancellation', icon: Timer, perm: 'order_cancellation' },

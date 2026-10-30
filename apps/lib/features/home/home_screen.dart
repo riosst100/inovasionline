@@ -161,12 +161,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   silent(ref.refresh(adChestProvider.future).then((_) {})),
                 ]);
               },
-              child: ListView(
+              child: CustomScrollView(
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
-                // Room for the floating active-order card only while it shows.
-                padding: EdgeInsets.only(bottom: hasActiveOrder ? 90 : 16),
-                children: [
+                slivers: [
+                  SliverList(
+                    delegate: SliverChildListDelegate([
                   // Top Header Backdrop (Brand green gradient + Petal pattern)
                   _HomeTopBackdrop(
                     child: Column(
@@ -241,7 +241,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     emptyHeight: 28,
                   ),
 
-                  // 7. Inspirasi Untukmu / Curated Product Feed with Tabs
+                    ]),
+                  ),
+
+                  // 7. Inspirasi Untukmu / Curated Product Feed with Tabs. A sliver, so the
+                  // product grid only builds the cards that are on screen.
                   _InspirasiUntukmuSection(
                     selectedTab: _selectedTab,
                     onTabChanged: (index) => setState(() => _selectedTab = index),
@@ -251,10 +255,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     loading: [bestSellers, popularProducts, flashSale].any((p) => p.isLoading && !p.hasValue),
                   ),
 
-                  const AdBanner(
-                    placement: AdPlacement.homeBottom,
-                    padding: EdgeInsets.only(top: 16),
+                  const SliverToBoxAdapter(
+                    child: AdBanner(
+                      placement: AdPlacement.homeBottom,
+                      padding: EdgeInsets.only(top: 16),
+                    ),
                   ),
+                  // Room for the floating active-order card only while it shows.
+                  SliverToBoxAdapter(child: SizedBox(height: hasActiveOrder ? 90 : 16)),
                 ],
               ),
             ),
@@ -1318,7 +1326,7 @@ class _WalletAction extends StatelessWidget {
 // ==========================================
 // 4. PROMO GERCEP (Flash Sale with Countdown)
 // ==========================================
-class _PromoGercepSection extends StatefulWidget {
+class _PromoGercepSection extends StatelessWidget {
   const _PromoGercepSection({
     required this.slotLabel,
     required this.products,
@@ -1330,50 +1338,7 @@ class _PromoGercepSection extends StatefulWidget {
   final DateTime? endsAt;
 
   @override
-  State<_PromoGercepSection> createState() => _PromoGercepSectionState();
-}
-
-class _PromoGercepSectionState extends State<_PromoGercepSection> {
-  Timer? _countdownTimer;
-  Duration _timeLeft = const Duration(hours: 1, minutes: 24, seconds: 35);
-
-  @override
-  void initState() {
-    super.initState();
-    _initTime();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      if (_timeLeft.inSeconds > 0) {
-        setState(() => _timeLeft = _timeLeft - const Duration(seconds: 1));
-      }
-    });
-  }
-
-  void _initTime() {
-    if (widget.endsAt != null) {
-      final diff = widget.endsAt!.difference(DateTime.now());
-      if (diff.isNegative) {
-        _timeLeft = Duration.zero;
-      } else {
-        _timeLeft = diff;
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _countdownTimer?.cancel();
-    super.dispose();
-  }
-
-  String _formatDigit(int n) => n.toString().padLeft(2, '0');
-
-  @override
   Widget build(BuildContext context) {
-    final hours = _formatDigit(_timeLeft.inHours % 24);
-    final minutes = _formatDigit(_timeLeft.inMinutes % 60);
-    final seconds = _formatDigit(_timeLeft.inSeconds % 60);
-
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: const BoxDecoration(
@@ -1402,22 +1367,7 @@ class _PromoGercepSectionState extends State<_PromoGercepSection> {
                     ),
                     const SizedBox(width: 8),
                     // Live Countdown Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '$hours : $minutes : $seconds',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
+                    _CountdownPill(endsAt: endsAt),
                   ],
                 ),
                 InkWell(
@@ -1446,10 +1396,10 @@ class _PromoGercepSectionState extends State<_PromoGercepSection> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: widget.products.length,
+              itemCount: products.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                final product = widget.products[index];
+                final product = products[index];
                 return SizedBox(
                   width: 154,
                   child: ProductCard(
@@ -1462,6 +1412,79 @@ class _PromoGercepSectionState extends State<_PromoGercepSection> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The red "hh : mm : ss" pill. Ticks on its own so the product list beside it is not rebuilt
+/// every second.
+class _CountdownPill extends StatefulWidget {
+  const _CountdownPill({this.endsAt});
+
+  final DateTime? endsAt;
+
+  @override
+  State<_CountdownPill> createState() => _CountdownPillState();
+}
+
+class _CountdownPillState extends State<_CountdownPill> {
+  Timer? _timer;
+  Duration _timeLeft = const Duration(hours: 1, minutes: 24, seconds: 35);
+
+  @override
+  void initState() {
+    super.initState();
+    _initTime();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_timeLeft.inSeconds > 0) {
+        setState(() => _timeLeft = _timeLeft - const Duration(seconds: 1));
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(_CountdownPill oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.endsAt != widget.endsAt) _initTime();
+  }
+
+  void _initTime() {
+    final endsAt = widget.endsAt;
+    if (endsAt == null) return;
+    final diff = endsAt.difference(DateTime.now());
+    _timeLeft = diff.isNegative ? Duration.zero : diff;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _digit(int n) => n.toString().padLeft(2, '0');
+
+  @override
+  Widget build(BuildContext context) {
+    final hours = _digit(_timeLeft.inHours % 24);
+    final minutes = _digit(_timeLeft.inMinutes % 60);
+    final seconds = _digit(_timeLeft.inSeconds % 60);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEF4444),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$hours : $minutes : $seconds',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
@@ -1827,11 +1850,18 @@ class _InspirasiUntukmuSection extends StatelessWidget {
         break;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final gridDelegate = ProductGridDelegate(
+      textScale: MediaQuery.textScalerOf(context).scale(1),
+    );
+
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           const Text(
             'Inspirasi Untukmu',
             style: TextStyle(
@@ -1893,45 +1923,50 @@ class _InspirasiUntukmuSection extends StatelessWidget {
           ),
 
           const SizedBox(height: 16),
-
-          // 2-Column Responsive Product Grid
-          if (activeProducts.isEmpty && loading)
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 4,
-              gridDelegate: ProductGridDelegate(
-                textScale: MediaQuery.textScalerOf(context).scale(1),
+              ],
+            ),
+          ),
+        ),
+        if (activeProducts.isEmpty && loading)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverGrid(
+              gridDelegate: gridDelegate,
+              delegate: SliverChildBuilderDelegate(
+                (_, _) => const ProductTileSkeleton(),
+                childCount: 4,
               ),
-              itemBuilder: (_, _) => const ProductTileSkeleton(),
-            )
-          else if (activeProducts.isEmpty)
-            const Padding(
+            ),
+          )
+        else if (activeProducts.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(
                 child: Text('Belum ada produk pilihan.'),
               ),
-            )
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: activeProducts.length,
-              gridDelegate: ProductGridDelegate(
-                textScale: MediaQuery.textScalerOf(context).scale(1),
-              ),
-              itemBuilder: (context, index) {
-                final product = activeProducts[index];
-                return ProductCard(
-                  product: product,
-                  compact: true,
-                  badgeText: selectedTab == 1 ? 'Terlaris' : 'Premium',
-                  onTap: () => context.push('/products/${product.slug}'),
-                );
-              },
             ),
-        ],
-      ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverGrid(
+              gridDelegate: gridDelegate,
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final product = activeProducts[index];
+                  return ProductCard(
+                    product: product,
+                    compact: true,
+                    badgeText: selectedTab == 1 ? 'Terlaris' : 'Premium',
+                    onTap: () => context.push('/products/${product.slug}'),
+                  );
+                },
+                childCount: activeProducts.length,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RegionResource;
+use App\Models\ServiceArea;
 use App\Models\ServiceCity;
 use App\Services\RegionLocator;
 use App\Support\Responses\ApiResponse;
@@ -89,10 +90,27 @@ class RegionController extends Controller
 
     public function districts(Request $request, string $cityCode): JsonResponse
     {
+        $rule = ServiceArea::restrictions()[trim($cityCode)] ?? null;
+
         $districts = District::query()
             ->where('city_code', $cityCode)
             ->orderBy('name')
             ->get();
+
+        // A city narrowed to some areas only offers the districts that hold one.
+        if ($rule !== null) {
+            $withVillages = $rule['villages'] === []
+                ? []
+                : Village::query()
+                    ->whereIn('code', array_keys($rule['villages']))
+                    ->pluck('district_code')
+                    ->map(fn ($c) => trim($c))
+                    ->all();
+
+            $districts = $districts->filter(
+                fn ($d) => isset($rule['districts'][trim($d->code)]) || in_array(trim($d->code), $withVillages, true)
+            )->values();
+        }
 
         return ApiResponse::success(RegionResource::collection($districts), 'Districts retrieved successfully.')
             ->header('Cache-Control', 'public, max-age=3600');
@@ -104,6 +122,13 @@ class RegionController extends Controller
             ->where('district_code', $districtCode)
             ->orderBy('name')
             ->get();
+
+        $cityCode = District::query()->where('code', $districtCode)->value('city_code');
+        $rule = $cityCode === null ? null : (ServiceArea::restrictions()[trim($cityCode)] ?? null);
+
+        if ($rule !== null && ! isset($rule['districts'][trim($districtCode)])) {
+            $villages = $villages->filter(fn ($v) => isset($rule['villages'][trim($v->code)]))->values();
+        }
 
         return ApiResponse::success(RegionResource::collection($villages), 'Villages retrieved successfully.')
             ->header('Cache-Control', 'public, max-age=3600');

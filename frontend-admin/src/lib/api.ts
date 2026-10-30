@@ -1,4 +1,4 @@
-import { ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CustomerDetail, PermissionCatalog, PaginatedData, Banner, LaunchPopupSettings, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, BankAccount, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { AppCacheGroup, ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, GuestInstall, GuestInstallDetail, CustomerDetail, PermissionCatalog, PaginatedData, Banner, LaunchPopupSettings, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, BankAccount, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -294,6 +294,18 @@ export const adminApi = {
     if (params?.page) query.append('page', params.page.toString());
 
     return apiRequest<PaginatedData<Customer>>(`/admin/customers?${query.toString()}`);
+  },
+
+  /** App installs that never registered/logged in. */
+  async getGuests(params?: { search?: string }): Promise<GuestInstall[]> {
+    const query = new URLSearchParams({ per_page: '200' });
+    if (params?.search) query.append('search', params.search);
+
+    return apiRequest<GuestInstall[]>(`/admin/customers/guests?${query.toString()}`);
+  },
+
+  async getGuest(id: string): Promise<GuestInstallDetail> {
+    return apiRequest<GuestInstallDetail>(`/admin/customers/guests/${id}`);
   },
 
   async createCustomer(data: { name: string; email: string; phone?: string; password: string }): Promise<Customer> {
@@ -596,6 +608,12 @@ export const adminApi = {
     const data = await apiRequest<ServiceCityOptions>('/admin/service-cities');
     return {
       selected: data.selected.map((c) => c.trim()),
+      areas: (data.areas ?? []).map((a) => ({
+        ...a,
+        code: a.code.trim(),
+        city_code: a.city_code.trim(),
+        district_code: a.district_code.trim(),
+      })),
       provinces: data.provinces.map((p) => ({
         ...p,
         code: p.code.trim(),
@@ -604,11 +622,32 @@ export const adminApi = {
     };
   },
 
-  async saveServiceCities(cities: string[]): Promise<void> {
+  async saveServiceCities(cities: string[], areas: { level: 'district' | 'village'; code: string }[]): Promise<void> {
     return apiRequest<void>('/admin/service-cities', {
       method: 'PUT',
-      body: JSON.stringify({ cities }),
+      body: JSON.stringify({ cities, areas }),
     });
+  },
+
+  async getServiceDistricts(cityCode: string): Promise<RegionItem[]> {
+    return trimCodes(await apiRequest<RegionItem[]>(`/admin/service-cities/${cityCode}/districts`));
+  },
+
+  async getServiceVillages(districtCode: string): Promise<RegionItem[]> {
+    return trimCodes(await apiRequest<RegionItem[]>(`/admin/service-cities/districts/${districtCode}/villages`));
+  },
+
+  async getAppCache(): Promise<AppCacheGroup[]> {
+    const data = await apiRequest<{ groups: AppCacheGroup[] }>('/admin/app-cache');
+    return data.groups;
+  },
+
+  async invalidateAppCache(groups: string[]): Promise<AppCacheGroup[]> {
+    const data = await apiRequest<{ groups: AppCacheGroup[] }>('/admin/app-cache/invalidate', {
+      method: 'POST',
+      body: JSON.stringify({ groups }),
+    });
+    return data.groups;
   },
 
   async getServiceFee(): Promise<ServiceFeeSettings> {

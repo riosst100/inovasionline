@@ -188,28 +188,45 @@ class _PromoBadge extends StatefulWidget {
 
 class _PromoBadgeState extends State<_PromoBadge>
     with SingleTickerProviderStateMixin {
-  /// One cycle: the shine sweeps during the first [_sweepPortion], then rests.
-  static const _cycle = Duration(milliseconds: 3200);
-  static const _sweepPortion = 0.3;
+  /// The shine sweeps for [_sweep], then rests for [_rest]. The controller only runs during the
+  /// sweep: ticking through the rest would keep the app drawing 60 frames a second for nothing.
+  static const _sweep = Duration(milliseconds: 960);
+  static const _rest = Duration(milliseconds: 2240);
 
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: _cycle,
+    duration: _sweep,
   );
+  bool _looping = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Honour the system "remove animations" accessibility setting.
     if (MediaQuery.disableAnimationsOf(context)) {
+      _looping = false;
       _controller.stop();
-    } else if (!_controller.isAnimating) {
-      _controller.repeat();
+    } else if (!_looping) {
+      _looping = true;
+      _loop();
+    }
+  }
+
+  Future<void> _loop() async {
+    while (mounted && _looping) {
+      try {
+        await _controller.forward(from: 0);
+      } on TickerCanceled {
+        return;
+      }
+      if (!mounted || !_looping) return;
+      await Future<void>.delayed(_rest);
     }
   }
 
   @override
   void dispose() {
+    _looping = false;
     _controller.dispose();
     super.dispose();
   }
@@ -250,8 +267,8 @@ class _PromoBadgeState extends State<_PromoBadge>
       animation: _controller,
       child: pill,
       builder: (context, child) {
-        final sweep = (_controller.value / _sweepPortion).clamp(0.0, 1.0);
-        if (sweep >= 1) return child!;
+        final sweep = _controller.value;
+        if (sweep <= 0 || sweep >= 1) return child!;
         return ShaderMask(
           blendMode: BlendMode.srcATop,
           shaderCallback: (bounds) => LinearGradient(

@@ -4,22 +4,49 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Disk cache for rarely-changing public GET endpoints, validated with ETag.
+import 'cache_versions.dart';
+
+/// Disk cache for rarely-changing public GET endpoints.
 ///
-/// Every request still asks the server, but sends `If-None-Match`; when nothing changed the server
-/// answers `304` with no body and we serve the saved copy. When the admin changes something the
-/// ETag differs, the server sends fresh data and the saved copy is replaced, so it can never go stale.
+/// Most public endpoints belong to a group with a version number kept by the server
+/// ([CacheVersions]). While a saved copy carries the server's current version (and is not older
+/// than the group's max age) it is served with no request at all. The version goes up when the data
+/// changes (admin edits, stock moving, "Segarkan cache" in the web admin), and the copy is then
+/// fetched again.
+///
+/// Anything else, and any copy whose version cannot be checked, falls back to validation with ETag:
+/// the request is sent with `If-None-Match`, and a `304` answer means the saved copy is still good.
 /// Offline, the saved copy is served instead of an error.
 class ResponseCache {
   ResponseCache._();
 
   /// Endpoints that return the same thing for every user (each must send an ETag).
   static final _public = [
-    RegExp(r'^/(banners|categories|launch-popup|payment-methods|shipping-methods|delivery-schedules|service-fee|free-shipping|flash-sale-slots|app-version|admob-config)$'),
+    RegExp(r'^/(banners|categories|launch-popup|payment-methods|shipping-methods|delivery-schedules|service-fee|free-shipping|flash-sale-slots|app-version|admob-config|nav-badge)$'),
     RegExp(r'^/categories/[^/]+$'),
     RegExp(r'^/products/(flash-sale|best-sellers|[^/]+)$'),
     RegExp(r'^/regions/(provinces|provinces/[^/]+/cities|cities/[^/]+/districts|districts/[^/]+/villages)$'),
   ];
+
+  /// Which version group an endpoint belongs to (names match the server's AppCache::GROUPS).
+  /// Endpoints not listed are always validated with the server.
+  static final _groups = <(RegExp, String)>[
+    (RegExp(r'^/(banners|launch-popup)$'), 'banners'),
+    (RegExp(r'^/categories$'), 'categories'),
+    (RegExp(r'^/(payment-methods|shipping-methods|delivery-schedules|service-fee|free-shipping)$'), 'checkout'),
+    (RegExp(r'^/regions/'), 'regions'),
+    (RegExp(r'^/(app-version|admob-config|nav-badge)$'), 'app_config'),
+    // Shows stock, so it moves whenever someone checks out.
+    (RegExp(r'^/(products/|categories/|flash-sale-slots$)'), 'products'),
+  ];
+
+  static String? groupOf(RequestOptions options) {
+    if (_isPrivate(options)) return null;
+    for (final (pattern, group) in _groups) {
+      if (pattern.hasMatch(options.path)) return group;
+    }
+    return null;
+  }
 
   /// Endpoints that depend on who is signed in. Saved per account (keyed by a hash of the login token),
   /// never shown offline (a stale balance or order status would mislead), and wiped on logout.
@@ -72,7 +99,12 @@ class ResponseCache {
       final file = await _file(key, private: _isPrivate(options));
       if (file == null || !await file.exists()) return null;
       final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-      return _memory[key] = _Entry(json['etag'] as String, json['data']);
+      return _memory[key] = _Entry(
+        json['etag'] as String,
+        json['data'],
+        version: json['v'] as int?,
+        savedAt: json['t'] as int?,
+      );
     } catch (_) {
       return null;
     }
@@ -83,7 +115,12 @@ class ResponseCache {
     _memory[key] = entry;
     try {
       final file = await _file(key, private: _isPrivate(options));
-      await file?.writeAsString(jsonEncode({'etag': entry.etag, 'data': entry.data}));
+      await file?.writeAsString(jsonEncode({
+        'etag': entry.etag,
+        'data': entry.data,
+        'v': entry.version,
+        't': entry.savedAt,
+      }));
     } catch (_) {
       // Cache is best-effort; the response itself is still delivered.
     }
@@ -100,6 +137,23 @@ class ResponseCache {
     } catch (_) {}
   }
 
+  /// The saved copy to answer with, without contacting the server, when its group version still
+  /// matches the server's. Null means: go and ask.
+  static Future<Response<dynamic>?> fresh(RequestOptions options, CacheVersions versions) async {
+    final group = groupOf(options);
+    if (group == null) return null;
+    await versions.ensure();
+    final current = versions.versionOf(group);
+    if (current == null) return null;
+    final entry = await _read(options);
+    if (entry == null || entry.version != current) return null;
+    final savedAt = entry.savedAt;
+    if (savedAt == null) return null;
+    final age = DateTime.now().millisecondsSinceEpoch - savedAt;
+    if (age > versions.maxAgeOf(group) * 1000) return null;
+    return Response<dynamic>(requestOptions: options, statusCode: 200, data: entry.data);
+  }
+
   /// Adds `If-None-Match` and lets `304` through as a normal response.
   static Future<void> prepare(RequestOptions options) async {
     final entry = await _read(options);
@@ -108,19 +162,27 @@ class ResponseCache {
   }
 
   /// Swaps a `304` for the saved body, or saves a fresh `200` that carries an ETag.
-  static Future<void> store(Response<dynamic> response) async {
+  static Future<void> store(Response<dynamic> response, CacheVersions versions) async {
     final options = response.requestOptions;
+    final group = groupOf(options);
+    final version = group == null ? null : versions.versionOf(group);
+    final now = DateTime.now().millisecondsSinceEpoch;
+
     if (response.statusCode == 304) {
       final entry = await _read(options);
       if (entry != null) {
         response
           ..statusCode = 200
           ..data = entry.data;
+        // Confirmed current by the server: the copy now counts as saved at this version.
+        if (version != null) await _write(options, _Entry(entry.etag, entry.data, version: version, savedAt: now));
       }
       return;
     }
     final etag = response.headers.value('etag');
-    if (etag != null && response.data != null) await _write(options, _Entry(etag, response.data));
+    if (etag != null && response.data != null) {
+      await _write(options, _Entry(etag, response.data, version: version, savedAt: now));
+    }
   }
 
   /// The saved copy to show when the network is unreachable.
@@ -133,8 +195,14 @@ class ResponseCache {
 }
 
 class _Entry {
-  const _Entry(this.etag, this.data);
+  const _Entry(this.etag, this.data, {this.version, this.savedAt});
 
   final String etag;
   final dynamic data;
+
+  /// Group version the copy was confirmed at; null for copies saved before versions existed.
+  final int? version;
+
+  /// Milliseconds since epoch when the copy was last confirmed.
+  final int? savedAt;
 }

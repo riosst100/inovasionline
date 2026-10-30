@@ -583,6 +583,7 @@ class _UserAddressFormSheetState extends ConsumerState<_UserAddressFormSheet> {
                   )
                 else
                   AddressPicker(
+                    autoSelectSingle: true,
                     initial: _region,
                     showErrors: _submitted,
                     onChanged: (selection) =>

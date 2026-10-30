@@ -29,6 +29,11 @@ class AppPresenceController extends Controller
             'app_version' => ['nullable', 'string', 'max:32'],
             'build_number' => ['nullable', 'integer', 'min:0'],
             'screen' => ['nullable', 'string', 'max:120'],
+            'location' => ['nullable', 'array'],
+            'location.latitude' => ['required_with:location', 'numeric', 'between:-90,90'],
+            'location.longitude' => ['required_with:location', 'numeric', 'between:-180,180'],
+            'location.accuracy' => ['nullable', 'numeric', 'min:0'],
+            'location.at' => ['nullable', 'date'],
             ...DeviceInfo::rules(),
         ]);
 
@@ -41,8 +46,17 @@ class AppPresenceController extends Controller
             'build_number' => $data['build_number'] ?? $install->build_number,
             'current_screen' => $data['screen'] ?? $install->current_screen,
             'ip_address' => $ip,
+            'user_agent' => mb_substr((string) $request->userAgent(), 0, 500),
             'last_seen_at' => $now,
         ]);
+        if ($location = $data['location'] ?? null) {
+            $install->fill([
+                'latitude' => $location['latitude'],
+                'longitude' => $location['longitude'],
+                'location_accuracy' => $location['accuracy'] ?? null,
+                'location_at' => $location['at'] ?? $now,
+            ]);
+        }
         if ($device = $data['device'] ?? null) {
             $install->fill(array_filter(DeviceInfo::columns($device), fn ($value) => $value !== null));
         }

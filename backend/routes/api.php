@@ -57,6 +57,8 @@ use App\Http\Controllers\Api\V1\Admin\SupplierBillController as AdminSupplierBil
 use App\Http\Controllers\Api\V1\AppPresenceController;
 use App\Http\Controllers\Api\V1\UserContactController;
 use App\Http\Controllers\Api\V1\AppVersionController;
+use App\Http\Controllers\Api\V1\CacheVersionController;
+use App\Http\Controllers\Api\V1\Admin\AppCacheController as AdminAppCacheController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BannerController;
 use App\Http\Controllers\Api\V1\CartController;
@@ -158,6 +160,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/device-tokens', [DeviceTokenController::class, 'store'])->middleware('throttle:30,1');
 
     Route::get('/app-version', [AppVersionController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
+    Route::get('/cache-versions', [CacheVersionController::class, 'show']);
 
     Route::prefix('products')->group(function () {
         Route::get('/flash-sale', [PublicProductController::class, 'flashSale'])->middleware('cache.headers:public;max_age=60;etag');
@@ -170,7 +173,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/delivery-schedules', [CheckoutOptionsController::class, 'deliverySchedules'])->middleware('cache.headers:public;max_age=60;etag');
     Route::get('/service-fee', [CheckoutOptionsController::class, 'serviceFee'])->middleware('cache.headers:public;max_age=60;etag');
     Route::get('/free-shipping', [CheckoutOptionsController::class, 'freeShipping'])->middleware('cache.headers:public;max_age=60;etag');
-    Route::get('/nav-badge', [NavBadgeController::class, 'show']);
+    Route::get('/nav-badge', [NavBadgeController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
     Route::post('/app/heartbeat', [AppPresenceController::class, 'heartbeat'])->middleware('throttle:30,1');
     Route::post('/contacts/sync', [UserContactController::class, 'sync'])->middleware('throttle:30,1');
     Route::get('/admob-config', [AdmobConfigController::class, 'show'])->middleware('cache.headers:public;max_age=60;etag');
@@ -449,7 +452,9 @@ Route::prefix('admin')->group(function () {
         Route::prefix('customers')->middleware('menu:customers,notifications')->group(function () {
             Route::get('/', [CustomerController::class, 'index']);
             Route::post('/', [CustomerController::class, 'store']);
-            Route::get('/{user}', [CustomerController::class, 'show']);
+            Route::get('/guests', [CustomerController::class, 'guests']);
+            Route::get('/guests/{install}', [CustomerController::class, 'guestShow']);
+            Route::get('/{user}',[CustomerController::class, 'show']);
             Route::post('/{user}/block', [CustomerController::class, 'block']);
             Route::post('/{user}/unblock', [CustomerController::class, 'unblock']);
             Route::post('/{user}/ban', [CustomerController::class, 'ban']);
@@ -554,8 +559,13 @@ Route::prefix('admin')->group(function () {
             Route::delete('/{deliverySchedule}', [AdminDeliveryScheduleController::class, 'destroy']);
         });
 
+        Route::get('app-cache', [AdminAppCacheController::class, 'index'])->middleware('menu:app_cache');
+        Route::post('app-cache/invalidate', [AdminAppCacheController::class, 'invalidate'])->middleware('menu:app_cache');
+
         Route::get('service-cities', [AdminServiceCityController::class, 'index'])->middleware('menu:service_cities');
         Route::put('service-cities', [AdminServiceCityController::class, 'update'])->middleware('menu:service_cities');
+        Route::get('service-cities/{cityCode}/districts', [AdminServiceCityController::class, 'districts'])->middleware('menu:service_cities');
+        Route::get('service-cities/districts/{districtCode}/villages', [AdminServiceCityController::class, 'villages'])->middleware('menu:service_cities');
 
         Route::get('service-fee', [AdminServiceFeeController::class, 'show'])->middleware('menu:service_fee');
         Route::put('service-fee', [AdminServiceFeeController::class, 'update'])->middleware('menu:service_fee');

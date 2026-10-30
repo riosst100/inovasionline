@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\AppInstall;
+use App\Models\UserContact;
 use App\Models\User;
 use App\Services\CodVerificationService;
 use App\Support\Enums\UserRole;
@@ -34,6 +36,95 @@ class CustomerController extends Controller
             ->paginate($request->integer('per_page', 15));
 
         return ApiResponse::paginated($paginator, UserResource::class, 'Daftar customer berhasil dimuat.');
+    }
+
+    /**
+     * App installs that never logged in / registered (no linked user).
+     * Search matches device, platform, IP and install id.
+     */
+    public function guests(Request $request): JsonResponse
+    {
+        $paginator = AppInstall::query()
+            ->whereNull('user_id')
+            ->when($request->string('search')->toString(), function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('install_id', 'like', "%{$search}%")
+                        ->orWhere('device_name', 'like', "%{$search}%")
+                        ->orWhere('device_brand', 'like', "%{$search}%")
+                        ->orWhere('device_model', 'like', "%{$search}%")
+                        ->orWhere('ip_address', 'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('last_seen_at')
+            ->paginate($request->integer('per_page', 15));
+
+        return ApiResponse::success(
+            $paginator->getCollection()->map(fn (AppInstall $i) => $this->guestPayload($i))->values(),
+            'Daftar guest berhasil dimuat.',
+            [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ]
+        );
+    }
+
+    /** Everything known about one guest install, including the raw device report. */
+    public function guestShow(AppInstall $install): JsonResponse
+    {
+        return ApiResponse::success($this->installDetail($install), 'Detail guest berhasil dimuat.');
+    }
+
+    /** Full device / network / location report of one app install. */
+    private function installDetail(AppInstall $install): array
+    {
+        $contacts = UserContact::query()->where('install_id', $install->install_id);
+
+        return [
+            ...$this->guestPayload($install),
+            'device_id' => $install->device_id,
+            'first_ip_address' => $install->first_ip_address,
+            'build_number' => $install->build_number,
+            'user_agent' => $install->user_agent,
+            'device_details' => $install->device_details,
+            'latitude' => $install->latitude,
+            'longitude' => $install->longitude,
+            'location_accuracy' => $install->location_accuracy,
+            'location_at' => $install->location_at?->toIso8601String(),
+            'user' => $install->user ? ['id' => $install->user->id, 'name' => $install->user->name] : null,
+            'contacts_count' => (clone $contacts)->count(),
+            'contacts' => (clone $contacts)->orderBy('name')->limit(200)->get(['name', 'phone']),
+            // Other installs sharing this physical device (reinstall / many installs).
+            'same_device_installs' => $install->device_id
+                ? AppInstall::query()
+                    ->where('device_id', $install->device_id)
+                    ->whereKeyNot($install->getKey())
+                    ->orderByDesc('last_seen_at')
+                    ->get(['id', 'install_id', 'user_id', 'last_seen_at'])
+                : [],
+            'created_at' => $install->created_at?->toIso8601String(),
+            'updated_at' => $install->updated_at?->toIso8601String(),
+        ];
+    }
+
+    private function guestPayload(AppInstall $i): array
+    {
+        return [
+            'id' => $i->id,
+            'install_id' => $i->install_id,
+            'device_name' => $i->device_name,
+            'device_brand' => $i->device_brand,
+            'device_model' => $i->device_model,
+            'os_version' => $i->os_version,
+            'is_emulator' => (bool) $i->is_emulator,
+            'platform' => $i->platform,
+            'app_version' => $i->app_version,
+            'ip_address' => $i->ip_address,
+            'current_screen' => $i->current_screen,
+            'first_seen_at' => $i->first_seen_at?->toIso8601String(),
+            'last_seen_at' => $i->last_seen_at?->toIso8601String(),
+        ];
     }
 
     public function store(Request $request): JsonResponse
@@ -154,6 +245,12 @@ class CustomerController extends Controller
                 'registered_at' => $d->created_at?->toIso8601String(),
                 'updated_at' => $d->updated_at?->toIso8601String(),
             ]),
+            'app_installs' => AppInstall::query()
+                ->where('user_id', $user->id)
+                ->orderByDesc('last_seen_at')
+                ->get()
+                ->map(fn (AppInstall $i) => $this->installDetail($i))
+                ->values(),
             'ip_addresses' => $ipAddresses->sortByDesc('last_seen_at')->values(),
             'login_history' => $history->map(fn ($log) => [
                 'id' => $log->id,

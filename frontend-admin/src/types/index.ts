@@ -65,6 +65,41 @@ export interface DriverOrder {
 
 export type BannableFeature = 'chat' | 'posts' | 'purchase';
 
+/** An app install with no linked account (never registered / logged in). */
+export interface GuestInstall {
+  id: string;
+  install_id: string;
+  device_name: string | null;
+  device_brand: string | null;
+  device_model: string | null;
+  os_version: string | null;
+  is_emulator: boolean;
+  platform: string;
+  app_version: string | null;
+  ip_address: string | null;
+  current_screen: string | null;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+}
+
+export interface GuestInstallDetail extends GuestInstall {
+  device_id: string | null;
+  first_ip_address: string | null;
+  build_number: number | null;
+  user_agent: string | null;
+  device_details: Record<string, unknown> | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_accuracy: number | null;
+  location_at: string | null;
+  user: { id: string; name: string } | null;
+  contacts_count: number;
+  contacts: { name: string | null; phone: string }[];
+  same_device_installs: { id: string; install_id: string; user_id: string | null; last_seen_at: string | null }[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -126,6 +161,7 @@ export interface CustomerDetail {
     registered_at: string | null;
     updated_at: string | null;
   }[];
+  app_installs: GuestInstallDetail[];
   ip_addresses: {
     ip_address: string;
     login_count: number;
@@ -720,10 +756,29 @@ export interface AdmobSettings {
   ssv_callback_url?: string;
 }
 
+export interface AppCacheGroup {
+  key: string;
+  label: string;
+  description: string;
+  /** Naik setiap kali datanya berubah atau cache disegarkan */
+  version: number;
+  /** Terakhir kali versinya naik; null bila belum pernah */
+  updated_at: string | null;
+}
+
 export interface ServiceCityOptions {
   /** Kode kota yang dijangkau aplikasi */
   selected: string[];
+  /** Kecamatan / desa yang mempersempit kota terpilih; kota tanpa baris di sini dijangkau seluruhnya */
+  areas: ServiceAreaEntry[];
   provinces: { code: string; name: string; cities: RegionItem[] }[];
+}
+
+export interface ServiceAreaEntry {
+  level: 'district' | 'village';
+  code: string;
+  city_code: string;
+  district_code: string;
 }
 
 export type FlashSaleStatus = 'running' | 'upcoming' | 'ended' | 'inactive';

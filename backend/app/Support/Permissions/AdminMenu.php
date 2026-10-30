@@ -65,6 +65,7 @@ final class AdminMenu
                 ['bank_accounts', 'Bank & E-Wallet', 'Pengaturan', true],
                 ['nav_badge', 'Badge Menu', 'Pengaturan', true],
                 ['app_update', 'Update Aplikasi', 'Pengaturan', true],
+                ['app_cache', 'Cache Aplikasi', 'Pengaturan', true],
                 ['order_statuses', 'Status Pesanan', 'Pengaturan', true],
                 ['shipping_methods', 'Metode Pengiriman', 'Pengaturan', true],
                 ['order_cancellation', 'Pembatalan Pesanan', 'Pengaturan', true],
