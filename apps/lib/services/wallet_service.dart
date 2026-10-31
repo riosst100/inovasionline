@@ -42,34 +42,7 @@ class WalletService {
 
   /// Debug builds only: Google's sample ads never call the backend, so this
   /// records the view instead (the backend refuses it in production).
-  Future<void> recordTestAdView({String purpose = 'bonus'}) =>
-      _apiClient.dio.post('/wallet/bonus/test-ad-view', data: {'purpose': purpose});
-
-  /// Null while the reward chest is off.
-  Future<AdChestStatus?> chestStatus() async {
-    final response = await _apiClient.dio.get('/wallet/chest');
-    final data = response.data['data'];
-    return data is Map<String, dynamic> ? AdChestStatus.fromJson(data) : null;
-  }
-
-  /// Right after a chest's rewarded ad: opens it and returns the (random)
-  /// amount credited. Retries while the backend still waits for AdMob's
-  /// confirmation of the view.
-  Future<int> openChest() async {
-    const attempts = 8;
-    for (var i = 1; ; i++) {
-      try {
-        final response = await _apiClient.dio.post('/wallet/chest/open');
-        final data = response.data['data'] as Map<String, dynamic>;
-        return (data['claimed_amount'] as num?)?.toInt() ?? 0;
-      } on DioException catch (e) {
-        final error = e.error;
-        final pending = error is ApiException && error.statusCode == 409;
-        if (!pending || i == attempts) rethrow;
-        await Future<void>.delayed(const Duration(milliseconds: 2500));
-      }
-    }
-  }
+  Future<void> recordTestAdView() => _apiClient.dio.post('/wallet/bonus/test-ad-view');
 
   Future<List<WalletTransaction>> transactions({int perPage = 50}) async {
     final response = await _apiClient.dio.get(

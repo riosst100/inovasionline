@@ -40,10 +40,10 @@ class OrderService {
     return Order.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 
-  Future<Order> updateStatus(String id, OrderStatus status, {String? adminNotes}) async {
+  Future<Order> updateStatus(String id, OrderStatus status, {String? adminNotes, String? cancelReason}) async {
     final res = await _api.dio.patch(
       '/admin/orders/$id/status',
-      data: {'status': status.value, 'admin_notes': ?adminNotes},
+      data: {'status': status.value, 'admin_notes': ?adminNotes, 'cancel_reason': ?cancelReason},
     );
     return Order.fromJson(res.data['data'] as Map<String, dynamic>);
   }

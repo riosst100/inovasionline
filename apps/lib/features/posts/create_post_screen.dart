@@ -52,7 +52,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 80, maxWidth: 1600, maxHeight: 1600, limit: 10 - _media.length);
-    if (picked.isEmpty) return;
+    if (picked.isEmpty || !mounted) return;
     setState(() => _media.addAll(picked.map((x) => File(x.path))));
   }
 
@@ -65,7 +65,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     if (picked == null) return;
 
     var file = File(picked.path);
-    if (await file.length() > _maxRawVideoSizeBytes) {
+    final rawSize = await file.length();
+    if (!mounted) return;
+    if (rawSize > _maxRawVideoSizeBytes) {
       setState(() => _error = 'Ukuran video terlalu besar.');
       return;
     }
@@ -165,7 +167,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       isScrollControlled: true,
       builder: (_) => ProductTagPickerSheet(initiallySelected: _taggedProducts),
     );
-    if (selected != null) setState(() => _taggedProducts.replaceRange(0, _taggedProducts.length, selected));
+    if (selected != null && mounted) setState(() => _taggedProducts.replaceRange(0, _taggedProducts.length, selected));
   }
 
   bool get _canSubmit =>
@@ -180,7 +182,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     });
 
     try {
-      await ref.read(feedProvider.notifier).createPost(
+      // Any tab's notifier works: the new post lands in the author's own tab.
+      await ref.read(feedProvider(PostTab.public).notifier).createPost(
             body: _bodyController.text.trim().isEmpty ? null : _bodyController.text.trim(),
             media: _media,
             productIds: _taggedProducts.map((p) => p.id).toList(),
@@ -243,7 +246,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(_media[index], width: 90, height: 90, fit: BoxFit.cover),
+                      child: Image.file(_media[index], width: 90, height: 90, cacheWidth: 270, fit: BoxFit.cover),
                     ),
                     Positioned(
                       top: 2,

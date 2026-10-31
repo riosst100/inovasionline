@@ -18,6 +18,11 @@ class BannerRequest extends FormRequest
         if ($this->input('link_url') === '') {
             $this->merge(['link_url' => null]);
         }
+        // Multipart forms send the weekdays as a JSON string ("[1,3]"); '' clears them.
+        if (is_string($this->input('weekdays'))) {
+            $decoded = json_decode($this->input('weekdays'), true);
+            $this->merge(['weekdays' => is_array($decoded) && $decoded !== [] ? array_values(array_unique($decoded)) : null]);
+        }
         foreach (['starts_on', 'ends_on'] as $date) {
             if ($this->input($date) === '') {
                 $this->merge([$date => null]);
@@ -39,6 +44,8 @@ class BannerRequest extends FormRequest
             'link_url' => ['nullable', 'string', 'max:2048'],
             'placement' => ['nullable', Rule::in(Banner::PLACEMENTS)],
             'is_active' => ['nullable'],
+            'weekdays' => ['nullable', 'array'],
+            'weekdays.*' => ['integer', 'between:1,7'],
             'starts_on' => ['nullable', 'date_format:Y-m-d'],
             'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
             'sort_order' => ['nullable', 'integer'],

@@ -16,6 +16,8 @@ return [
     'name' => env('APP_NAME', 'Laravel'),
 
     // FRONTEND_URL is a comma-separated list (CORS origins); links use the first one.
+    // Admin web: base of the parcel QR links (<admin>/d/<code> opens the driver app).
+    'admin_url' => rtrim((string) env('ADMIN_URL', 'http://localhost:3000'), '/'),
     'frontend_url' => trim(explode(',', (string) env('FRONTEND_URL', 'http://localhost:3000'))[0]),
 
     /*

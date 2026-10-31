@@ -14,10 +14,11 @@ import '../../providers/providers.dart';
 /// Shows the scanned parcel and confirms the next step with a camera photo as proof:
 /// pickup ("dikirim") or handover ("diterima"). Pops `true` once confirmed.
 class ConfirmScreen extends ConsumerStatefulWidget {
-  const ConfirmScreen({super.key, required this.parcel, required this.code});
+  const ConfirmScreen({super.key, required this.parcel, this.code});
 
   final Parcel parcel;
-  final String code;
+  /// Scanned QR, if any; picking the parcel from the list needs none.
+  final String? code;
 
   @override
   ConsumerState<ConfirmScreen> createState() => _ConfirmScreenState();
@@ -43,15 +44,26 @@ class _ConfirmScreenState extends ConsumerState<ConfirmScreen> {
     setState(() => _submitting = true);
 
     final service = ref.read(deliveryServiceProvider);
+    final tracker = ref.read(deliveryTrackerProvider);
+    var allDelivered = false;
     try {
       if (_isShip) {
         await service.ship(widget.parcel, code: widget.code, photoPath: photo.path);
+        // Sharing location starts right at pickup, so the buyer can follow the parcel straight away.
+        await tracker.start();
       } else {
         await service.deliver(widget.parcel, code: widget.code, photoPath: photo.path);
+        // Last parcel handed over: stop using GPS. Others still on the way keep it running.
+        // A failed refresh is not a failed handover; the list refresh on return retries the check.
+        final remaining = await ref.refresh(parcelsProvider(false).future).catchError((_) => [widget.parcel]);
+        allDelivered = remaining.isEmpty;
+        if (allDelivered) await tracker.stop();
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(_isShip ? 'Ditandai sedang diantar.' : 'Ditandai selesai diterima.')));
+      if (allDelivered) await offerGpsOff(context);
+      if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;

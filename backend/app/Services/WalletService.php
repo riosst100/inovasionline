@@ -140,12 +140,6 @@ class WalletService
         });
     }
 
-    /** Pays an opened reward chest (see AdChestService). */
-    public function creditAdChest(User $user, int $amount): WalletTransaction
-    {
-        return $this->apply($user->id, WalletTransaction::TYPE_AD_CHEST, $amount, 'Hadiah peti iklan', []);
-    }
-
     public function maxBalance(): float
     {
         return (float) config('services.wallet.max_balance');

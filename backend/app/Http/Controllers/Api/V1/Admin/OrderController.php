@@ -219,6 +219,9 @@ class OrderController extends Controller
         $data = $request->validate([
             'status' => ['required', Rule::enum(OrderStatus::class)],
             'admin_notes' => ['nullable', 'string', 'max:1000'],
+            'cancel_reason' => ['required_if:status,cancelled', 'nullable', 'string', 'max:500'],
+        ], [
+            'cancel_reason.required_if' => 'Alasan pembatalan wajib diisi.',
         ]);
 
         $next = OrderStatus::from($data['status']);
@@ -234,7 +237,7 @@ class OrderController extends Controller
 
             try {
                 // Paid orders are credited back to the buyer's balance inside cancel().
-                $order = $this->cancellationService->cancel($order, $by);
+                $order = $this->cancellationService->cancel($order, $by, trim($data['cancel_reason']));
             } catch (RuntimeException $e) {
                 return ApiResponse::error($e->getMessage(), [], 422);
             }
@@ -323,6 +326,10 @@ class OrderController extends Controller
     {
         $user = $order->user;
         $body = self::STATUS_MESSAGES[$status->value] ?? null;
+
+        if ($status === OrderStatus::CANCELLED && $order->cancel_reason) {
+            $body = "Pesanan Anda dibatalkan oleh Admin dengan alasan \"{$order->cancel_reason}\".";
+        }
 
         if ($user === null || $body === null) {
             return;

@@ -18,6 +18,12 @@ class Env {
 
   static String get reverbAppKey => _nonEmpty('REVERB_APP_KEY') ?? 'inovasionline-key';
 
+  /// Order tracking map: `maptiler` (default) or `google` (needs the Google Maps key in the native config).
+  static bool get useGoogleMaps => dotenv.env['MAP_PROVIDER'] == 'google';
+
+  /// Null falls back to OpenStreetMap's own tiles, which are fine for testing but not for release.
+  static String? get maptilerKey => _nonEmpty('MAPTILER_KEY');
+
   static String? _nonEmpty(String key) {
     final value = dotenv.env[key];
     return value == null || value.isEmpty ? null : value;

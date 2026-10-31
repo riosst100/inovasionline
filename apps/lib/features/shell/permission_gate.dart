@@ -19,7 +19,6 @@ import '../../services/location_service.dart';
 import '../../services/push_notification_handler.dart';
 import '../../widgets/app_loading_skeleton.dart';
 import 'manual_address_screen.dart';
-import 'welcome_burst.dart';
 
 /// First thing that happens once the native splash is gone.
 ///
@@ -58,10 +57,6 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
   /// for someone who is in the service area and about to enter the app.
   bool _notificationAsked = false;
 
-  /// The one-off welcome animation: queued when the app is first shown,
-  /// removed by itself when it ends.
-  bool _welcomeQueued = false;
-  bool _welcomeVisible = false;
   bool _askingNotification = false;
   bool _locationGranted = false;
   bool _locationPermanentlyDenied = false;
@@ -515,21 +510,7 @@ class _PermissionGateState extends ConsumerState<PermissionGate>
         if (mounted) ref.read(startupSettledProvider.notifier).state = true;
       });
     }
-    // Only for someone whose address was just set up on this launch; with an
-    // address saved from before there is nothing new to welcome.
-    if (_locationNeeded && !_welcomeQueued) {
-      _welcomeQueued = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _welcomeVisible = true);
-      });
-    }
-    return Stack(
-      children: [
-        widget.child,
-        if (_welcomeVisible)
-          WelcomeBurst(onDone: () => setState(() => _welcomeVisible = false)),
-      ],
-    );
+    return widget.child;
   }
 }
 

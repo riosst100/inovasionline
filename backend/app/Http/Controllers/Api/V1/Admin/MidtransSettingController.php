@@ -22,6 +22,8 @@ class MidtransSettingController extends Controller
     {
         $data = $request->validate([
             'mode' => ['required', Rule::in(MidtransSetting::MODES)],
+            'topup_expiry_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+            'order_expiry_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
             'sandbox.client_key' => ['nullable', 'string', 'max:255'],
             'sandbox.server_key' => ['nullable', 'string', 'max:255'],
             'production.client_key' => ['nullable', 'string', 'max:255'],
@@ -31,6 +33,8 @@ class MidtransSettingController extends Controller
         // Starts from the .env fallback on the first save, so keys already in .env carry over.
         $setting = MidtransSetting::current();
         $setting->mode = $data['mode'];
+        $setting->topup_expiry_minutes = $data['topup_expiry_minutes'];
+        $setting->order_expiry_minutes = $data['order_expiry_minutes'];
 
         foreach (MidtransSetting::MODES as $mode) {
             $clientKey = trim((string) ($data[$mode]['client_key'] ?? ''));

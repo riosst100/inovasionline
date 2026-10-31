@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/theme.dart';
@@ -10,16 +9,16 @@ import '../../core/utils/formatters.dart';
 import '../../models/order_tracking.dart';
 import '../../providers/core_providers.dart';
 import 'order_providers.dart';
+import 'tracking_map.dart';
 
 const _trackingPollInterval = Duration(seconds: 10);
 
 /// With the socket connected, poll only every Nth tick (60s) as a safety net.
 const _liveSafetyPollEvery = 6;
 
-const _courierMarker = MarkerId('courier');
-
-/// "Lacak Pengiriman": the courier's latest position on a map, refreshed when the driver app reports
-/// a new fix (signal on `order-tracking.{id}`) or by polling while the socket is down.
+/// "Lacak Pengiriman": the courier, the buyer's location and the road between them on a map,
+/// refreshed when the driver app reports a new fix (signal on `order-tracking.{id}`) or by polling
+/// while the socket is down.
 class OrderTrackingScreen extends ConsumerStatefulWidget {
   const OrderTrackingScreen({super.key, required this.orderId});
 
@@ -32,16 +31,15 @@ class OrderTrackingScreen extends ConsumerStatefulWidget {
 class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> with WidgetsBindingObserver {
   OrderTracking? _tracking;
   String? _error;
-  GoogleMapController? _map;
   Timer? _pollTimer;
   VoidCallback? _unlisten;
   int _ticks = 0;
 
-  /// The map follows the courier until the buyer pans it themselves.
+  /// The map keeps courier and destination in view until the buyer pans it themselves.
   bool _follow = true;
 
-  /// Set while the camera moves on our own command, so that move doesn't count as the buyer panning.
-  bool _animating = false;
+  /// Bumped by the recenter button to frame courier and destination again.
+  int _fitRequest = 0;
 
   @override
   void initState() {
@@ -80,7 +78,6 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> with 
     WidgetsBinding.instance.removeObserver(this);
     _unlisten?.call();
     _pollTimer?.cancel();
-    _map?.dispose();
     super.dispose();
   }
 
@@ -95,26 +92,10 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> with 
       });
       // Delivered (or otherwise moved on) while watching: the detail screen behind shows the new status.
       if (wasActive && !tracking.active) ref.invalidate(orderDetailProvider(widget.orderId));
-      final location = tracking.location;
-      if (_follow && location != null) _moveCamera(CameraUpdate.newLatLng(LatLng(location.latitude, location.longitude)));
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Gagal memuat lokasi kurir.');
     }
-  }
-
-  void _recenter() {
-    final location = _tracking?.location;
-    if (location == null) return;
-    setState(() => _follow = true);
-    _moveCamera(CameraUpdate.newLatLngZoom(LatLng(location.latitude, location.longitude), 16));
-  }
-
-  void _moveCamera(CameraUpdate update) {
-    final map = _map;
-    if (map == null) return;
-    _animating = true;
-    map.animateCamera(update);
   }
 
   @override
@@ -145,55 +126,31 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen> with 
   }
 
   Widget _buildMap(OrderTracking tracking) {
-    final location = tracking.location;
-    if (location == null) {
+    if (tracking.location == null) {
       return const _Message(
         icon: Icons.location_searching,
         text: 'Menunggu lokasi kurir. Peta tampil setelah aplikasi kurir mengirim posisinya.',
       );
     }
 
-    final position = LatLng(location.latitude, location.longitude);
     return Stack(
       children: [
-        GoogleMap(
-          initialCameraPosition: CameraPosition(target: position, zoom: 16),
-          onMapCreated: (controller) => _map = controller,
-          // A pan or zoom by the buyer stops the camera from snapping back to the courier.
-          onCameraMoveStarted: () {
-            if (!_animating && _follow) setState(() => _follow = false);
-          },
-          onCameraIdle: () => _animating = false,
-          myLocationButtonEnabled: false,
-          mapToolbarEnabled: false,
-          zoomControlsEnabled: false,
-          markers: {
-            Marker(
-              markerId: _courierMarker,
-              position: position,
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-              infoWindow: InfoWindow(title: tracking.driver?.name ?? 'Kurir'),
-            ),
-          },
-          circles: {
-            if (location.accuracy != null && location.accuracy! > 20)
-              Circle(
-                circleId: const CircleId('accuracy'),
-                center: position,
-                radius: location.accuracy!,
-                strokeWidth: 1,
-                strokeColor: AppColors.primary.withValues(alpha: 0.4),
-                fillColor: AppColors.primary.withValues(alpha: 0.1),
-              ),
-          },
+        TrackingMap(
+          tracking: tracking,
+          follow: _follow,
+          onUserMoved: () => setState(() => _follow = false),
+          fitRequest: _fitRequest,
         ),
         Positioned(
           right: 12,
-          bottom: 12,
+          bottom: 32,
           child: FloatingActionButton.small(
             heroTag: null,
-            onPressed: _recenter,
-            tooltip: 'Ke posisi kurir',
+            onPressed: () => setState(() {
+              _follow = true;
+              _fitRequest++;
+            }),
+            tooltip: 'Tampilkan kurir & tujuan',
             child: const Icon(Icons.my_location),
           ),
         ),
@@ -207,6 +164,19 @@ class _CourierPanel extends StatelessWidget {
 
   final OrderTracking tracking;
   final String? error;
+
+  /// e.g. "± 3,2 km · sekitar 12 menit lagi"; only the distance (as the crow flies) without a road route.
+  static String? _remainingLabel(OrderTracking tracking) {
+    final meters = tracking.remainingMeters;
+    if (meters == null) return null;
+    final distance = meters < 1000
+        ? '${(meters / 10).round() * 10} m'
+        : '${(meters / 1000).toStringAsFixed(1).replaceAll('.', ',')} km';
+    final route = tracking.route;
+    if (route == null) return '± $distance dari lokasi kamu';
+    final minutes = (route.durationSeconds / 60).ceil();
+    return '± $distance · ${minutes <= 1 ? 'sebentar lagi sampai' : 'sekitar $minutes menit lagi'}';
+  }
 
   Future<void> _call(BuildContext context, String phone) async {
     final opened = await launchUrl(Uri(scheme: 'tel', path: phone));
@@ -225,6 +195,7 @@ class _CourierPanel extends StatelessWidget {
         .where((e) => e != null && e.isNotEmpty)
         .join(' · ');
     final phone = driver?.phone;
+    final remaining = _remainingLabel(tracking);
 
     return SafeArea(
       top: false,
@@ -243,6 +214,13 @@ class _CourierPanel extends StatelessWidget {
                   Text(driver?.name ?? 'Kurir', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   if (vehicle.isNotEmpty)
                     Text(vehicle, style: const TextStyle(fontSize: 12.5, color: AppColors.mutedForeground)),
+                  if (remaining != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      remaining,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+                    ),
+                  ],
                   const SizedBox(height: 2),
                   Text(
                     error ??

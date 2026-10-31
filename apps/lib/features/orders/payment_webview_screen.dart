@@ -140,20 +140,13 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
         if (!didPop) _close();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Pembayaran'),
-          actions: [
-            TextButton(
-              onPressed: _closing ? null : _close,
-              child: const Text('Selesai'),
-            ),
-          ],
-        ),
-        body: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            if (_loading || _closing) const Center(child: CircularProgressIndicator()),
-          ],
+        body: SafeArea(
+          child: Stack(
+            children: [
+              WebViewWidget(controller: _controller),
+              if (_loading || _closing) const Center(child: CircularProgressIndicator()),
+            ],
+          ),
         ),
       ),
     );

@@ -9,6 +9,8 @@ class Region {
   final String code;
   final String name;
 
+  Map<String, dynamic> toJson() => {'code': code, 'name': name};
+
   // By code, so a region loaded elsewhere (e.g. a saved address) matches the
   // same entry in a freshly fetched dropdown list.
   @override

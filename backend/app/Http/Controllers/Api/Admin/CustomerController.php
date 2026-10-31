@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\AppInstall;
+use App\Models\RegionAdmin;
 use App\Models\UserContact;
 use App\Models\User;
+use App\Services\ChatService;
 use App\Services\CodVerificationService;
+use App\Support\Enums\ChatRegionLevel;
 use App\Support\Enums\UserRole;
 use App\Support\Responses\ApiResponse;
 use App\Support\UserAgent;
@@ -15,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\PersonalAccessToken;
 use RuntimeException;
 
@@ -24,6 +28,7 @@ class CustomerController extends Controller
     {
         $paginator = User::query()
             ->withLastSeen()
+            ->with('regionAdmins')
             ->where('role', '!=', UserRole::PLATFORM_ADMIN->value)
             ->when($request->string('search')->toString(), function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -322,6 +327,86 @@ class CustomerController extends Controller
         $user->forceFill(['banned_features' => null, 'ban_reason' => null])->save();
 
         return ApiResponse::success(new UserResource($user), 'Pembatasan fitur customer berhasil dicabut.');
+    }
+
+    /** Grants or removes the verified badge that puts the customer's posts in the app's "Resmi" tab. */
+    public function verifiedBadge(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate(['enabled' => 'required|boolean']);
+
+        $user->forceFill(['verified_badge_at' => $validated['enabled'] ? ($user->verified_badge_at ?? now()) : null])->save();
+
+        return ApiResponse::success(
+            new UserResource($user),
+            $validated['enabled'] ? 'Badge verified berhasil diberikan.' : 'Badge verified berhasil dicabut.'
+        );
+    }
+
+    /**
+     * Appoints the customer to a city, district or village (picked by `region_code`; the level follows from its
+     * length) with a community role (what they may do there) and a badge worded by `badge_text`
+     * (default "Admin <wilayah>"); they also join that region's chat. Appointing the same region again updates it.
+     */
+    public function storeRegionAdmin(Request $request, User $user, ChatService $chatService): JsonResponse
+    {
+        $validated = $request->validate([
+            'region_code' => 'required|string|max:10',
+            'community_role_id' => 'required|string|exists:community_roles,id',
+            'badge_text' => 'nullable|string|max:60',
+        ], [
+            'community_role_id.required' => 'Peran wajib dipilih.',
+            'badge_text.max' => 'Teks badge maksimal 60 karakter.',
+        ]);
+        $code = $validated['region_code'];
+
+        [$level, $table] = match (strlen($code)) {
+            4 => [ChatRegionLevel::CITY, 'indonesia_cities'],
+            7 => [ChatRegionLevel::DISTRICT, 'indonesia_districts'],
+            10 => [ChatRegionLevel::VILLAGE, 'indonesia_villages'],
+            default => [null, null],
+        };
+        $name = $table ? DB::table($table)->where('code', $code)->value('name') : null;
+        if ($name === null) {
+            return ApiResponse::error('Wilayah tidak ditemukan. Pilih kabupaten/kota, kecamatan, atau desa.', [], 422);
+        }
+
+        $user->regionAdmins()->updateOrCreate(['region_code' => $code], [
+            'community_role_id' => $validated['community_role_id'],
+            'region_level' => $level,
+            'region_name' => Str::title(Str::lower(trim($name))),
+            'badge_text' => trim($validated['badge_text'] ?? '') ?: RegionAdmin::DEFAULT_BADGE_TEXT,
+        ]);
+        $chatService->joinRegionThread($user, $level, $code);
+
+        return ApiResponse::success(new UserResource($user->load('regionAdmins')), 'Admin wilayah berhasil disimpan.');
+    }
+
+    /** Changes an appointment's role and/or badge wording (e.g. to "Kepala Desa <wilayah>"). */
+    public function updateRegionAdmin(Request $request, User $user, RegionAdmin $regionAdmin): JsonResponse
+    {
+        abort_unless($regionAdmin->user_id === $user->id, 404);
+        $validated = $request->validate([
+            'community_role_id' => 'sometimes|required|string|exists:community_roles,id',
+            'badge_text' => 'sometimes|required|string|max:60',
+        ], [
+            'badge_text.required' => 'Teks badge wajib diisi.',
+            'badge_text.max' => 'Teks badge maksimal 60 karakter.',
+        ]);
+        if (isset($validated['badge_text'])) {
+            $validated['badge_text'] = trim($validated['badge_text']);
+        }
+
+        $regionAdmin->update($validated);
+
+        return ApiResponse::success(new UserResource($user->load('regionAdmins')), 'Penunjukan berhasil disimpan.');
+    }
+
+    public function destroyRegionAdmin(User $user, RegionAdmin $regionAdmin): JsonResponse
+    {
+        abort_unless($regionAdmin->user_id === $user->id, 404);
+        $regionAdmin->delete();
+
+        return ApiResponse::success(new UserResource($user->load('regionAdmins')), 'Admin wilayah berhasil dicabut.');
     }
 
     public function unblock(User $user): JsonResponse

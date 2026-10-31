@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\PostService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +18,8 @@ class PostResource extends JsonResource
             'user_id' => $this->user_id,
             'user_name' => $this->user?->name,
             'user_avatar_url' => $this->user?->avatar_path ? asset('storage/'.$this->user->avatar_path) : null,
+            'user_verified_badge' => (bool) $this->user?->hasVerifiedBadge(),
+            'user_admin_badge' => $this->user?->adminBadgeLabel($this->resource->regionCodes()),
             'body' => $this->body,
             'media' => $this->media->map(fn ($media) => [
                 'id' => $media->id,
@@ -32,6 +35,8 @@ class PostResource extends JsonResource
             'share_count' => (int) ($this->shares_count ?? 0),
             'is_liked' => $viewer ? $this->likes->isNotEmpty() : false,
             'is_mine' => $viewer ? $this->user_id === $viewer->id : false,
+            // Author, or appointed to the post's region with a role that may delete posts.
+            'can_moderate' => app(PostService::class)->canModerate($viewer, $this->resource),
             'created_at' => $this->created_at,
         ];
     }

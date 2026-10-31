@@ -1,4 +1,4 @@
-import { AppCacheGroup, ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, GuestInstall, GuestInstallDetail, CustomerDetail, PermissionCatalog, PaginatedData, Banner, LaunchPopupSettings, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, BankAccount, AdChestSettings, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
+import { AppCacheGroup, ApiResponse, Role, AdminUser, Driver, DriverOrder, Customer, CommunityAbility, CommunityRole, CommunityRoleList, GuestInstall, GuestInstallDetail, CustomerDetail, PermissionCatalog, PaginatedData, Banner, LaunchPopupSettings, AdminSession, SearchSuggestion, ProductAttribute, Warehouse, Supplier, Brand,ProductStockRow, RegionItem, ServiceCityOptions, ServiceFeeSettings, MidtransSettings, MidtransSettingsPayload, WalletBonusSettings, FreeShippingSettings, PaymentMethodOption, BankAccount, NavBadgeSettings, AppUpdateSettings, AppUpdateOverview, OrderSettings, AdmobSettings,DeliverySchedule, DeliveryHoliday, ShippingMethod, FlashSale, FlashSalePayload } from '../types';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
 
@@ -339,6 +339,57 @@ export const adminApi = {
 
   async unbanCustomer(id: string): Promise<Customer> {
     return apiRequest<Customer>(`/admin/customers/${id}/unban`, { method: 'POST' });
+  },
+
+  /** regionCode: a city, district or village code; the level follows from it. */
+  async addCustomerRegionAdmin(
+    id: string,
+    data: { region_code: string; community_role_id: string; badge_text?: string }
+  ): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/region-admins`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateCustomerRegionAdmin(
+    id: string,
+    regionAdminId: string,
+    data: { community_role_id?: string; badge_text?: string }
+  ): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/region-admins/${regionAdminId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getCommunityRoles(): Promise<CommunityRoleList> {
+    return apiRequest<CommunityRoleList>('/admin/community-roles');
+  },
+
+  async saveCommunityRole(
+    data: { name: string; abilities: CommunityAbility[] },
+    id?: string
+  ): Promise<CommunityRole> {
+    return apiRequest<CommunityRole>(id ? `/admin/community-roles/${id}` : '/admin/community-roles', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteCommunityRole(id: string): Promise<void> {
+    await apiRequest(`/admin/community-roles/${id}`, { method: 'DELETE' });
+  },
+
+  async removeCustomerRegionAdmin(id: string, regionAdminId: string): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/region-admins/${regionAdminId}`, { method: 'DELETE' });
+  },
+
+  async setCustomerVerifiedBadge(id: string, enabled: boolean): Promise<Customer> {
+    return apiRequest<Customer>(`/admin/customers/${id}/verified-badge`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    });
   },
 
   async revokeCustomerVerification(id: string, reason: string): Promise<Customer> {
@@ -758,17 +809,6 @@ export const adminApi = {
 
   async saveOrderSettings(payload: OrderSettings): Promise<OrderSettings> {
     return apiRequest<OrderSettings>('/admin/order-settings', {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-  },
-
-  async getAdChest(): Promise<AdChestSettings> {
-    return apiRequest<AdChestSettings>('/admin/ad-chest');
-  },
-
-  async saveAdChest(payload: AdChestSettings): Promise<AdChestSettings> {
-    return apiRequest<AdChestSettings>('/admin/ad-chest', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });

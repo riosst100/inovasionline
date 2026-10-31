@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
+use App\Services\DeliveryRouteService;
 use App\Services\MidtransService;
 use App\Services\OrderCancellationService;
 use App\Support\Enums\OrderStatus;
@@ -125,7 +126,7 @@ class OrderController extends Controller
      * The courier's latest position for the buyer's tracking map. Only while the order is on the way:
      * before pickup and after handover the courier's whereabouts are none of the buyer's business.
      */
-    public function tracking(Request $request, Order $order): JsonResponse
+    public function tracking(Request $request, Order $order, DeliveryRouteService $routes): JsonResponse
     {
         if ($order->user_id !== $request->user()->id) {
             return ApiResponse::error('This order does not belong to you.', [], 403);
@@ -133,6 +134,22 @@ class OrderController extends Controller
 
         $active = $order->status === OrderStatus::ON_DELIVERY && $order->driver_id !== null;
         $driver = $active ? $order->driver : null;
+
+        // The order has no geocoded address; where the buyer's phone was at checkout stands in for it.
+        $log = $driver !== null ? $order->deviceLog : null;
+        $destination = $log?->latitude !== null && $log->longitude !== null
+            ? ['latitude' => $log->latitude, 'longitude' => $log->longitude]
+            : null;
+
+        $route = $destination !== null && $driver->last_location_at !== null
+            ? $routes->remaining(
+                $order->id,
+                $driver->last_latitude,
+                $driver->last_longitude,
+                $destination['latitude'],
+                $destination['longitude'],
+            )
+            : null;
 
         return ApiResponse::success([
             'status' => $order->status->value,
@@ -150,6 +167,9 @@ class OrderController extends Controller
                 'updated_at' => $driver->last_location_at->toIso8601String(),
                 'seconds_ago' => (int) $driver->last_location_at->diffInSeconds(now(), true),
             ],
+            'destination' => $destination,
+            // Null without a route service: the app draws a straight line courier → destination.
+            'route' => $route,
         ], 'Tracking retrieved successfully.');
     }
 }

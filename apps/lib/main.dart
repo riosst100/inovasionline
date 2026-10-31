@@ -23,6 +23,10 @@ import 'services/push_notification_handler.dart';
 Future<void> bootstrap({required String envFile, required bool isDev}) async {
   WidgetsFlutterBinding.ensureInitialized();
   Env.isDev = isDev;
+  // Decoded images stay in memory; the default (100 MB, 1000 images) is a lot on a low-RAM phone.
+  PaintingBinding.instance.imageCache
+    ..maximumSizeBytes = 64 << 20
+    ..maximumSize = 300;
   // Independent of each other, so run side by side: the native splash stays
   // up until all of this is done.
   await Future.wait([

@@ -8,7 +8,6 @@ use App\Http\Resources\WalletTransactionResource;
 use App\Models\AdReward;
 use App\Models\User;
 use App\Models\WalletTopup;
-use App\Services\AdChestService;
 use App\Services\AdRewardService;
 use App\Services\AdViewRequiredException;
 use App\Services\MidtransService;
@@ -26,7 +25,6 @@ class WalletController extends Controller
         private readonly WalletService $wallet,
         private readonly MidtransService $midtrans,
         private readonly AdRewardService $adRewards,
-        private readonly AdChestService $chests,
     ) {}
 
     public function show(Request $request): JsonResponse
@@ -74,33 +72,9 @@ class WalletController extends Controller
     {
         abort_if(app()->isProduction() || ! config('services.admob.allow_unverified_rewards'), 404);
 
-        $purpose = $request->input('purpose') === AdReward::PURPOSE_CHEST ? AdReward::PURPOSE_CHEST : AdReward::PURPOSE_BONUS;
-        $this->adRewards->record($request->user(), 'test-'.Str::ulid(), 'test', $purpose);
+        $this->adRewards->record($request->user(), 'test-'.Str::ulid(), 'test', AdReward::PURPOSE_BONUS);
 
         return ApiResponse::success(null, 'Test ad view recorded.');
-    }
-
-    /** The home screen's reward chest; data is null while it is off. */
-    public function chest(Request $request): JsonResponse
-    {
-        return ApiResponse::success($this->chests->status($request->user()), 'Reward chest retrieved successfully.');
-    }
-
-    public function openChest(Request $request): JsonResponse
-    {
-        try {
-            $amount = $this->chests->open($request->user());
-        } catch (AdViewRequiredException $e) {
-            // AdMob's callback for the last view may still be on its way; the app retries.
-            return ApiResponse::error($e->getMessage(), ['code' => ['ad_view_required']], 409);
-        } catch (RuntimeException $e) {
-            return ApiResponse::error($e->getMessage(), [], 422);
-        }
-
-        return ApiResponse::success([
-            'claimed_amount' => $amount,
-            'chest' => $this->chests->status($request->user()),
-        ], 'Peti hadiah berhasil dibuka.');
     }
 
     public function transactions(Request $request): JsonResponse

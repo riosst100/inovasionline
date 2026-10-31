@@ -548,7 +548,7 @@ class _PickerField<T> extends StatelessWidget {
       ),
       builder: (context) => SafeArea(
         child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.5,
+          height: MediaQuery.sizeOf(context).height * 0.5,
           child: Column(
             children: [
               const SizedBox(height: 8),

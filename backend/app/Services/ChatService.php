@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ChatMessage;
 use App\Models\ChatThread;
+use App\Models\CommunityRole;
 use App\Models\ChatThreadParticipant;
 use App\Models\User;
 use App\Support\Enums\ChatRegionLevel;
@@ -61,6 +62,19 @@ class ChatService
                 $this->joinThread($user, $thread);
             }
         });
+    }
+
+    /** Joins the user into one region's chat (e.g. a region admin who lives elsewhere). */
+    public function joinRegionThread(User $user, ChatRegionLevel $level, string $code): void
+    {
+        $thread = ChatThread::firstOrCreate([
+            'type' => ChatThreadType::REGION->value,
+            'region_code' => $code,
+        ], [
+            'region_level' => $level->value,
+        ]);
+
+        $this->joinThread($user, $thread);
     }
 
     private function joinThread(User $user, ChatThread $thread): void
@@ -198,6 +212,31 @@ class ChatService
             || in_array($user->id, [$thread->user_one_id, $thread->user_two_id], true);
     }
 
+    /** The sender, or someone appointed to the thread's region whose role may delete chat. */
+    public function canDeleteMessage(?User $user, ChatMessage $message): bool
+    {
+        if ($user === null || $message->deleted_at !== null) {
+            return false;
+        }
+
+        return ($message->sender_id !== null && $message->sender_id === $user->id)
+            || ($message->thread->type === ChatThreadType::REGION
+                && $user->canInRegion(CommunityRole::DELETE_CHAT_MESSAGES, [$message->thread->region_code]));
+    }
+
+    /** Leaves a "Pesan ini dihapus" placeholder, so replies to it and the thread keep their shape. */
+    public function deleteMessage(User $requester, ChatMessage $message): void
+    {
+        if (! $this->canDeleteMessage($requester, $message)) {
+            throw new RuntimeException('Anda tidak dapat menghapus pesan ini.');
+        }
+
+        $message->forceFill(['deleted_at' => now(), 'deleted_by' => $requester->id])->save();
+
+        // Open threads refetch and show the placeholder.
+        event(ChatMessageSent::for($message->thread, $message));
+    }
+
     public function sendMessage(User $sender, ChatThread $thread, string $body, ?string $replyToId = null): ChatMessage
     {
         if (! $this->canPost($sender, $thread)) {
@@ -248,7 +287,7 @@ class ChatService
     public function messages(ChatThread $thread, int $perPage = 20): LengthAwarePaginator
     {
         return $thread->messages()
-            ->with(['sender', 'replyTo.sender'])
+            ->with(['sender.regionAdmins', 'thread', 'replyTo.sender'])
             ->latest('created_at')
             ->paginate($perPage);
     }
@@ -269,7 +308,7 @@ class ChatService
     public function latestGuestMessages(ChatThread $thread): Collection
     {
         return $thread->messages()
-            ->with(['sender', 'replyTo.sender'])
+            ->with(['sender.regionAdmins', 'thread', 'replyTo.sender'])
             ->latest('created_at')
             ->limit(self::GUEST_MESSAGE_LIMIT)
             ->get();

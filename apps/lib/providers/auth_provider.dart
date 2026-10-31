@@ -11,6 +11,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../config/env.dart';
 import '../core/api/account_block.dart';
 import '../core/api/api_exception.dart';
+import '../core/api/session_expired.dart';
 import '../core/api/connectivity.dart';
 import '../models/user.dart';
 import '../services/analytics.dart';
@@ -38,10 +39,25 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._ref) : super(const AuthState()) {
+    SessionExpired.signal.addListener(_onSessionExpired);
     _restore();
   }
 
   final Ref _ref;
+
+  @override
+  void dispose() {
+    SessionExpired.signal.removeListener(_onSessionExpired);
+    super.dispose();
+  }
+
+  /// The server no longer accepts our token: forget it and show the signed-out state.
+  Future<void> _onSessionExpired() async {
+    await _ref.read(tokenStorageProvider).clearToken();
+    if (state.status == AuthStatus.authenticated) {
+      state = const AuthState(status: AuthStatus.unauthenticated);
+    }
+  }
 
   /// Re-reads the user from the server. Used by the blocked-account screen to
   /// pick up an unblock without forcing the user to log in again.

@@ -129,6 +129,30 @@ class OrderDetailScreen extends ConsumerWidget {
         data: (order) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
+            if (order.status == 'cancelled' && (order.cancelReason ?? '').isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.destructive.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.destructive.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline, size: 18, color: AppColors.destructive),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Pesanan ini dibatalkan oleh ${order.cancelledBy == 'admin' ? 'Admin' : 'penjual'} dengan alasan "${order.cancelReason}"',
+                        style: const TextStyle(fontSize: 13, color: AppColors.destructive),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             _SectionCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

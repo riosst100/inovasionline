@@ -16,6 +16,7 @@ class BannerResource extends JsonResource
             'link_url' => $this->link_url,
             'placement' => $this->placement,
             'is_active' => $this->is_active,
+            'weekdays' => $this->weekdays ?: null,
             'starts_on' => $this->starts_on?->format('Y-m-d'),
             'ends_on' => $this->ends_on?->format('Y-m-d'),
             'sort_order' => $this->sort_order,

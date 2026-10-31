@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
 import 'package:location/location.dart' as loc;
 import 'package:permission_handler/permission_handler.dart';
@@ -5,8 +8,9 @@ import 'package:permission_handler/permission_handler.dart';
 /// Asked once right after the splash, so scanning and proof photos never stop for a camera
 /// prompt. Already granted or permanently denied permissions do not show a dialog again.
 /// The GPS switch is deliberately not asked here; that only happens on each scan.
+/// Notifications (Android 13+) show the "Sedang mengantar paket" notice while location is shared.
 Future<void> requestStartupPermissions() async {
-  await [Permission.camera, Permission.locationWhenInUse].request();
+  await [Permission.camera, Permission.locationWhenInUse, Permission.notification].request();
 }
 
 /// Every scan and every delivery confirmation needs location permission and GPS switched on.
@@ -48,6 +52,31 @@ Future<bool> ensureLocationReady(BuildContext context) async {
       ),
     );
     if (retry != true || !context.mounted) return false;
+  }
+}
+
+/// After the last parcel is handed over: offers to switch GPS off to save battery. Apps cannot turn
+/// it off themselves, so this opens Android's Location settings. Skipped when GPS is already off.
+Future<void> offerGpsOff(BuildContext context) async {
+  if (!await Permission.locationWhenInUse.serviceStatus.isEnabled || !context.mounted) return;
+
+  final open = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      icon: const Icon(Icons.task_alt),
+      title: const Text('Semua paket sudah diantar'),
+      content: const Text('Lokasi sudah tidak dibagikan lagi. Matikan GPS supaya baterai lebih awet?'),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Nanti saja')),
+        FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Matikan GPS')),
+      ],
+    ),
+  );
+  if (open != true || !Platform.isAndroid) return;
+  try {
+    await const AndroidIntent(action: 'android.settings.LOCATION_SOURCE_SETTINGS').launch();
+  } catch (_) {
+    await openAppSettings();
   }
 }
 

@@ -144,7 +144,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     radius: 52,
                     backgroundColor: AppColors.surface,
                     backgroundImage: _croppedAvatar != null
-                        ? FileImage(_croppedAvatar!)
+                        ? ResizeImage(FileImage(_croppedAvatar!), width: 300)
                         : (user?.avatarUrl != null ? CachedNetworkImageProvider(user!.avatarUrl!) : null)
                             as ImageProvider?,
                     child: _croppedAvatar == null && user?.avatarUrl == null

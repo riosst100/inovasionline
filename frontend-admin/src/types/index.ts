@@ -100,6 +100,34 @@ export interface GuestInstallDetail extends GuestInstall {
   updated_at: string | null;
 }
 
+export interface CustomerRegionAdmin {
+  id: string;
+  region_level: 'city' | 'district' | 'village';
+  region_code: string;
+  region_name: string;
+  /** Wording set by the admin; <wilayah> becomes the region name */
+  badge_text: string;
+  /** e.g. "Kepala Desa Tiwulandu" */
+  label: string;
+  community_role_id: string | null;
+  role_name: string | null;
+}
+
+export type CommunityAbility = 'delete_posts' | 'delete_comments' | 'delete_chat_messages';
+
+/** Role of a region appointment (Admin, Moderator, ...) and what it may do there */
+export interface CommunityRole {
+  id: string;
+  name: string;
+  abilities: CommunityAbility[];
+  appointments_count: number;
+}
+
+export interface CommunityRoleList {
+  roles: CommunityRole[];
+  abilities: { key: CommunityAbility; label: string }[];
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -112,6 +140,11 @@ export interface Customer {
   verification_status: CodVerificationStatus | null;
   /** The verification event behind verification_status (verified by it, or revoked on it) */
   verification_id: string | null;
+  /** Admin-granted verified badge: the customer's posts show in the app's "Resmi" tab */
+  has_verified_badge: boolean;
+  verified_badge_at: string | null;
+  /** Regions the customer looks after ("Admin <wilayah>" badge, moderates posts there, joins the region chat) */
+  region_admins: CustomerRegionAdmin[];
   /** Latest app heartbeat or API use; sent by the admin customer list/detail only */
   last_seen_at?: string | null;
   is_blocked: boolean;
@@ -259,6 +292,8 @@ export interface Banner {
   link_url: string | null;
   placement: BannerPlacement;
   is_active: boolean;
+  /** Popup images only: ISO weekdays 1 (Senin) – 7 (Minggu) it shows on; null = every day. */
+  weekdays?: number[] | null;
   /** Popup images only: show from/until these dates (YYYY-MM-DD, WIB); null = no limit. */
   starts_on?: string | null;
   ends_on?: string | null;
@@ -271,11 +306,7 @@ export type LaunchPopupMode = 'off' | 'admob' | 'image';
 
 export interface LaunchPopupSettings {
   mode: LaunchPopupMode;
-  /** ISO weekdays 1 (Senin) – 7 (Minggu); null = every day. */
-  weekdays: number[] | null;
   max_per_day: number;
-  starts_on: string | null;
-  ends_on: string | null;
 }
 
 export interface AdminSession {
@@ -464,20 +495,6 @@ export interface WalletBonusSettings {
   tiers: WalletBonusTier[];
 }
 
-/** Iklan > Peti Hadiah: rewarded ads fill a chest that pays random saldo belanja. */
-export interface AdChestSettings {
-  is_active: boolean;
-  chests_per_day: number;
-  /** Saldo all chests may pay out per day (WIB); 0 = no cap. */
-  daily_budget: number;
-  step: number;
-  tiers: WalletBonusTier[];
-  /** Read-only: AdMob is on with a rewarded unit, without which the chest never shows. */
-  ads_ready?: boolean;
-  /** Read-only: saldo paid out by chests today. */
-  paid_today?: number;
-}
-
 export interface ServiceFeeSettings {
   is_active: boolean;
   label: string;
@@ -500,6 +517,10 @@ export interface MidtransSettings {
   mode: MidtransMode;
   /** True until saved once in the panel: values come from the backend .env. */
   from_env: boolean;
+  /** Minutes a balance top-up payment stays open (default 5). */
+  topup_expiry_minutes: number;
+  /** Minutes an order payment stays open (default 5). */
+  order_expiry_minutes: number;
   notification_url: string;
   sandbox: MidtransModeKeys;
   production: MidtransModeKeys;
@@ -508,6 +529,8 @@ export interface MidtransSettings {
 /** A blank server_key keeps the stored one. */
 export interface MidtransSettingsPayload {
   mode: MidtransMode;
+  topup_expiry_minutes: number;
+  order_expiry_minutes: number;
   sandbox: { client_key: string; server_key: string };
   production: { client_key: string; server_key: string };
 }

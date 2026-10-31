@@ -25,12 +25,17 @@ class HomePopup {
   /// Once per process: home can be rebuilt (e.g. after logging in again).
   static bool _handledThisLaunch = false;
 
-  static void scheduleOn(State state, WidgetRef ref) {
+  /// [before] runs first, once startup has settled (the first-launch tour);
+  /// when it returns true the popup is left out for this launch.
+  static void scheduleOn(State state, WidgetRef ref, {Future<bool> Function()? before}) {
     if (_handledThisLaunch) return;
     ref.listenManual<bool>(startupSettledProvider, (_, settled) {
       if (!settled || _handledThisLaunch) return;
       _handledThisLaunch = true;
-      unawaited(_maybeShow(state, ref).catchError((_) {}));
+      unawaited(() async {
+        if (before != null && await before()) return;
+        await _maybeShow(state, ref);
+      }().catchError((_) {}));
     }, fireImmediately: true);
   }
 
@@ -173,7 +178,7 @@ class _PopupContent extends StatelessWidget {
                 child: Semantics(
                   label: banner.name,
                   image: true,
-                  child: CachedNetworkImage(imageUrl: banner.imageUrl, fit: BoxFit.cover),
+                  child: CachedNetworkImage(memCacheWidth: 900, imageUrl: banner.imageUrl, fit: BoxFit.cover),
                 ),
               ),
             ),

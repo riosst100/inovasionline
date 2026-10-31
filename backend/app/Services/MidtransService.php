@@ -45,7 +45,7 @@ class MidtransService
             ? $order->order_number.'~'.now()->timestamp
             : $order->order_number;
 
-        $snap = $this->requestSnap([
+        $snap = $this->requestSnap(expiryMinutes: MidtransSetting::current()->order_expiry_minutes ?: MidtransSetting::DEFAULT_ORDER_EXPIRY_MINUTES, payload: [
             // A single enabled channel makes Snap skip its own method list.
             'enabled_payments' => $channel ? [$channel] : null,
             'transaction_details' => [
@@ -74,7 +74,7 @@ class MidtransService
     {
         $topup->loadMissing('user');
 
-        $snap = $this->requestSnap([
+        $snap = $this->requestSnap(expiryMinutes: MidtransSetting::current()->topup_expiry_minutes ?: MidtransSetting::DEFAULT_TOPUP_EXPIRY_MINUTES, payload: [
             'transaction_details' => [
                 'order_id' => $topup->topup_number,
                 'gross_amount' => (int) round((float) $topup->amount),
@@ -315,7 +315,7 @@ class MidtransService
     /**
      * @return array{payment_token: string, payment_redirect_url: string, payment_expires_at: \Illuminate\Support\Carbon}
      */
-    private function requestSnap(array $payload): array
+    private function requestSnap(array $payload, ?int $expiryMinutes = null): array
     {
         $serverKey = MidtransSetting::current()->serverKey();
 
@@ -323,7 +323,7 @@ class MidtransService
             throw new RuntimeException('Payment gateway is not configured.');
         }
 
-        $expiryMinutes = (int) config('services.midtrans.expiry_minutes', 1440);
+        $expiryMinutes ??= (int) config('services.midtrans.expiry_minutes', 1440);
 
         // Lets a local/staging server receive its own notifications (e.g. via an ngrok URL)
         // while the dashboard Notification URL keeps pointing at production.

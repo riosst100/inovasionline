@@ -9,15 +9,17 @@ use App\Services\NotificationService;
 use App\Support\Enums\OrderStatus;
 use App\Support\Enums\PaymentMethodType;
 use App\Support\Enums\PaymentStatus;
+use App\Support\Enums\ShippingMethodType;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Endpoints for the driver app. A driver carries several parcels at once, so every parcel is
- * identified by its QR code: scanning it picks the order, then a photo confirms the step. An order
- * split into several parcels has one QR per parcel; any of them resolves the order.
+ * Endpoints for the driver app. A driver carries several parcels at once. A parcel is picked either by
+ * scanning its QR (an order split into several parcels has one QR per parcel; any resolves the order)
+ * or from the lists (`tab=ready` to pick up, `tab=active` to hand over); a photo then confirms the step.
+ * The QR is optional on ship/deliver: when sent it must match the order.
  */
 class DriverDeliveryController extends Controller
 {
@@ -26,14 +28,23 @@ class DriverDeliveryController extends Controller
     /** The driver's parcels: `tab=active` (on the way, default) or `tab=done` (delivered). */
     public function index(Request $request): JsonResponse
     {
-        $done = $request->string('tab')->toString() === 'done';
+        $tab = $request->string('tab')->toString();
+        $done = $tab === 'done';
 
-        $paginator = Order::query()
-            ->where('driver_id', $request->user()->id)
-            ->where('status', $done ? OrderStatus::COMPLETED : OrderStatus::ON_DELIVERY)
+        // `ready`: parcels waiting for a courier (not claimed by another driver, no store pickup).
+        $query = $tab === 'ready'
+            ? Order::query()
+                ->where('status', OrderStatus::READY)
+                ->where(fn ($q) => $q->whereNull('driver_id')->orWhere('driver_id', $request->user()->id))
+                ->where('delivery_method', '!=', ShippingMethodType::STORE_PICKUP->value)
+            : Order::query()
+                ->where('driver_id', $request->user()->id)
+                ->where('status', $done ? OrderStatus::COMPLETED : OrderStatus::ON_DELIVERY);
+
+        $paginator = $query
             ->with(['user', 'paymentMethod'])
             ->withCount('items')
-            ->orderByDesc($done ? 'completed_at' : 'shipped_at')
+            ->orderByDesc($done ? 'completed_at' : ($tab === 'ready' ? 'updated_at' : 'shipped_at'))
             ->paginate($request->integer('per_page', 20));
 
         return ApiResponse::success(
@@ -65,13 +76,13 @@ class DriverDeliveryController extends Controller
     public function ship(Request $request, Order $order): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string'],
+            'code' => ['nullable', 'string'],
             'photo' => ['required', 'image', 'max:8192'],
         ]);
 
         $driver = $request->user();
 
-        if ($error = $this->guard($order, $data['code'])) {
+        if ($error = $this->guard($order, $data['code'] ?? null)) {
             return $error;
         }
         if ($order->status !== OrderStatus::READY || $order->isStorePickup()) {
@@ -98,13 +109,13 @@ class DriverDeliveryController extends Controller
     public function deliver(Request $request, Order $order): JsonResponse
     {
         $data = $request->validate([
-            'code' => ['required', 'string'],
+            'code' => ['nullable', 'string'],
             'photo' => ['required', 'image', 'max:8192'],
         ]);
 
         $driver = $request->user();
 
-        if ($error = $this->guard($order, $data['code'])) {
+        if ($error = $this->guard($order, $data['code'] ?? null)) {
             return $error;
         }
         if ($order->status !== OrderStatus::ON_DELIVERY) {
@@ -135,9 +146,13 @@ class DriverDeliveryController extends Controller
         return ApiResponse::success($this->payload($this->reload($order), $driver), 'Pesanan ditandai selesai.');
     }
 
-    /** The scanned code must belong to the order in the URL. */
-    private function guard(Order $order, string $code): ?JsonResponse
+    /** A scanned code, when sent, must belong to the order in the URL. */
+    private function guard(Order $order, ?string $code): ?JsonResponse
     {
+        if ($code === null || $code === '') {
+            return null;
+        }
+
         $scanned = Order::findByQrCode($code);
 
         return $scanned?->is($order) ? null : ApiResponse::error('QR tidak cocok dengan pesanan ini.', [], 422);

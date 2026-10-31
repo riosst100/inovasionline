@@ -6,6 +6,8 @@ import Link from 'next/link';
 import AdminLayout from '../../../components/layout/AdminLayout';
 import VerificationStatus from '../../../components/customers/VerificationStatus';
 import LastSeen from '../../../components/customers/LastSeen';
+import RegionAdminModal from '../../../components/customers/RegionAdminModal';
+import CommunityRolesModal from '../../../components/customers/CommunityRolesModal';
 import { adminApi } from '../../../lib/api';
 import { BannableFeature, Customer, GuestInstall } from '../../../types';
 import {
@@ -13,6 +15,7 @@ import {
   Search,
   Loader2,
   Ban,
+  BadgeCheck,
   ShieldCheck,
   ShieldOff,
   MessageSquareOff,
@@ -38,6 +41,8 @@ export default function CustomersPage() {
   const [banTarget, setBanTarget] = useState<Customer | null>(null);
   const [banFeatures, setBanFeatures] = useState<BannableFeature[]>([]);
   const [banReason, setBanReason] = useState('');
+  const [regionAdminTarget, setRegionAdminTarget] = useState<Customer | null>(null);
+  const [showRoles, setShowRoles] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', email: '', phone: '', password: '' });
@@ -142,6 +147,22 @@ export default function CustomersPage() {
     }
   };
 
+  const handleToggleVerifiedBadge = async (c: Customer) => {
+    const message = c.has_verified_badge
+      ? `Cabut badge verified ${c.name}? Postingannya pindah ke tab Publik di aplikasi.`
+      : `Beri badge verified ke ${c.name}? Postingannya tampil di tab Resmi di aplikasi.`;
+    if (!window.confirm(message)) return;
+
+    try {
+      setBusyId(c.id);
+      applyUpdated(c.id, await adminApi.setCustomerVerifiedBadge(c.id, !c.has_verified_badge));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Gagal memperbarui badge verified.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleRevokeVerification = async (c: Customer) => {
     const reason = window.prompt(
       `Cabut verifikasi wajah ${c.name}? Customer wajib verifikasi ulang sebelum memakai COD/Paylater.\nAlasan (wajib):`,
@@ -184,12 +205,20 @@ export default function CustomersPage() {
               Daftar pembeli dan pengguna yang mendaftar melalui aplikasi mobile Inovasi Online ({total} pengguna).
             </p>
           </div>
-          <button
-            onClick={openAddModal}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs md:text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            <UserPlus className="h-4 w-4" /> Tambah Customer
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowRoles(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2 text-xs md:text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              <ShieldCheck className="h-4 w-4" /> Peran Komunitas
+            </button>
+            <button
+              onClick={openAddModal}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs md:text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              <UserPlus className="h-4 w-4" /> Tambah Customer
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -329,7 +358,25 @@ export default function CustomersPage() {
                             {c.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <span className="font-bold text-slate-900">{c.name}</span>
+                            <span className="inline-flex items-center gap-1 font-bold text-slate-900">
+                              {c.name}
+                              {c.has_verified_badge && (
+                                <BadgeCheck className="h-4 w-4 text-sky-500" aria-label="Badge verified" />
+                              )}
+                            </span>
+                            {(c.region_admins ?? []).length > 0 && (
+                              <div className="mt-0.5 flex flex-wrap gap-1">
+                                {c.region_admins.map((a) => (
+                                  <span
+                                    key={a.id}
+                                    title={a.role_name ? `Peran: ${a.role_name}` : undefined}
+                                    className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700"
+                                  >
+                                    {a.label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             <p className="text-xs text-slate-400">{c.email}</p>
                           </div>
                         </div>
@@ -382,6 +429,20 @@ export default function CustomersPage() {
                           className="inline-flex items-center gap-1 rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
                         >
                           <MessageSquareOff className="h-3.5 w-3.5" /> Banned
+                        </button>
+                        <button
+                          onClick={() => handleToggleVerifiedBadge(c)}
+                          disabled={busyId === c.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5" /> {c.has_verified_badge ? 'Cabut Badge' : 'Beri Badge'}
+                        </button>
+                        <button
+                          onClick={() => setRegionAdminTarget(c)}
+                          disabled={busyId === c.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" /> Admin Wilayah
                         </button>
                         {c.verification_status === 'verified' && (
                           <button
@@ -463,6 +524,19 @@ export default function CustomersPage() {
             </div>
           </form>
         </div>
+      )}
+
+      {showRoles && <CommunityRolesModal onClose={() => setShowRoles(false)} />}
+
+      {regionAdminTarget && (
+        <RegionAdminModal
+          customer={regionAdminTarget}
+          onClose={() => setRegionAdminTarget(null)}
+          onUpdated={(updated) => {
+            applyUpdated(regionAdminTarget.id, updated);
+            setRegionAdminTarget(updated);
+          }}
+        />
       )}
 
       {banTarget && (

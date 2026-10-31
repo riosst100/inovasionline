@@ -12,32 +12,32 @@ use Illuminate\Http\JsonResponse;
 class LaunchPopupController extends Controller
 {
     /**
-     * What to show on opening the app today. `mode` is "off" whenever the schedule says
-     * no (or there is nothing to show), so the app only has to follow it.
+     * What to show on opening the app today (WIB): the popup images scheduled for today, else
+     * the AdMob ad. The app only has to follow `mode`.
      */
     public function show(): JsonResponse
     {
         $setting = LaunchPopupSetting::current();
-        $now = now(LaunchPopupSetting::TIMEZONE);
         $mode = $setting->mode;
         $items = collect();
 
-        if (! $setting->allowsDay($now)) {
-            $mode = LaunchPopupSetting::MODE_OFF;
-        }
-
         if ($mode === LaunchPopupSetting::MODE_IMAGE) {
+            $now = now(LaunchPopupSetting::TIMEZONE);
             $today = $now->toDateString();
+
             $items = Banner::query()
                 ->where('placement', Banner::PLACEMENT_POPUP)
                 ->where('is_active', true)
                 ->where(fn ($q) => $q->whereNull('starts_on')->orWhereDate('starts_on', '<=', $today))
                 ->where(fn ($q) => $q->whereNull('ends_on')->orWhereDate('ends_on', '>=', $today))
                 ->orderBy('sort_order')
-                ->get();
+                ->get()
+                ->filter(fn (Banner $b) => empty($b->weekdays) || in_array($now->isoWeekday(), array_map('intval', $b->weekdays), true))
+                ->values();
 
+            // Nothing scheduled today: show the AdMob ad instead (the app shows nothing if AdMob is off).
             if ($items->isEmpty()) {
-                $mode = LaunchPopupSetting::MODE_OFF;
+                $mode = LaunchPopupSetting::MODE_ADMOB;
             }
         }
 

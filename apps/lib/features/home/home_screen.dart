@@ -24,10 +24,10 @@ import '../cart/cart_providers.dart';
 import '../orders/order_providers.dart';
 import '../wallet/reward_effects.dart';
 import '../wallet/wallet_providers.dart';
-import 'ad_chest.dart';
 import 'bonus_gift.dart';
 import 'delivery_address_sheet.dart';
 import 'home_popup.dart';
+import 'home_tour.dart';
 import 'home_providers.dart';
 import 'welcome_message.dart';
 
@@ -42,6 +42,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _scrollController = ScrollController();
   final _locationKey = GlobalKey();
   final _searchKey = GlobalKey();
+  final _walletKey = GlobalKey();
+  final _cartKey = GlobalKey();
   int _selectedTab = 0;
   bool _defaultAddressAttempted = false;
   /// Scroll position (0..400). Only the sticky search bar follows it, through a
@@ -59,7 +61,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if ((clamped - _offset.value).abs() > 0.5) _offset.value = clamped;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeSetDefaultAddress());
-    HomePopup.scheduleOn(this, ref);
+    HomePopup.scheduleOn(this, ref, before: _maybeShowTour);
+  }
+
+  Future<bool> _maybeShowTour() async {
+    // Let the first data land so the highlighted spots do not jump around.
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return false;
+    return HomeTour.maybeShow(
+      context,
+      authenticated: ref.read(authProvider).status == AuthStatus.authenticated,
+      scroll: _scrollController,
+      wallet: _walletKey,
+      location: _locationKey,
+      cart: _cartKey,
+    );
   }
 
   /// First open with no saved address: default it to the user's current
@@ -135,7 +151,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       activeOrdersProvider.select((orders) => (orders.valueOrNull ?? const []).isNotEmpty),
     );
 
-    final topPadding = MediaQuery.of(context).padding.top;
+    final topPadding = MediaQuery.paddingOf(context).top;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _measureHeader();
     });
@@ -163,7 +179,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   silent(ref.refresh(bestSellersProvider.future)),
                   silent(ref.refresh(popularProductsProvider.future)),
                   silent(ref.refresh(walletProvider.future).then((_) {})),
-                  silent(ref.refresh(adChestProvider.future).then((_) {})),
                 ]);
               },
               child: CustomScrollView(
@@ -204,7 +219,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   // Promo: gratis ongkir untuk pembayaran pakai saldo belanja
                   const _WalletFreeShippingPromo(),
                   const SizedBox(height: 8),
-                  const _WalletSection(),
+                  KeyedSubtree(key: _walletKey, child: const _WalletSection()),
 
                   const SizedBox(height: 8),
 
@@ -278,7 +293,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 padding: EdgeInsets.only(top: topPadding + 12, bottom: 6),
                 child: KeyedSubtree(
                   key: _searchKey,
-                  child: _TopSearchBar(cartItemCount: cartItemCount),
+                  child: _TopSearchBar(cartItemCount: cartItemCount, cartKey: _cartKey),
                 ),
               ),
               builder: (context, offset, searchBar) {
@@ -701,9 +716,12 @@ class _ExpressCarIconState extends State<_ExpressCarIcon>
 // 2. MODERN SEARCH BAR
 // ==========================================
 class _TopSearchBar extends StatelessWidget {
-  const _TopSearchBar({required this.cartItemCount});
+  const _TopSearchBar({required this.cartItemCount, required this.cartKey});
 
   final int cartItemCount;
+
+  /// Marks the cart button for the first-launch tour.
+  final GlobalKey cartKey;
 
   @override
   Widget build(BuildContext context) {
@@ -767,6 +785,7 @@ class _TopSearchBar extends StatelessWidget {
           const SizedBox(width: 10),
           // Cart Shortcut with Badge
           InkWell(
+            key: cartKey,
             onTap: () => context.push('/cart'),
             borderRadius: BorderRadius.circular(22),
             child: Container(
@@ -1137,8 +1156,6 @@ class _WalletSectionState extends ConsumerState<_WalletSection> {
               ),
             ],
           ),
-          // Its own row, last: a game, not a money action like Top Up / Riwayat.
-          const AdChestWalletStrip(),
         ],
       ),
     );
@@ -1531,7 +1548,8 @@ class _WalletFreeShippingPromoState extends ConsumerState<_WalletFreeShippingPro
     if (count > 1) {
       _timer = Timer.periodic(const Duration(seconds: 4), (_) {
         final c = _controller;
-        if (c == null || !c.hasClients) return;
+        // Skip while another page covers this one: nobody sees the slide.
+        if (!mounted || !TickerMode.of(context) || c == null || !c.hasClients) return;
         c.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
       });
     }

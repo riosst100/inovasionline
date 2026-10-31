@@ -18,6 +18,9 @@ class MainShell extends ConsumerWidget {
   static const _ordersBranch = 3;
   static const _homeBranch = MainNavBar.homeIndex;
 
+  /// The bottom bar, for the first-launch tour (HomeTour) to point at its tabs.
+  static final navBarKey = GlobalKey();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeOrderCount =
@@ -78,6 +81,7 @@ class MainShell extends ConsumerWidget {
             ],
           ),
           bottomNavigationBar: MainNavBar(
+            key: navBarKey,
             selectedIndex: navigationShell.currentIndex,
             onDestinationSelected: (index) => navigationShell.goBranch(
               index,

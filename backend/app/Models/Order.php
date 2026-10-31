@@ -55,6 +55,8 @@ class Order extends Model
         'delivered_proof_path',
         'packages',
         'cancelled_at',
+        'cancelled_by',
+        'cancel_reason',
         'cancel_hold_started_at',
         'cancel_declined_at',
     ];
@@ -189,9 +191,23 @@ class Order extends Model
         return 'IO:'.$this->order_number.':'.$package.':'.$this->qrSignature($package);
     }
 
-    /** Resolves an order QR or any of its parcel QRs. */
+    /**
+     * Link printed in the QR: the admin web page /d/[code] that opens the driver app for a driver
+     * and the Inovasi Online app (order `o`) for the buyer. findByQrCode() accepts the link as well
+     * as the bare code.
+     */
+    public function qrLink(string $code): string
+    {
+        return config('app.admin_url').'/d/'.rawurlencode($code).'?o='.$this->id;
+    }
+
+    /** Resolves an order QR or any of its parcel QRs, given as the bare code or as its link. */
     public static function findByQrCode(string $code): ?self
     {
+        if (preg_match('~/d/([^/?#\s]+)~', $code, $m)) {
+            $code = rawurldecode($m[1]);
+        }
+
         $parts = explode(':', trim($code));
         if (! in_array(count($parts), [3, 4], true) || $parts[0] !== 'IO') {
             return null;

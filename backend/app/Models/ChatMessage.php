@@ -18,6 +18,14 @@ class ChatMessage extends Model
         'body',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            // Deleted messages stay as a placeholder; see ChatService::deleteMessage.
+            'deleted_at' => 'datetime',
+        ];
+    }
+
     public function thread(): BelongsTo
     {
         return $this->belongsTo(ChatThread::class, 'thread_id');

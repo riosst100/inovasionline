@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/account/account_screen.dart';
@@ -11,7 +12,6 @@ import '../features/checkout/checkout_screen.dart';
 import '../features/checkout/face_verification_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/flash_sale/flash_sale_screen.dart';
-import '../features/home/ad_chest.dart';
 import '../features/home/home_screen.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
@@ -24,6 +24,7 @@ import '../features/shell/main_shell.dart';
 import '../features/wallet/topup_screen.dart';
 import '../features/wallet/wallet_screen.dart';
 import '../models/cart.dart';
+import '../widgets/auth_required.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -89,7 +90,15 @@ final router = GoRouter(
       builder: (context, state) => const CompleteAddressScreen(),
     ),
     GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
-    GoRoute(path: '/cart', builder: (context, state) => const CartScreen()),
+    GoRoute(
+      path: '/cart',
+      builder: (context, state) => AuthRequired(
+        title: 'Keranjang',
+        icon: Icons.shopping_cart_outlined,
+        message: 'Masuk untuk melihat keranjang kamu.',
+        builder: (_) => const CartScreen(),
+      ),
+    ),
     GoRoute(
       path: '/flash-sale',
       builder: (context, state) => const FlashSaleScreen(),
@@ -108,39 +117,80 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/checkout',
-      builder: (context, state) =>
-          CheckoutScreen(selection: state.extra as CartSelection),
+      builder: (context, state) => AuthRequired(
+        title: 'Checkout',
+        icon: Icons.shopping_bag_outlined,
+        message: 'Masuk untuk melanjutkan checkout.',
+        builder: (_) => CheckoutScreen(selection: state.extra as CartSelection),
+      ),
     ),
-    GoRoute(path: '/face-verification', builder: (context, state) => const FaceVerificationScreen()),
-    GoRoute(path: '/wallet', builder: (context, state) => const WalletScreen()),
-    GoRoute(path: '/chest', builder: (context, state) => const AdChestScreen()),
+    GoRoute(
+      path: '/face-verification',
+      builder: (context, state) => AuthRequired(
+        title: 'Verifikasi Wajah',
+        icon: Icons.face_retouching_natural,
+        message: 'Masuk untuk melakukan verifikasi.',
+        builder: (_) => const FaceVerificationScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/wallet',
+      builder: (context, state) => AuthRequired(
+        title: 'Saldo Belanja',
+        icon: Icons.account_balance_wallet_outlined,
+        message: 'Masuk untuk melihat saldo belanja kamu.',
+        builder: (_) => const WalletScreen(),
+      ),
+    ),
     GoRoute(
       path: '/wallet/topup',
-      builder: (context, state) =>
-          TopupScreen(fromCheckout: state.extra == topupFromCheckout),
+      builder: (context, state) => AuthRequired(
+        title: 'Top Up Saldo',
+        icon: Icons.account_balance_wallet_outlined,
+        message: 'Masuk untuk mengisi saldo belanja.',
+        builder: (_) => TopupScreen(fromCheckout: state.extra == topupFromCheckout),
+      ),
     ),
     GoRoute(
       path: '/wallet/topups/:id/pay',
-      builder: (context, state) => PaymentWebViewScreen.topup(
-        topupId: state.pathParameters['id']!,
-        redirectUrl: state.extra as String,
+      builder: (context, state) => AuthRequired(
+        title: 'Pembayaran',
+        icon: Icons.payment_outlined,
+        message: 'Masuk untuk melanjutkan pembayaran.',
+        builder: (_) => PaymentWebViewScreen.topup(
+          topupId: state.pathParameters['id']!,
+          redirectUrl: state.extra as String,
+        ),
       ),
     ),
     GoRoute(
       path: '/orders/:id',
-      builder: (context, state) =>
-          OrderDetailScreen(orderId: state.pathParameters['id']!),
+      builder: (context, state) => AuthRequired(
+        title: 'Detail Pesanan',
+        icon: Icons.receipt_long_outlined,
+        message: 'Masuk untuk melihat pesanan kamu.',
+        builder: (_) => OrderDetailScreen(orderId: state.pathParameters['id']!),
+      ),
     ),
     GoRoute(
       path: '/orders/:id/track',
-      builder: (context, state) =>
-          OrderTrackingScreen(orderId: state.pathParameters['id']!),
+      builder: (context, state) => AuthRequired(
+        title: 'Lacak Pesanan',
+        icon: Icons.local_shipping_outlined,
+        message: 'Masuk untuk melacak pesanan kamu.',
+        builder: (_) => OrderTrackingScreen(orderId: state.pathParameters['id']!),
+      ),
     ),
     GoRoute(
       path: '/orders/:id/pay',
-      builder: (context, state) => PaymentWebViewScreen(
-        orderId: state.pathParameters['id']!,
-        redirectUrl: state.extra as String,
+      builder: (context, state) => AuthRequired(
+        title: 'Pembayaran',
+        icon: Icons.payment_outlined,
+        message: 'Masuk untuk melanjutkan pembayaran.',
+        builder: (_) => PaymentWebViewScreen(
+          orderId: state.pathParameters['id']!,
+          redirectUrl: state.extra as String,
+        ),
       ),
     ),
   ],

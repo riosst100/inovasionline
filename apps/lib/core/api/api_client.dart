@@ -6,6 +6,7 @@ import 'api_exception.dart';
 import 'cache_versions.dart';
 import 'connectivity.dart';
 import 'response_cache.dart';
+import 'session_expired.dart';
 
 class ApiClient {
   ApiClient(this._tokenStorage) : dio = Dio(
@@ -66,6 +67,7 @@ class ApiClient {
             final saved = await ResponseCache.offline(error.requestOptions);
             if (saved != null) return handler.resolve(saved);
           }
+          await _notifyIfSessionExpired(error);
           handler.next(_mapError(error));
         },
       ),
@@ -101,6 +103,16 @@ class ApiClient {
     } catch (_) {
       return null;
     }
+  }
+
+  /// A 401 for the token we are still holding means the session is over. A late answer to a
+  /// request made with an older token (e.g. before a fresh login) is ignored.
+  Future<void> _notifyIfSessionExpired(DioException error) async {
+    if (error.response?.statusCode != 401) return;
+    final sent = error.requestOptions.headers['Authorization'];
+    if (sent == null) return;
+    final current = await _tokenStorage.readToken();
+    if (current != null && sent == 'Bearer $current') SessionExpired.notify();
   }
 
   DioException _mapError(DioException error) {

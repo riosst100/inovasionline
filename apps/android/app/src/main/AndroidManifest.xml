@@ -40,6 +40,13 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Parcel QR label: the admin web page /d/<code> sends the buyer to inovasionline://app/orders/<id>. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="inovasionline" android:host="app"/>
+            </intent-filter>
             <!-- App Links: opens inovasionline.com links directly in the app.
                  autoVerify requires a matching public/.well-known/assetlinks.json
                  to be served over HTTPS at the domain root. -->

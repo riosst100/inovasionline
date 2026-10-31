@@ -35,6 +35,20 @@ class UserResource extends JsonResource
             'banned_features' => $this->banned_features ?? [],
             'ban_reason' => $this->ban_reason,
             'is_verified' => $this->isVerified(),
+            // Admin-granted verified badge; the user's posts show in the app's "Resmi" tab.
+            'has_verified_badge' => $this->hasVerifiedBadge(),
+            'verified_badge_at' => $this->verified_badge_at,
+            // Regions this user looks after ("Admin <region>" badge).
+            'region_admins' => $this->regionAdmins->map(fn ($a) => [
+                'id' => $a->id,
+                'region_level' => $a->region_level->value,
+                'region_code' => $a->region_code,
+                'region_name' => $a->region_name,
+                'badge_text' => $a->badge_text,
+                'label' => $a->label(),
+                'community_role_id' => $a->community_role_id,
+                'role_name' => $a->role?->name,
+            ])->values(),
             // Face verification (COD/Paylater): null = never, verified, or revoked; verification_id is the event behind it.
             'verification_status' => $this->verification_status,
             'verification_id' => $this->verification_id,

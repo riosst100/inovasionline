@@ -70,7 +70,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen>
   @override
   Widget build(BuildContext context) {
     final productAsync = ref.watch(productDetailProvider(widget.slug));
-    final cartItemCount = ref.watch(cartProvider).cart?.itemCount ?? 0;
+    final cartItemCount = ref.watch(cartProvider.select((s) => s.cart?.itemCount ?? 0));
 
     return Scaffold(
       appBar: AppBar(

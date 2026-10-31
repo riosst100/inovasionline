@@ -29,8 +29,8 @@ enum OrderStatus {
   /// Verb shown on the button that moves an order into this status.
   String get actionLabel => switch (this) {
     processing => 'Mulai Siapkan',
-    ready => 'Tandai Siap',
-    onDelivery => 'Antar Pesanan',
+    ready => 'Selesaikan Pengemasan',
+    onDelivery => 'Kirim Pesanan',
     completed => 'Selesaikan',
     cancelled => 'Batalkan',
     pending => label,
@@ -138,6 +138,7 @@ class Order {
     this.deliverySlot,
     this.customerNotes,
     this.adminNotes,
+    this.cancelReason,
     this.history = const [],
     this.paidAt,
     this.qrCode,
@@ -165,6 +166,7 @@ class Order {
     deliverySlot: (json['delivery_slot'] as Map?)?.cast<String, dynamic>(),
     customerNotes: json['customer_notes'] as String?,
     adminNotes: json['admin_notes'] as String?,
+    cancelReason: json['cancel_reason'] as String?,
     history: (json['status_history'] as List? ?? [])
         .map((e) => StatusHistoryEntry.fromJson(e as Map<String, dynamic>))
         .toList(),
@@ -196,6 +198,7 @@ class Order {
   final Map<String, dynamic>? deliverySlot;
   final String? customerNotes;
   final String? adminNotes;
+  final String? cancelReason;
   final List<StatusHistoryEntry> history;
   final DateTime? paidAt;
 

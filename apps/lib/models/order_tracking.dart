@@ -1,6 +1,15 @@
+import 'dart:math';
+
 /// The courier's latest position for one order (`GET /orders/{id}/tracking`).
 class OrderTracking {
-  OrderTracking({required this.status, required this.active, this.driver, this.location});
+  OrderTracking({
+    required this.status,
+    required this.active,
+    this.driver,
+    this.location,
+    this.destination,
+    this.route,
+  });
 
   factory OrderTracking.fromJson(Map<String, dynamic> json) => OrderTracking(
         status: json['status'] as String? ?? '',
@@ -8,6 +17,8 @@ class OrderTracking {
         driver: json['driver'] != null ? TrackingDriver.fromJson(json['driver'] as Map<String, dynamic>) : null,
         location:
             json['location'] != null ? TrackingLocation.fromJson(json['location'] as Map<String, dynamic>) : null,
+        destination: json['destination'] != null ? GeoPoint.fromJson(json['destination'] as Map<String, dynamic>) : null,
+        route: json['route'] != null ? TrackingRoute.fromJson(json['route'] as Map<String, dynamic>) : null,
       );
 
   final String status;
@@ -18,6 +29,58 @@ class OrderTracking {
 
   /// Null until the courier's app has sent a first GPS fix.
   final TrackingLocation? location;
+
+  /// Where the buyer's phone was at checkout (the address itself has no coordinates); null when unknown.
+  final GeoPoint? destination;
+
+  /// Road route from the courier to [destination]; null without a route service (draw a straight line).
+  final TrackingRoute? route;
+
+  /// Meters left: along the road when [route] is known, otherwise as the crow flies.
+  double? get remainingMeters {
+    final from = location;
+    final to = destination;
+    if (route != null) return route!.distanceMeters.toDouble();
+    if (from == null || to == null) return null;
+    return GeoPoint(from.latitude, from.longitude).metersTo(to);
+  }
+}
+
+class GeoPoint {
+  const GeoPoint(this.latitude, this.longitude);
+
+  factory GeoPoint.fromJson(Map<String, dynamic> json) =>
+      GeoPoint((json['latitude'] as num).toDouble(), (json['longitude'] as num).toDouble());
+
+  final double latitude;
+  final double longitude;
+
+  double metersTo(GeoPoint other) {
+    double rad(double deg) => deg * pi / 180;
+    final dLat = rad(other.latitude - latitude);
+    final dLng = rad(other.longitude - longitude);
+    final a = pow(sin(dLat / 2), 2) + cos(rad(latitude)) * cos(rad(other.latitude)) * pow(sin(dLng / 2), 2);
+    return 6371000 * 2 * atan2(sqrt(a), sqrt(1 - a));
+  }
+}
+
+class TrackingRoute {
+  TrackingRoute({required this.points, required this.distanceMeters, required this.durationSeconds});
+
+  factory TrackingRoute.fromJson(Map<String, dynamic> json) => TrackingRoute(
+        points: (json['points'] as List<dynamic>)
+            .map((p) => GeoPoint(((p as List)[0] as num).toDouble(), (p[1] as num).toDouble()))
+            .toList(),
+        distanceMeters: (json['distance_m'] as num?)?.toInt() ?? 0,
+        durationSeconds: (json['duration_s'] as num?)?.toInt() ?? 0,
+      );
+
+  /// From (near) the courier to the destination, already trimmed to the part not yet driven.
+  final List<GeoPoint> points;
+  final int distanceMeters;
+
+  /// By car; a motorbike in city traffic is often a bit quicker.
+  final int durationSeconds;
 }
 
 class TrackingDriver {
