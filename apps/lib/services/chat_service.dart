@@ -58,6 +58,12 @@ class ChatService {
     return ChatMessage.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
+  /// Returns the message as it now is (a "Pesan ini dihapus" placeholder).
+  Future<ChatMessage> deleteMessage(String messageId) async {
+    final response = await _apiClient.dio.delete('/chat/messages/$messageId');
+    return ChatMessage.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
   Future<ChatThread> startDirectMessage(String userId) async {
     final response = await _apiClient.dio.post('/chat/users/$userId/dm');
     return ChatThread.fromJson(response.data['data'] as Map<String, dynamic>);

@@ -31,7 +31,7 @@ class _Collected {
 /// Plays the full-screen reveal for [claim] (the amount credited), with [box]
 /// drawing the container whose lid pops ([lidLift] 0..1). Once collected the
 /// coin flies into the saldo card and the wallet refreshes; a failed claim
-/// shows its message. Also used by the home screen's reward chest.
+/// shows its message.
 Future<void> revealReward(
   BuildContext context,
   WidgetRef ref, {

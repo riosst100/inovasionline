@@ -8,39 +8,61 @@ import '../../core/formatters.dart';
 import '../../core/permissions.dart';
 import '../../models/parcel.dart';
 import '../../providers/providers.dart';
+import '../scan/confirm_screen.dart';
 import '../scan/scan_screen.dart';
 
 /// Opens the scanner (after the location check) and refreshes the parcel lists when it closes.
 Future<void> openScan(BuildContext context, WidgetRef ref, {Parcel? expected}) async {
   if (!await ensureLocationReady(context) || !context.mounted) return;
   Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ScanScreen(expected: expected))).then((_) {
+    ref.invalidate(readyParcelsProvider);
     ref.invalidate(parcelsProvider(false));
     ref.invalidate(parcelsProvider(true));
   });
 }
 
-/// "Pesanan" menu, two tabs: parcels still to deliver and delivered ones.
+/// Confirms pickup or handover of [parcel] straight from a list, no QR scan needed.
+Future<void> openConfirm(BuildContext context, WidgetRef ref, Parcel parcel) async {
+  if (parcel.action == ParcelAction.none || !await ensureLocationReady(context) || !context.mounted) return;
+  await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ConfirmScreen(parcel: parcel)));
+  ref.invalidate(readyParcelsProvider);
+  ref.invalidate(parcelsProvider(false));
+  ref.invalidate(parcelsProvider(true));
+}
+
+/// "Pesanan" menu, three tabs: parcels to pick up, on the way, and delivered ones. Pickup and
+/// handover are confirmed by tapping the parcel; scanning its QR is optional.
 class OrdersScreen extends ConsumerWidget {
   const OrdersScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Pesanan'),
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'Perlu Dikirim'),
+              Tab(text: 'Siap Diambil'),
+              Tab(text: 'Diantar'),
               Tab(text: 'Selesai'),
             ],
           ),
         ),
         body: TabBarView(
           children: [
-            _ParcelList(done: false, onTap: (p) => openScan(context, ref, expected: p)),
-            const _ParcelList(done: true),
+            _ParcelList(
+              provider: readyParcelsProvider,
+              emptyText: 'Belum ada paket yang siap diambil.',
+              onTap: (p) => openConfirm(context, ref, p),
+            ),
+            _ParcelList(
+              provider: parcelsProvider(false),
+              emptyText: 'Tidak ada paket di tangan.\nAmbil paket dari tab Siap Diambil atau scan QR-nya.',
+              onTap: (p) => openConfirm(context, ref, p),
+            ),
+            _ParcelList(provider: parcelsProvider(true), emptyText: 'Belum ada pesanan yang selesai.'),
           ],
         ),
       ),
@@ -49,27 +71,23 @@ class OrdersScreen extends ConsumerWidget {
 }
 
 class _ParcelList extends ConsumerWidget {
-  const _ParcelList({required this.done, this.onTap});
+  const _ParcelList({required this.provider, required this.emptyText, this.onTap});
 
-  final bool done;
+  final ProviderBase<AsyncValue<List<Parcel>>> provider;
+  final String emptyText;
   final void Function(Parcel)? onTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final parcels = ref.watch(parcelsProvider(done));
+    final parcels = ref.watch(provider);
 
     return RefreshIndicator(
-      onRefresh: () => ref.refresh(parcelsProvider(done).future),
+      onRefresh: () async => ref.invalidate(provider),
       child: parcels.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _Message(icon: Icons.cloud_off, text: errorMessage(e)),
         data: (items) => items.isEmpty
-            ? _Message(
-                icon: Icons.inventory_2_outlined,
-                text: done
-                    ? 'Belum ada pesanan yang selesai.'
-                    : 'Tidak ada paket di tangan.\nScan QR paket untuk mulai mengantar.',
-              )
+            ? _Message(icon: Icons.inventory_2_outlined, text: emptyText)
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
                 itemCount: items.length,

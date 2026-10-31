@@ -11,6 +11,7 @@ use App\Support\Enums\OrderStatus;
 use App\Support\Enums\PaymentStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -57,6 +58,57 @@ class OrderTrackingTest extends TestCase
 
         $this->actingAs(User::factory()->create())->getJson("/api/v1/orders/{$onTheWay->id}/tracking")
             ->assertForbidden();
+    }
+
+    public function test_route_to_the_checkout_location_is_fetched_once_and_trimmed_as_the_courier_moves(): void
+    {
+        config(['services.openrouteservice.key' => 'test-key']);
+        Http::fake(['api.openrouteservice.org/*' => Http::response([
+            'features' => [[
+                // [lng, lat]: three points ~1.1 km apart going north.
+                'geometry' => ['coordinates' => [[106.8, -6.2], [106.8, -6.19], [106.8, -6.18]]],
+                'properties' => ['summary' => ['distance' => 2200, 'duration' => 600]],
+            ]],
+        ])]);
+
+        $driver = $this->driver();
+        $driver->forceFill(['last_latitude' => -6.2, 'last_longitude' => 106.8, 'last_location_at' => now()])->save();
+        $buyer = User::factory()->create();
+        $order = $this->order($buyer, OrderStatus::ON_DELIVERY, $driver);
+        $order->deviceLog()->create(['user_id' => $buyer->id, 'latitude' => -6.18, 'longitude' => 106.8]);
+
+        $this->actingAs($buyer)->getJson("/api/v1/orders/{$order->id}/tracking")
+            ->assertOk()
+            ->assertJsonPath('data.destination.latitude', -6.18)
+            ->assertJsonPath('data.route.distance_m', 2200)
+            ->assertJsonPath('data.route.points.0', [-6.2, 106.8])
+            ->assertJsonCount(3, 'data.route.points');
+
+        // The courier reached the middle point: the cached route is reused, minus the driven half.
+        $driver->forceFill(['last_latitude' => -6.19])->save();
+        $this->actingAs($buyer)->getJson("/api/v1/orders/{$order->id}/tracking")
+            ->assertJsonPath('data.route.distance_m', 1100)
+            ->assertJsonPath('data.route.duration_s', 300)
+            ->assertJsonCount(2, 'data.route.points');
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_without_a_route_key_the_app_gets_no_route(): void
+    {
+        config(['services.openrouteservice.key' => null]);
+        Http::fake();
+        $driver = $this->driver();
+        $driver->forceFill(['last_latitude' => -6.2, 'last_longitude' => 106.8, 'last_location_at' => now()])->save();
+        $buyer = User::factory()->create();
+        $order = $this->order($buyer, OrderStatus::ON_DELIVERY, $driver);
+        $order->deviceLog()->create(['user_id' => $buyer->id, 'latitude' => -6.18, 'longitude' => 106.8]);
+
+        $this->actingAs($buyer)->getJson("/api/v1/orders/{$order->id}/tracking")
+            ->assertJsonPath('data.destination.latitude', -6.18)
+            ->assertJsonPath('data.route', null);
+
+        Http::assertNothingSent();
     }
 
     public function test_only_drivers_can_report_a_location(): void

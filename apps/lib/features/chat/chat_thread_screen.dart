@@ -12,6 +12,7 @@ import '../../models/chat_message.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/skeleton.dart';
+import '../../widgets/user_badges.dart';
 import 'chat_thread_info_screen.dart';
 
 const _chatPollInterval = Duration(seconds: 5);
@@ -267,13 +268,62 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen>
           .read(chatServiceProvider)
           .messages(widget.threadId);
       if (!mounted) return;
+      final fresh = {for (final m in result.data) m.id: m};
       final newMessages = result.data
           .where((m) => !_messages.any((existing) => existing.id == m.id))
           .toList();
-      if (newMessages.isEmpty) return;
-      setState(() => _messages.insertAll(0, newMessages));
+      // Messages already on screen may have been deleted since.
+      final changed = _messages.any((m) => fresh[m.id] != null && fresh[m.id]!.isDeleted != m.isDeleted);
+      if (newMessages.isEmpty && !changed) return;
+      setState(() {
+        for (var i = 0; i < _messages.length; i++) {
+          final update = fresh[_messages[i].id];
+          if (update != null) _messages[i] = update;
+        }
+        _messages.insertAll(0, newMessages);
+      });
     } catch (_) {
       // Silently ignore poll failures; next tick will retry.
+    }
+  }
+
+  Future<void> _deleteMessage(ChatMessage message) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Hapus Pesan'),
+            content: const Text('Pesan akan diganti dengan "Pesan ini dihapus" untuk semua anggota.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Batal'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Hapus'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    try {
+      final deleted = await ref.read(chatServiceProvider).deleteMessage(message.id);
+      if (!mounted) return;
+      setState(() {
+        final index = _messages.indexWhere((m) => m.id == message.id);
+        if (index != -1) _messages[index] = deleted;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal menghapus pesan.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -549,8 +599,11 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen>
                                 isLastInGroup: endsGroup,
                                 isHighlighted:
                                     message.id == _highlightedMessageId,
-                                onReply: widget.canPost
+                                onReply: widget.canPost && !message.isDeleted
                                     ? () => _startReply(message)
+                                    : null,
+                                onDelete: message.canDelete
+                                    ? () => _deleteMessage(message)
                                     : null,
                                 onQuoteTap: message.replyTo != null
                                     ? () =>
@@ -945,6 +998,8 @@ class _ScrollToBottomButtonState extends State<_ScrollToBottomButton> {
   }
 }
 
+const _deletedMessageText = 'Pesan ini dihapus';
+
 class _MessageBubble extends StatefulWidget {
   const _MessageBubble({
     super.key,
@@ -957,6 +1012,7 @@ class _MessageBubble extends StatefulWidget {
     this.isHighlighted = false,
     this.onReply,
     this.onQuoteTap,
+    this.onDelete,
   });
 
   final ChatMessage message;
@@ -972,6 +1028,9 @@ class _MessageBubble extends StatefulWidget {
   final bool isHighlighted;
   final VoidCallback? onReply;
   final VoidCallback? onQuoteTap;
+
+  /// Long press; set when the viewer may delete it (sender, or a role allowed in this region's chat).
+  final VoidCallback? onDelete;
 
   @override
   State<_MessageBubble> createState() => _MessageBubbleState();
@@ -1046,6 +1105,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
                     size: 13,
                     color: AppColors.secondary,
                   ),
+                ] else if (message.senderVerifiedBadge) ...[
+                  const SizedBox(width: 3),
+                  const Icon(Icons.verified, size: 13, color: verifiedBadgeColor),
+                ],
+                if (message.senderAdminBadge != null) ...[
+                  const SizedBox(width: 5),
+                  Flexible(child: AdminBadge(label: message.senderAdminBadge!)),
                 ],
               ],
             ),
@@ -1139,11 +1205,12 @@ class _MessageBubbleState extends State<_MessageBubble> {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: message.body,
+                    text: message.isDeleted ? _deletedMessageText : message.body,
                     style: TextStyle(
-                      color: textColor,
+                      color: message.isDeleted ? textColor.withValues(alpha: 0.6) : textColor,
                       fontSize: 14.5,
                       height: 1.35,
+                      fontStyle: message.isDeleted ? FontStyle.italic : null,
                     ),
                   ),
                   const WidgetSpan(child: SizedBox(width: 10)),
@@ -1171,8 +1238,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
               ),
             )
           : Text(
-              message.body,
-              style: TextStyle(color: textColor, fontSize: 14.5, height: 1.35),
+              message.isDeleted ? _deletedMessageText : message.body,
+              style: TextStyle(
+                color: message.isDeleted ? textColor.withValues(alpha: 0.6) : textColor,
+                fontSize: 14.5,
+                height: 1.35,
+                fontStyle: message.isDeleted ? FontStyle.italic : null,
+              ),
             ),
     );
 
@@ -1186,6 +1258,12 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 ..onUpdate = _onDragUpdate
                 ..onEnd = _onDragEnd;
             }),
+        if (widget.onDelete != null)
+          LongPressGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+            () => LongPressGestureRecognizer(),
+            (instance) => instance.onLongPress = widget.onDelete,
+          ),
       },
       child: Stack(
         children: [

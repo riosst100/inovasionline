@@ -34,7 +34,7 @@ class ChatThreadResource extends JsonResource
                 'avatar_url' => $otherUser->avatar_path ? asset('storage/'.$otherUser->avatar_path) : null,
             ] : null,
             'latest_message' => $this->whenLoaded('latestMessage', fn () => $this->latestMessage ? [
-                'body' => $this->latestMessage->body,
+                'body' => $this->latestMessage->deleted_at !== null ? 'Pesan ini dihapus' : $this->latestMessage->body,
                 'sender_id' => $this->latestMessage->sender_id,
                 'sender_name' => $this->latestMessage->sender?->name,
                 'created_at' => $this->latestMessage->created_at,

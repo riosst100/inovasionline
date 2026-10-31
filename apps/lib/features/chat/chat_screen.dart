@@ -11,6 +11,7 @@ import '../../models/chat_thread.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/skeleton.dart';
+import '../../widgets/user_badges.dart';
 import 'chat_providers.dart';
 import 'chat_thread_screen.dart';
 
@@ -1237,8 +1238,10 @@ class _GuestGlobalMessagesScreen extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    message.senderName ?? 'Pengguna',
+                                  UserNameWithBadges(
+                                    name: message.senderName ?? 'Pengguna',
+                                    verified: message.senderVerifiedBadge,
+                                    adminBadge: message.senderAdminBadge,
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
@@ -1247,10 +1250,12 @@ class _GuestGlobalMessagesScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    message.body,
-                                    style: const TextStyle(
+                                    message.isDeleted ? 'Pesan ini dihapus' : message.body,
+                                    style: TextStyle(
                                       fontSize: 14.5,
                                       height: 1.35,
+                                      fontStyle: message.isDeleted ? FontStyle.italic : null,
+                                      color: message.isDeleted ? AppColors.mutedForeground : null,
                                     ),
                                   ),
                                 ],

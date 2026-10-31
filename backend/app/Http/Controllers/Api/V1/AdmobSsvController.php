@@ -47,10 +47,7 @@ class AdmobSsvController extends Controller
             return response('ok');
         }
 
-        // The app tags chest views via ServerSideVerificationOptions.customData; it is signed too.
-        $purpose = $request->query('custom_data') === AdReward::PURPOSE_CHEST ? AdReward::PURPOSE_CHEST : AdReward::PURPOSE_BONUS;
-
-        $this->rewards->record($user, $transactionId, $adUnit, $purpose);
+        $this->rewards->record($user, $transactionId, $adUnit, AdReward::PURPOSE_BONUS);
 
         return response('ok');
     }

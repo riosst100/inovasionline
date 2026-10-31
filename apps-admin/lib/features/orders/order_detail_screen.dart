@@ -58,7 +58,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
     setState(() => _updating = true);
     try {
-      final updated = await ref.read(orderServiceProvider).updateStatus(order.id, next, adminNotes: notes.adminNotes);
+      final updated = await ref.read(orderServiceProvider).updateStatus(order.id, next, adminNotes: notes.adminNotes, cancelReason: notes.cancelReason);
       if (!mounted) return;
       setState(() => _order = _changed = updated);
       showMessage(context, 'Status diubah menjadi "${next.label}".');
@@ -194,6 +194,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             _Row('Total', formatCurrency(order.grandTotal), bold: true),
           ],
         ),
+        if (order.status == OrderStatus.cancelled && (order.cancelReason ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _Section(
+            title: 'Alasan Pembatalan',
+            children: [Text(order.cancelReason!, style: const TextStyle(color: AppColors.destructive))],
+          ),
+        ],
         if ((order.customerNotes ?? '').isNotEmpty || (order.adminNotes ?? '').isNotEmpty) ...[
           const SizedBox(height: 12),
           _Section(
@@ -388,9 +395,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 }
 
 class _StatusChange {
-  _StatusChange(this.adminNotes);
+  _StatusChange(this.adminNotes, [this.cancelReason]);
 
   final String? adminNotes;
+  final String? cancelReason;
 }
 
 class _StatusChangeSheet extends StatefulWidget {
@@ -405,10 +413,13 @@ class _StatusChangeSheet extends StatefulWidget {
 
 class _StatusChangeSheetState extends State<_StatusChangeSheet> {
   late final _notes = TextEditingController(text: widget.order.adminNotes);
+  final _reason = TextEditingController();
+  String? _reasonError;
 
   @override
   void dispose() {
     _notes.dispose();
+    _reason.dispose();
     super.dispose();
   }
 
@@ -435,22 +446,38 @@ class _StatusChangeSheetState extends State<_StatusChangeSheet> {
             style: const TextStyle(color: AppColors.mutedForeground),
           ),
           const SizedBox(height: 16),
+          if (cancelling) ...[
+            TextField(
+              controller: _reason,
+              maxLines: 3,
+              minLines: 2,
+              maxLength: 500,
+              decoration: InputDecoration(
+                labelText: 'Alasan pembatalan (ditampilkan ke pembeli)',
+                errorText: _reasonError,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           TextField(
             controller: _notes,
             maxLines: 3,
             minLines: 2,
-            decoration: InputDecoration(
-              labelText: cancelling ? 'Alasan / catatan admin (opsional)' : 'Catatan admin (opsional)',
-            ),
+            decoration: const InputDecoration(labelText: 'Catatan admin (opsional)'),
           ),
           const SizedBox(height: 16),
           FilledButton(
             style: cancelling ? FilledButton.styleFrom(backgroundColor: AppColors.destructive) : null,
             onPressed: () {
               final text = _notes.text.trim();
+              final reason = _reason.text.trim();
+              if (cancelling && reason.isEmpty) {
+                setState(() => _reasonError = 'Alasan pembatalan wajib diisi.');
+                return;
+              }
               // Only send the notes when they changed, so a status change never clears them by accident.
               final changed = text != (widget.order.adminNotes ?? '');
-              Navigator.pop(context, _StatusChange(changed ? text : null));
+              Navigator.pop(context, _StatusChange(changed ? text : null, cancelling ? reason : null));
             },
             child: Text(cancelling ? 'Ya, Batalkan' : widget.next.actionLabel),
           ),

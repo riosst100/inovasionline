@@ -8,6 +8,7 @@ import '../../core/utils/formatters.dart';
 import '../../models/post.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
+import '../../widgets/user_badges.dart';
 import 'post_providers.dart';
 
 class PostCommentsSheet extends ConsumerStatefulWidget {
@@ -78,9 +79,51 @@ class _PostCommentsSheetState extends ConsumerState<PostCommentsSheet> {
         _controller.clear();
         _sending = false;
       });
-      ref.read(feedProvider.notifier).incrementCommentCount(widget.postId);
+      for (final tab in PostTab.values) {
+        ref.read(feedProvider(tab).notifier).incrementCommentCount(widget.postId);
+      }
     } finally {
       if (mounted && _sending) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _delete(PostComment comment) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Hapus Komentar'),
+            content: const Text('Apakah Anda yakin ingin menghapus komentar ini?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Batal'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Hapus'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    try {
+      await ref.read(postServiceProvider).deleteComment(comment.id);
+      if (!mounted) return;
+      setState(() => _comments.removeWhere((c) => c.id == comment.id));
+      for (final tab in PostTab.values) {
+        ref.read(feedProvider(tab).notifier).incrementCommentCount(widget.postId, by: -1);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal menghapus komentar.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -116,8 +159,10 @@ class _PostCommentsSheetState extends ConsumerState<PostCommentsSheet> {
                       controller: scrollController,
                       padding: const EdgeInsets.all(16),
                       itemCount: _comments.length,
-                      itemBuilder: (context, index) =>
-                          _CommentTile(comment: _comments[index]),
+                      itemBuilder: (context, index) => _CommentTile(
+                        comment: _comments[index],
+                        onDelete: () => _delete(_comments[index]),
+                      ),
                     ),
             ),
             const Divider(height: 1),
@@ -170,9 +215,10 @@ class _PostCommentsSheetState extends ConsumerState<PostCommentsSheet> {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment});
+  const _CommentTile({required this.comment, required this.onDelete});
 
   final PostComment comment;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +243,10 @@ class _CommentTile extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Container(
+            child: GestureDetector(
+              // Commenter, post author or region admin.
+              onLongPress: comment.canDelete ? onDelete : null,
+              child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.surface,
@@ -207,8 +256,10 @@ class _CommentTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    comment.userName,
+                  UserNameWithBadges(
+                    name: comment.userName,
+                    verified: comment.userVerifiedBadge,
+                    adminBadge: comment.userAdminBadge,
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 12.5,
@@ -228,6 +279,7 @@ class _CommentTile extends StatelessWidget {
                   ],
                 ],
               ),
+            ),
             ),
           ),
         ],

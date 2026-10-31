@@ -44,39 +44,6 @@ class WalletSummary {
   }
 }
 
-/// The home screen's daily reward chests: each opens with one rewarded ad
-/// for a random saldo amount (up to [maxAmount]).
-class AdChestStatus {
-  AdChestStatus({
-    required this.openedToday,
-    required this.chestsPerDay,
-    required this.maxAmount,
-    required this.doneToday,
-    required this.soldOut,
-  });
-
-  factory AdChestStatus.fromJson(Map<String, dynamic> json) => AdChestStatus(
-    openedToday: json['opened_today'] as int? ?? 0,
-    chestsPerDay: json['chests_per_day'] as int? ?? 0,
-    maxAmount: json['max_amount'] as int? ?? 0,
-    doneToday: json['done_today'] as bool? ?? false,
-    soldOut: json['sold_out'] as bool? ?? false,
-  );
-
-  final int openedToday;
-  final int chestsPerDay;
-  final int maxAmount;
-
-  /// All of today's chests are opened; back tomorrow.
-  final bool doneToday;
-
-  /// Today's prize budget is used up; back tomorrow.
-  final bool soldOut;
-
-  int get remaining => (chestsPerDay - openedToday).clamp(0, chestsPerDay);
-  bool get canOpen => !doneToday && !soldOut && remaining > 0;
-}
-
 class WalletTransaction {
   WalletTransaction({
     required this.id,

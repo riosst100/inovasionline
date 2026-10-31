@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\AdminAuthController;
 use App\Http\Controllers\Api\Admin\AdminStaffController;
+use App\Http\Controllers\Api\Admin\CommunityRoleController;
 use App\Http\Controllers\Api\Admin\CustomerController;
 use App\Http\Controllers\Api\Admin\DriverController;
 use App\Http\Controllers\Api\Admin\DriverDeliveryController;
@@ -31,7 +32,6 @@ use App\Http\Controllers\Api\V1\Admin\ServiceCityController as AdminServiceCityC
 use App\Http\Controllers\Api\V1\Admin\NavBadgeController as AdminNavBadgeController;
 use App\Http\Controllers\Api\V1\Admin\LabelConfigController as AdminLabelConfigController;
 use App\Http\Controllers\Api\V1\Admin\OrderSettingController as AdminOrderSettingController;
-use App\Http\Controllers\Api\V1\Admin\AdChestController as AdminAdChestController;
 use App\Http\Controllers\Api\V1\Admin\AdmobController as AdminAdmobController;
 use App\Http\Controllers\Api\V1\Admin\AppUpdateController as AdminAppUpdateController;
 use App\Http\Controllers\Api\V1\Admin\FreeShippingController as AdminFreeShippingController;
@@ -201,6 +201,7 @@ Route::prefix('v1')->group(function () {
 
     Route::prefix('posts')->group(function () {
         Route::get('/', [PostController::class, 'index']);
+        Route::get('/recent-ids', [PostController::class, 'recentIds'])->middleware('throttle:30,1');
         Route::get('/{post}/comments', [PostController::class, 'comments']);
 
         Route::middleware(['auth:sanctum', 'not.blocked', 'feature.ban:posts'])->group(function () {
@@ -221,6 +222,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/threads/{thread}', [ChatController::class, 'show']);
             Route::get('/threads/{thread}/messages', [ChatController::class, 'messages']);
             Route::post('/threads/{thread}/messages', [ChatController::class, 'sendMessage']);
+            Route::delete('/messages/{message}', [ChatController::class, 'destroyMessage']);
             Route::get('/threads/{thread}/participants', [ChatController::class, 'participants']);
             Route::post('/threads/{thread}/read', [ChatController::class, 'markAsRead']);
             Route::post('/threads/{thread}/favorite', [ChatController::class, 'toggleFavorite']);
@@ -261,9 +263,6 @@ Route::prefix('v1')->group(function () {
         // Retried every couple of seconds while AdMob's reward callback is pending.
         Route::post('/bonus/claim', [WalletController::class, 'claimBonus'])->middleware('throttle:20,1');
         Route::post('/bonus/test-ad-view', [WalletController::class, 'testAdView'])->middleware('throttle:10,1');
-        // Opening is retried every couple of seconds while AdMob's reward callback is pending.
-        Route::get('/chest', [WalletController::class, 'chest'])->middleware('throttle:60,1');
-        Route::post('/chest/open', [WalletController::class, 'openChest'])->middleware('throttle:20,1');
         Route::post('/topups', [WalletController::class, 'topup'])->middleware('throttle:10,1');
         Route::get('/topups/{topup}/status', [WalletController::class, 'topupStatus']);
     });
@@ -448,6 +447,14 @@ Route::prefix('admin')->group(function () {
             Route::delete('/{role}', [AdminRoleController::class, 'destroy']);
         });
 
+        // Community roles for region appointments (Admin, Moderator, ...), managed from the customers page
+        Route::prefix('community-roles')->middleware('menu:customers')->group(function () {
+            Route::get('/', [CommunityRoleController::class, 'index']);
+            Route::post('/', [CommunityRoleController::class, 'store']);
+            Route::put('/{role}', [CommunityRoleController::class, 'update']);
+            Route::delete('/{role}', [CommunityRoleController::class, 'destroy']);
+        });
+
         // Customer Listing (users table)
         Route::prefix('customers')->middleware('menu:customers,notifications')->group(function () {
             Route::get('/', [CustomerController::class, 'index']);
@@ -459,6 +466,10 @@ Route::prefix('admin')->group(function () {
             Route::post('/{user}/unblock', [CustomerController::class, 'unblock']);
             Route::post('/{user}/ban', [CustomerController::class, 'ban']);
             Route::post('/{user}/unban', [CustomerController::class, 'unban']);
+            Route::post('/{user}/verified-badge', [CustomerController::class, 'verifiedBadge']);
+            Route::post('/{user}/region-admins', [CustomerController::class, 'storeRegionAdmin']);
+            Route::patch('/{user}/region-admins/{regionAdmin}', [CustomerController::class, 'updateRegionAdmin']);
+            Route::delete('/{user}/region-admins/{regionAdmin}', [CustomerController::class, 'destroyRegionAdmin']);
             Route::post('/{user}/revoke-verification', [CustomerController::class, 'revokeVerification']);
             Route::delete('/{user}/sessions/{session}', [CustomerController::class, 'revokeSession']);
         });
@@ -636,9 +647,6 @@ Route::prefix('admin')->group(function () {
 
         Route::get('order-settings', [AdminOrderSettingController::class, 'show'])->middleware('menu:order_cancellation');
         Route::put('order-settings', [AdminOrderSettingController::class, 'update'])->middleware('menu:order_cancellation');
-
-        Route::get('ad-chest', [AdminAdChestController::class, 'show'])->middleware('menu:reward_chest');
-        Route::put('ad-chest', [AdminAdChestController::class, 'update'])->middleware('menu:reward_chest');
 
         Route::get('admob', [AdminAdmobController::class, 'show'])->middleware('menu:admob');
         Route::put('admob', [AdminAdmobController::class, 'update'])->middleware('menu:admob');

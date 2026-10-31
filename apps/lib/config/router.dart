@@ -12,7 +12,6 @@ import '../features/checkout/checkout_screen.dart';
 import '../features/checkout/face_verification_screen.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/flash_sale/flash_sale_screen.dart';
-import '../features/home/ad_chest.dart';
 import '../features/home/home_screen.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
@@ -141,15 +140,6 @@ final router = GoRouter(
         icon: Icons.account_balance_wallet_outlined,
         message: 'Masuk untuk melihat saldo belanja kamu.',
         builder: (_) => const WalletScreen(),
-      ),
-    ),
-    GoRoute(
-      path: '/chest',
-      builder: (context, state) => AuthRequired(
-        title: 'Peti Hadiah',
-        icon: Icons.card_giftcard_outlined,
-        message: 'Masuk untuk membuka peti hadiah.',
-        builder: (_) => const AdChestScreen(),
       ),
     ),
     GoRoute(

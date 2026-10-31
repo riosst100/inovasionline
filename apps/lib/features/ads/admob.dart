@@ -197,14 +197,12 @@ class RewardedAds {
     return loaded.future.timeout(const Duration(seconds: 20), onTimeout: () => null);
   }
 
-  /// [customData] tells the backend what the view was for ('chest' for the
-  /// home reward chest; none for the one-time bonus).
-  Future<RewardedResult> show({required String userId, String? customData}) async {
+  Future<RewardedResult> show({required String userId}) async {
     final ad = await preload();
     _loading = null; // a rewarded ad can only be shown once
     if (ad == null) return RewardedResult.unavailable;
 
-    await ad.setServerSideOptions(ServerSideVerificationOptions(userId: userId, customData: customData));
+    await ad.setServerSideOptions(ServerSideVerificationOptions(userId: userId));
     var earned = false;
     final closed = Completer<void>();
     ad.fullScreenContentCallback = FullScreenContentCallback(

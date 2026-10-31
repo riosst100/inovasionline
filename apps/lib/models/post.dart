@@ -66,6 +66,8 @@ class Post {
     required this.userId,
     required this.userName,
     this.userAvatarUrl,
+    this.userVerifiedBadge = false,
+    this.userAdminBadge,
     this.body,
     this.media = const [],
     this.products = const [],
@@ -75,6 +77,7 @@ class Post {
     this.shareCount = 0,
     this.isLiked = false,
     this.isMine = false,
+    this.canModerate = false,
     this.createdAt,
   });
 
@@ -83,6 +86,8 @@ class Post {
         userId: json['user_id'] as String,
         userName: json['user_name'] as String? ?? 'Pengguna',
         userAvatarUrl: json['user_avatar_url'] as String?,
+        userVerifiedBadge: json['user_verified_badge'] as bool? ?? false,
+        userAdminBadge: json['user_admin_badge'] as String?,
         body: json['body'] as String?,
         media: (json['media'] as List<dynamic>? ?? [])
             .map((e) => PostMedia.fromJson(e as Map<String, dynamic>))
@@ -96,6 +101,7 @@ class Post {
         shareCount: json['share_count'] as int? ?? 0,
         isLiked: json['is_liked'] as bool? ?? false,
         isMine: json['is_mine'] as bool? ?? false,
+        canModerate: json['can_moderate'] as bool? ?? false,
         createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
       );
 
@@ -103,6 +109,12 @@ class Post {
   final String userId;
   final String userName;
   final String? userAvatarUrl;
+
+  /// Author has the admin-granted verified badge (their posts are also in the Resmi tab).
+  final bool userVerifiedBadge;
+
+  /// e.g. "Admin Tiwulandu" when the author looks after a region; null otherwise.
+  final String? userAdminBadge;
   final String? body;
   final List<PostMedia> media;
   final List<PostProductTag> products;
@@ -112,6 +124,9 @@ class Post {
   final int shareCount;
   final bool isLiked;
   final bool isMine;
+
+  /// The viewer may delete it (and its comments): its author, or an admin of the post's region.
+  final bool canModerate;
   final DateTime? createdAt;
 
   Post copyWith({int? likeCount, bool? isLiked, int? commentCount, int? shareCount}) => Post(
@@ -119,6 +134,8 @@ class Post {
         userId: userId,
         userName: userName,
         userAvatarUrl: userAvatarUrl,
+        userVerifiedBadge: userVerifiedBadge,
+        userAdminBadge: userAdminBadge,
         body: body,
         media: media,
         products: products,
@@ -128,6 +145,7 @@ class Post {
         shareCount: shareCount ?? this.shareCount,
         isLiked: isLiked ?? this.isLiked,
         isMine: isMine,
+        canModerate: canModerate,
         createdAt: createdAt,
       );
 }
@@ -139,6 +157,9 @@ class PostComment {
     required this.userId,
     required this.userName,
     this.userAvatarUrl,
+    this.userVerifiedBadge = false,
+    this.userAdminBadge,
+    this.canDelete = false,
     required this.body,
     this.createdAt,
   });
@@ -149,6 +170,9 @@ class PostComment {
         userId: json['user_id'] as String,
         userName: json['user_name'] as String? ?? 'Pengguna',
         userAvatarUrl: json['user_avatar_url'] as String?,
+        userVerifiedBadge: json['user_verified_badge'] as bool? ?? false,
+        userAdminBadge: json['user_admin_badge'] as String?,
+        canDelete: json['can_delete'] as bool? ?? false,
         body: json['body'] as String,
         createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
       );
@@ -158,6 +182,11 @@ class PostComment {
   final String userId;
   final String userName;
   final String? userAvatarUrl;
+  final bool userVerifiedBadge;
+  final String? userAdminBadge;
+
+  /// The viewer wrote it, or may moderate the post it is on.
+  final bool canDelete;
   final String body;
   final DateTime? createdAt;
 }

@@ -70,6 +70,8 @@ dependencies:
   device_info_plus: ^13.3.0
   android_id: ^0.6.0
   google_maps_flutter: ^2.19.0
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:

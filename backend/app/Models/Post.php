@@ -17,7 +17,20 @@ class Post extends Model
         'user_id',
         'shared_post_id',
         'body',
+        'province_code',
+        'city_code',
+        'district_code',
+        'village_code',
     ];
+
+    /** Region columns the Publik feed can filter on, broadest first (copied from the author's address). */
+    public const REGION_COLUMNS = ['province_code', 'city_code', 'district_code', 'village_code'];
+
+    /** @return array<int, string|null> */
+    public function regionCodes(): array
+    {
+        return array_values($this->only(self::REGION_COLUMNS));
+    }
 
     public function user(): BelongsTo
     {

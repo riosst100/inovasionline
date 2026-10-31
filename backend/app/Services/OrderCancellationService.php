@@ -16,13 +16,13 @@ class OrderCancellationService
         private readonly WalletService $walletService = new WalletService,
     ) {}
 
-    public function cancel(Order $order, string $by): Order
+    public function cancel(Order $order, string $by, ?string $reason = null): Order
     {
         if (! $order->canTransitionTo(OrderStatus::CANCELLED)) {
             throw new RuntimeException('Order cannot be cancelled.');
         }
 
-        return DB::transaction(function () use ($order, $by) {
+        return DB::transaction(function () use ($order, $by, $reason) {
             $order->load('items');
 
             foreach ($order->items as $item) {
@@ -40,6 +40,8 @@ class OrderCancellationService
                     ['status' => 'cancelled', 'at' => now()->toIso8601String(), 'by' => $by],
                 ],
                 'cancelled_at' => now(),
+                'cancelled_by' => str_starts_with($by, 'admin') ? 'admin' : $by,
+                'cancel_reason' => $reason,
             ]);
 
             // Whatever the original payment method, paid money always comes back as balance.

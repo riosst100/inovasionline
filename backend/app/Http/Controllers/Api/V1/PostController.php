@@ -14,7 +14,9 @@ use App\Services\PostService;
 use App\Support\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 
 class PostController extends Controller
@@ -23,10 +25,43 @@ class PostController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'tab' => ['nullable', Rule::in([PostService::TAB_OFFICIAL, PostService::TAB_PUBLIC])],
+            'sort' => ['nullable', Rule::in([PostService::SORT_RELEVANCE, PostService::SORT_NEWEST, PostService::SORT_OLDEST])],
+            'unread_ids' => ['nullable', 'array', 'max:'.PostService::UNREAD_LIMIT],
+            'unread_ids.*' => ['string', 'max:26'],
+            ...$this->regionRules(),
+        ]);
+
         $viewer = Auth::guard('sanctum')->user();
-        $paginator = $this->postService->feed($viewer, $request->integer('per_page', 15));
+        $paginator = $this->postService->feed(
+            $viewer,
+            $request->integer('per_page', 15),
+            $validated['tab'] ?? null,
+            Arr::only($validated, Post::REGION_COLUMNS),
+            $validated['sort'] ?? PostService::SORT_NEWEST,
+            $validated['unread_ids'] ?? [],
+        );
 
         return ApiResponse::paginated($paginator, PostResource::class, 'Feed retrieved successfully.');
+    }
+
+    /** Newest post ids of the Resmi / Publik tabs; the app counts the ones it hasn't shown for the unread badges. */
+    public function recentIds(Request $request): JsonResponse
+    {
+        $validated = $request->validate($this->regionRules());
+
+        $ids = $this->postService->recentIds(
+            Auth::guard('sanctum')->user(),
+            Arr::only($validated, Post::REGION_COLUMNS),
+        );
+
+        return ApiResponse::success($ids, 'Recent post ids retrieved successfully.');
+    }
+
+    private function regionRules(): array
+    {
+        return collect(Post::REGION_COLUMNS)->mapWithKeys(fn ($column) => [$column => 'nullable|string|max:13'])->all();
     }
 
     public function store(CreatePostRequest $request): JsonResponse

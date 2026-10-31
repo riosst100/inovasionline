@@ -37,6 +37,7 @@ class AddressPicker extends ConsumerStatefulWidget {
     this.initial,
     this.showErrors = false,
     this.autoSelectSingle = false,
+    this.required = true,
   });
 
   final ValueChanged<AddressSelection> onChanged;
@@ -48,6 +49,9 @@ class AddressPicker extends ConsumerStatefulWidget {
 
   /// Marks every region still empty as required.
   final bool showErrors;
+
+  /// False for filters, where every level may stay empty: no asterisks or validation.
+  final bool required;
 
   @override
   ConsumerState<AddressPicker> createState() => _AddressPickerState();
@@ -215,6 +219,7 @@ class _AddressPickerState extends ConsumerState<AddressPicker> {
           value: _province,
           items: _provinces,
           showError: widget.showErrors,
+          required: widget.required,
           onChanged: _onProvinceChanged,
         ),
         const SizedBox(height: 12),
@@ -223,6 +228,7 @@ class _AddressPickerState extends ConsumerState<AddressPicker> {
           value: _city,
           items: _cities,
           showError: widget.showErrors,
+          required: widget.required,
           enabled: _province != null,
           onChanged: _onCityChanged,
         ),
@@ -232,6 +238,7 @@ class _AddressPickerState extends ConsumerState<AddressPicker> {
           value: _district,
           items: _districts,
           showError: widget.showErrors,
+          required: widget.required,
           enabled: _city != null,
           onChanged: _onDistrictChanged,
         ),
@@ -241,6 +248,7 @@ class _AddressPickerState extends ConsumerState<AddressPicker> {
           value: _village,
           items: _villages,
           showError: widget.showErrors,
+          required: widget.required,
           enabled: _district != null,
           onChanged: _onVillageChanged,
         ),
@@ -257,9 +265,11 @@ class _RegionDropdown extends StatelessWidget {
     required this.onChanged,
     this.enabled = true,
     this.showError = false,
+    this.required = true,
   });
 
   final bool showError;
+  final bool required;
   final String label;
   final Region? value;
   final List<Region> items;
@@ -292,7 +302,7 @@ class _RegionDropdown extends StatelessWidget {
       dropdownColor: Colors.white,
       menuMaxHeight: 320,
       decoration: InputDecoration(
-        label: requiredLabel(label),
+        label: required ? requiredLabel(label) : Text(label),
         labelStyle: const TextStyle(fontSize: 13.5),
         floatingLabelStyle: const TextStyle(fontSize: 13),
         isDense: true,
@@ -311,7 +321,7 @@ class _RegionDropdown extends StatelessWidget {
           .map((region) => DropdownMenuItem(value: region, child: Text(region.name, overflow: TextOverflow.ellipsis)))
           .toList(),
       onChanged: enabled ? onChanged : null,
-      validator: (value) => value == null ? '$label wajib dipilih' : null,
+      validator: (value) => required && value == null ? '$label wajib dipilih' : null,
     );
   }
 }

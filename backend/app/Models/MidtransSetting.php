@@ -8,8 +8,13 @@ class MidtransSetting extends Model
 {
     public const MODES = ['sandbox', 'production'];
 
+    public const DEFAULT_TOPUP_EXPIRY_MINUTES = 5;
+    public const DEFAULT_ORDER_EXPIRY_MINUTES = 5;
+
     protected $fillable = [
         'mode',
+        'topup_expiry_minutes',
+        'order_expiry_minutes',
         'sandbox_server_key',
         'sandbox_client_key',
         'production_server_key',
@@ -40,6 +45,8 @@ class MidtransSetting extends Model
 
         return new static([
             'mode' => $mode,
+            'topup_expiry_minutes' => self::DEFAULT_TOPUP_EXPIRY_MINUTES,
+            'order_expiry_minutes' => self::DEFAULT_ORDER_EXPIRY_MINUTES,
             "{$mode}_server_key" => config('services.midtrans.server_key'),
             "{$mode}_client_key" => config('services.midtrans.client_key'),
         ]);
@@ -66,6 +73,8 @@ class MidtransSetting extends Model
         $payload = [
             'mode' => $this->mode,
             'from_env' => ! $this->exists,
+            'topup_expiry_minutes' => (int) ($this->topup_expiry_minutes ?: self::DEFAULT_TOPUP_EXPIRY_MINUTES),
+            'order_expiry_minutes' => (int) ($this->order_expiry_minutes ?: self::DEFAULT_ORDER_EXPIRY_MINUTES),
             'notification_url' => url('/api/v1/payments/midtrans/notification'),
         ];
 

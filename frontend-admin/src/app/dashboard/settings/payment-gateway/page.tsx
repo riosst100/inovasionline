@@ -14,6 +14,8 @@ const MODES: { value: MidtransMode; label: string; hint: string }[] = [
 function toForm(s: MidtransSettings): MidtransSettingsPayload {
   return {
     mode: s.mode,
+    topup_expiry_minutes: s.topup_expiry_minutes,
+    order_expiry_minutes: s.order_expiry_minutes,
     sandbox: { client_key: s.sandbox.client_key ?? '', server_key: '' },
     production: { client_key: s.production.client_key ?? '', server_key: '' },
   };
@@ -167,6 +169,38 @@ export default function PaymentGatewayPage() {
                       <p className="text-xs text-slate-500">{m.hint}</p>
                     </div>
                   </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold text-slate-800">Batas waktu pembayaran</h2>
+              <p className="text-xs text-slate-500">
+                Berapa menit pembeli punya waktu menyelesaikan pembayaran sebelum kedaluwarsa. Default 5 menit.
+                Berlaku untuk transaksi baru.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {([
+                  ['order_expiry_minutes', 'Pesanan'],
+                  ['topup_expiry_minutes', 'Top up saldo'],
+                ] as const).map(([field, label]) => (
+                  <div key={field}>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={1440}
+                        className={`${input} w-28`}
+                        value={form[field]}
+                        onChange={(e) => {
+                          setSuccess(null);
+                          setForm({ ...form, [field]: Number(e.target.value) });
+                        }}
+                      />
+                      <span className="text-sm text-slate-600">menit</span>
+                    </div>
+                  </div>
                 ))}
               </div>
             </section>

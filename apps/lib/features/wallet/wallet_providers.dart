@@ -20,15 +20,6 @@ final walletTransactionsProvider =
       return ref.watch(walletServiceProvider).transactions();
     });
 
-/// The home reward chest; null while signed out or while admin has it off.
-final adChestProvider = FutureProvider<AdChestStatus?>((ref) async {
-  final authenticated = ref.watch(
-    authProvider.select((s) => s.status == AuthStatus.authenticated),
-  );
-  if (!authenticated) return null;
-  return ref.watch(walletServiceProvider).chestStatus();
-});
-
 /// Refreshes every balance view at once.
 void invalidateWallet(Ref ref) {
   ref.invalidate(walletProvider);

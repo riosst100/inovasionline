@@ -14,9 +14,6 @@ class AdReward extends Model
     /** Watched to unlock the one-time saldo bonus. */
     public const PURPOSE_BONUS = 'bonus';
 
-    /** Watched to fill the home screen's reward chest. */
-    public const PURPOSE_CHEST = 'chest';
-
     protected $fillable = ['user_id', 'transaction_id', 'ad_unit', 'purpose', 'consumed_at'];
 
     protected function casts(): array

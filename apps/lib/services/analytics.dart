@@ -117,6 +117,8 @@ class Analytics {
       _log((fa) => fa.logEvent(name: name, parameters: params));
 
   // Permission / location flow.
+  static void homeTourCompleted() => event('tutorial_complete');
+
   static void locationIntroShown() => event('location_intro_shown');
   static void locationButtonTapped() => event('location_button_tapped');
   static void locationPermission({required bool granted, required bool permanent}) =>

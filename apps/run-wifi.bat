@@ -4,32 +4,20 @@ cd /d "%~dp0"
 
 REM Run the app on a physical Android phone connected over Wi-Fi (adb connect / wireless debugging).
 REM Usage: run-wifi.bat [ip[:port]] [extra flutter args]
-REM   (with ip, runs "adb connect" first; port defaults to 5555. Without ip, the first
-REM    already-connected network device is used.)
-REM Laptop on the phone's hotspot: the phone's IP is the Wi-Fi "Default Gateway" in ipconfig.
+REM Without ip the phone is found automatically (scripts\adb-wifi-connect.ps1): an already-connected
+REM device, wireless debugging (mDNS), the last IP used, or the Wi-Fi default gateway (laptop on the phone's
+REM hotspot). If none answers and the phone is on USB, "adb tcpip 5555" is run for you; that lasts until the
+REM phone reboots, so plug in USB once after each reboot.
 
 where adb >nul 2>&1 || (echo [ERROR] adb not found in PATH & exit /b 1)
 
-set "DEVICE=%~1"
-if defined DEVICE (
-  shift
-  echo %DEVICE% | findstr ":" >nul || set "DEVICE=%DEVICE%:5555"
-)
-if defined DEVICE (
-  adb connect %DEVICE% | findstr /i "connected" >nul || (
-    echo [ERROR] adb connect %DEVICE% failed. For hotspot: plug in USB once and run "adb tcpip 5555".
-    exit /b 1
-  )
-) else (
-  REM Network devices show up as ip:port or adb-<serial>._adb-tls-connect._tcp (wireless debugging).
-  for /f "skip=1 tokens=1,2" %%a in ('adb devices') do (
-    if "%%b"=="device" if not defined DEVICE (
-      echo %%a | findstr /r ": _adb-tls" >nul && set "DEVICE=%%a"
-    )
-  )
-)
+set "TARGET=%~1"
+if defined TARGET if "%TARGET:~0,1%"=="-" set "TARGET="
+if defined TARGET shift
+
+set "DEVICE="
+for /f "usebackq delims=" %%d in (`powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\adb-wifi-connect.ps1" "%TARGET%"`) do set "DEVICE=%%d"
 if not defined DEVICE (
-  echo [ERROR] No Wi-Fi device found. Run: run-wifi.bat ^<phone-ip^>
   adb devices -l
   exit /b 1
 )

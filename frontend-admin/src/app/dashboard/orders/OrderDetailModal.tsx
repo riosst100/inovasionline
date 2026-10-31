@@ -33,6 +33,10 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const [order, setOrder] = useState<any>(null);
   const [error, setError] = useState('');
   const [showQr, setShowQr] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const tabs = useOrderTabs();
   const { get: getLabel } = useLabels();
 
@@ -60,6 +64,62 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
     ? [{ label: order.order_number, value: order.qr_code }]
     : [];
   const findItem = (id: any) => order.items?.find((i: any) => String(i.id) === String(id));
+
+  // Forward steps mirror Order::TRANSITIONS; sending/handing over needs no QR scan from the admin panel.
+  const nextAction: { status: string; label: string; confirm: string } | null = !order
+    ? null
+    : order.status === 'processing'
+    ? { status: 'ready', label: 'Selesaikan Pengemasan', confirm: 'Tandai pengemasan selesai? Pesanan siap dikirim.' }
+    : order.status === 'ready' && order.delivery_method === 'store_pickup'
+    ? { status: 'completed', label: 'Selesaikan Pesanan', confirm: 'Tandai pesanan sudah diambil pembeli?' }
+    : order.status === 'ready'
+    ? { status: 'on_delivery', label: 'Kirim Pesanan', confirm: 'Tandai pesanan sedang dikirim (tanpa scan QR)?' }
+    : order.status === 'on_delivery'
+    ? { status: 'completed', label: 'Selesaikan Pesanan', confirm: 'Tandai pesanan sudah diterima pembeli (tanpa scan QR)?' }
+    : null;
+
+  const advance = async () => {
+    if (!nextAction || updating || !window.confirm(nextAction.confirm)) return;
+    setUpdating(true);
+    setActionError('');
+    try {
+      await apiRequest(`/admin/orders/${orderId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: nextAction.status }),
+      });
+      setOrder(await apiRequest<any>(`/admin/orders/${orderId}`));
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Gagal mengubah status pesanan.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const canCancel = order?.status === 'pending' || order?.status === 'processing';
+
+  const cancelOrder = async () => {
+    const reason = cancelReason.trim();
+    if (!reason) {
+      setActionError('Alasan pembatalan wajib diisi.');
+      return;
+    }
+    if (updating) return;
+    setUpdating(true);
+    setActionError('');
+    try {
+      await apiRequest(`/admin/orders/${orderId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'cancelled', cancel_reason: reason }),
+      });
+      setOrder(await apiRequest<any>(`/admin/orders/${orderId}`));
+      setCancelling(false);
+      setCancelReason('');
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Gagal membatalkan pesanan.');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={onClose}>
@@ -169,6 +229,15 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 </div>
               </Section>
 
+              {order.status === 'cancelled' && order.cancel_reason && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                  <p className="font-bold">
+                    {order.cancelled_by === 'admin' ? 'Dibatalkan oleh Admin' : 'Pesanan dibatalkan'}
+                  </p>
+                  <p className="mt-1">Alasan: {order.cancel_reason}</p>
+                </div>
+              )}
+
               {(order.customer_notes || order.admin_notes) && (
                 <Section title="Catatan">
                   {order.customer_notes && <Row label="Pembeli">{order.customer_notes}</Row>}
@@ -191,6 +260,65 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
             </>
           )}
         </div>
+
+        {(nextAction || canCancel) && (
+          <div className="space-y-2 border-t border-slate-100 px-5 py-3">
+            {actionError && <p className="text-center text-xs text-red-600">{actionError}</p>}
+            {cancelling && (
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                maxLength={500}
+                rows={2}
+                placeholder="Alasan pembatalan (ditampilkan ke pembeli)"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400"
+              />
+            )}
+            {nextAction && !cancelling && (
+              <button
+                onClick={advance}
+                disabled={updating}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {updating && <Loader2 className="h-4 w-4 animate-spin" />}
+                {nextAction.label}
+              </button>
+            )}
+            {canCancel && !cancelling && (
+              <button
+                onClick={() => {
+                  setCancelling(true);
+                  setActionError('');
+                }}
+                className="w-full rounded-xl border border-red-200 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50"
+              >
+                Batalkan Pesanan
+              </button>
+            )}
+            {cancelling && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setCancelling(false);
+                    setActionError('');
+                  }}
+                  disabled={updating}
+                  className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Kembali
+                </button>
+                <button
+                  onClick={cancelOrder}
+                  disabled={updating}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  {updating && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Ya, Batalkan
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showQr && (
@@ -221,6 +349,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               {packages.length > 1
                 ? `Tempel QR di paket yang sesuai. Driver scan salah satu QR dan wajib membawa semua ${packages.length} paket.`
                 : 'Driver scan QR ini saat mengambil dan menyerahkan paket.'}
+              {' '}QR berisi link: bisa dibuka lewat kamera HP, driver ke aplikasi Driver dan pembeli ke aplikasi Inovasi Online.
             </p>
           </div>
         </div>

@@ -7,6 +7,7 @@ use App\Http\Requests\Chat\SendChatMessageRequest;
 use App\Http\Resources\ChatMessageResource;
 use App\Http\Resources\ChatParticipantResource;
 use App\Http\Resources\ChatThreadResource;
+use App\Models\ChatMessage;
 use App\Models\ChatThread;
 use App\Models\User;
 use App\Services\ChatService;
@@ -111,10 +112,24 @@ class ChatController extends Controller
         }
 
         return ApiResponse::success(
-            new ChatMessageResource($message->load(['sender', 'replyTo.sender'])),
+            new ChatMessageResource($message->load(['sender.regionAdmins', 'thread', 'replyTo.sender'])),
             'Message sent successfully.',
             [],
             201,
+        );
+    }
+
+    public function destroyMessage(Request $request, ChatMessage $message): JsonResponse
+    {
+        try {
+            $this->chatService->deleteMessage($request->user(), $message);
+        } catch (RuntimeException $e) {
+            return ApiResponse::error($e->getMessage(), [], 403);
+        }
+
+        return ApiResponse::success(
+            new ChatMessageResource($message->load(['sender.regionAdmins', 'thread', 'replyTo.sender'])),
+            'Message deleted successfully.',
         );
     }
 

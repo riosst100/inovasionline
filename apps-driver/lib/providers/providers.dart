@@ -7,6 +7,7 @@ import '../models/driver_user.dart';
 import '../models/parcel.dart';
 import '../services/auth_service.dart';
 import '../services/delivery_service.dart';
+import '../services/delivery_tracker.dart';
 
 final _tokenStorageProvider = Provider((ref) => TokenStorage());
 final _apiClientProvider = Provider((ref) => ApiClient(ref.watch(_tokenStorageProvider)));
@@ -14,6 +15,16 @@ final _authServiceProvider = Provider(
   (ref) => AuthService(ref.watch(_apiClientProvider), ref.watch(_tokenStorageProvider)),
 );
 final deliveryServiceProvider = Provider((ref) => DeliveryService(ref.watch(_apiClientProvider)));
+final deliveryTrackerProvider = Provider((ref) {
+  final tracker = DeliveryTracker(ref.watch(deliveryServiceProvider));
+  ref.onDispose(tracker.stop);
+  return tracker;
+});
+
+/// Parcels waiting at the shop for a courier (pickup without scanning).
+final readyParcelsProvider = FutureProvider.autoDispose<List<Parcel>>(
+  (ref) => ref.watch(deliveryServiceProvider).parcels(done: false, ready: true),
+);
 
 /// Parcels the driver has on the road (`false`) or has delivered (`true`).
 final parcelsProvider = FutureProvider.autoDispose.family<List<Parcel>, bool>(

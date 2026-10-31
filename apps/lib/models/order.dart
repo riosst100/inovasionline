@@ -89,6 +89,8 @@ class Order {
     this.deliverySlot,
     this.customerNotes,
     this.adminNotes,
+    this.cancelReason,
+    this.cancelledBy,
     this.paymentRedirectUrl,
     this.serverCanCancel,
     this.cancelDeadline,
@@ -117,6 +119,8 @@ class Order {
         deliverySlot: (json['delivery_slot'] as Map?)?.cast<String, dynamic>(),
         customerNotes: json['customer_notes'] as String?,
         adminNotes: json['admin_notes'] as String?,
+        cancelReason: json['cancel_reason'] as String?,
+        cancelledBy: json['cancelled_by'] as String?,
         paymentRedirectUrl: json['payment_redirect_url'] as String?,
         serverCanCancel: json['can_cancel'] as bool?,
         cancelOnHold: json['cancel_on_hold'] as bool? ?? false,
@@ -152,6 +156,10 @@ class Order {
   final Map<String, dynamic>? deliverySlot;
   final String? customerNotes;
   final String? adminNotes;
+
+  /// Set when an admin cancelled the order: shown to the buyer as "dibatalkan oleh Admin dengan alasan ...".
+  final String? cancelReason;
+  final String? cancelledBy;
   final String? paymentRedirectUrl;
   final bool? serverCanCancel;
 

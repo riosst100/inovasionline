@@ -70,6 +70,12 @@ return [
         'contact_url' => env('SUPPORT_CONTACT_URL'),
     ],
 
+    // Road route courier → buyer on the order tracking map (App\Services\DeliveryRouteService).
+    // Free key at openrouteservice.org; empty = the app draws a straight line instead.
+    'openrouteservice' => [
+        'key' => env('OPENROUTESERVICE_API_KEY'),
+    ],
+
     'potocandid' => [
         'base_url' => env('POTOCANDID_SERVICE_BASE_URL', 'http://127.0.0.1:3200'),
         'api_key' => env('POTOCANDID_SERVICE_API_KEY'),

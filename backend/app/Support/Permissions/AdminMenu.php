@@ -58,7 +58,6 @@ final class AdminMenu
                 ['wallet_bonus', 'Bonus Saldo Belanja', 'Promosi', true],
                 ['product_ads', 'Iklan Produk', 'Iklan', true],
                 ['admob', 'Adsense / Admob', 'Iklan', true],
-                ['reward_chest', 'Peti Hadiah', 'Iklan', true],
                 ['service_cities', 'Cakupan Kota', 'Pengaturan', true],
                 ['service_fee', 'Biaya Layanan', 'Pengaturan', true],
                 ['payment_gateway', 'Payment Gateway (Midtrans)', 'Pengaturan', true],

@@ -57,6 +57,7 @@ class User extends Authenticatable
             'wallet_balance' => 'decimal:2',
             'wallet_bonus_claimed_at' => 'datetime',
             'blocked_at' => 'datetime',
+            'verified_badge_at' => 'datetime',
             'banned_features' => 'array',
             'date_of_birth' => 'date',
             'password' => 'hashed',
@@ -194,6 +195,45 @@ class User extends Authenticatable
     public function isVerified(): bool
     {
         return $this->userVerifications()->where('status', UserVerificationStatus::APPROVED)->exists();
+    }
+
+    /** Admin-granted badge: this user's posts go to the app's "Resmi" feed instead of "Publik". */
+    public function hasVerifiedBadge(): bool
+    {
+        return $this->verified_badge_at !== null;
+    }
+
+    /** Regions this user was appointed to, each with a community role and badge; roles come along. */
+    public function regionAdmins(): HasMany
+    {
+        return $this->hasMany(RegionAdmin::class)->with('role');
+    }
+
+    /**
+     * "Admin Tiwulandu" badge: the region among $regionCodes (e.g. a post's region columns) this user looks
+     * after, else their first one; null when they look after none.
+     *
+     * @param  array<int, string|null>  $regionCodes
+     */
+    public function adminBadgeLabel(array $regionCodes = []): ?string
+    {
+        $match = $this->regionAdmins->first(fn (RegionAdmin $a) => in_array($a->region_code, $regionCodes, true))
+            ?? $this->regionAdmins->first();
+
+        return $match?->label();
+    }
+
+    /**
+     * Whether one of this user's region appointments covers $regionCodes and its role grants $ability
+     * (a CommunityRole constant).
+     *
+     * @param  array<int, string|null>  $regionCodes  any level; codes of different levels never collide
+     */
+    public function canInRegion(string $ability, array $regionCodes): bool
+    {
+        return $this->regionAdmins->contains(
+            fn (RegionAdmin $a) => in_array($a->region_code, $regionCodes, true) && $a->can($ability)
+        );
     }
 
     public function hasAddress(): bool

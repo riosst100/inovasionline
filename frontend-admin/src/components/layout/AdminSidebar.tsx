@@ -153,7 +153,6 @@ export const NAV_SECTIONS: NavSection[] = [
         children: [
           { name: 'Iklan Produk', href: '/dashboard/ads/products', icon: PackageOpen, perm: 'product_ads' },
           { name: 'Adsense / Admob', href: '/dashboard/ads/adsense', icon: Code, perm: 'admob' },
-          { name: 'Peti Hadiah', href: '/dashboard/ads/reward-chest', icon: Gift, perm: 'reward_chest' },
         ],
       },
       {

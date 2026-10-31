@@ -7,6 +7,7 @@ import 'package:in_app_update/in_app_update.dart';
 import '../../config/theme.dart';
 import '../../providers/core_providers.dart';
 import '../../services/app_update_service.dart';
+import '../home/home_tour.dart';
 
 /// Checks Google Play for an app update once per launch. Wrap the app shell
 /// with this widget; it renders nothing on its own.
@@ -14,10 +15,11 @@ import '../../services/app_update_service.dart';
 /// The check is the very last thing at start-up: it waits for the splash,
 /// permissions, locating and the current-location choice
 /// ([startupSettledProvider]), then a few more seconds so home's API calls
-/// and images get to load first.
+/// and images get to load first. If the first-launch tour is up by then, it
+/// waits until the tour is closed.
 ///
-/// - Optional (default): Play downloads the update in the background while
-///   the app stays usable; a snackbar then offers to restart into it.
+/// - Optional (default): Play's full-screen update, which installs and
+///   restarts the app. The user may back out of it and keep using the app.
 /// - Mandatory (this build is below the minimum set in admin, Pengaturan →
 ///   Update Aplikasi): Play's full-screen update starts right away, and a
 ///   screen that cannot be dismissed stays up until the user updates.
@@ -60,6 +62,9 @@ class _AppUpdateCheckerState extends ConsumerState<AppUpdateChecker> {
   Future<void> _checkForUpdate() async {
     _checkedThisLaunch = true;
     try {
+      // The first-launch tour goes first; Play's update dialog would cover it.
+      await HomeTour.whenIdle();
+      if (!mounted) return;
       final service = ref.read(appUpdateServiceProvider);
       final update = await service.checkForUpdate();
       if (update == null || !mounted) return;
@@ -75,19 +80,13 @@ class _AppUpdateCheckerState extends ConsumerState<AppUpdateChecker> {
         _offerRestart();
         return;
       }
-      if (info.flexibleUpdateAllowed) {
-        // Completes once the download is done (or throws / is declined).
-        final result = await InAppUpdate.startFlexibleUpdate();
-        if (!mounted) return;
-        if (result == AppUpdateResult.success) {
-          _offerRestart();
-          return;
-        }
-        // Declined in Play's dialog: not asked again this launch.
-        if (result == AppUpdateResult.userDeniedUpdate) return;
+      if (info.immediateUpdateAllowed) {
+        // Same as Akun → Versi Aplikasi. Backing out of it = declined: not
+        // asked again this launch.
+        await service.updateNow(info);
+        return;
       }
-      // No background download possible (or it failed): let the user start
-      // the update themselves.
+      // Play's update screen not allowed: let the user open the Play Store.
       _offerUpdate(info);
     } catch (_) {
       // Silent failure (offline, not installed from Play, ...): update checks

@@ -68,6 +68,14 @@ class AppUpdateService {
   /// otherwise (or when that fails) the app's Play Store page. Returns false
   /// only when the user backed out of Play's update screen.
   Future<bool> updateNow(AppUpdateInfo info) async {
+    // Play lets each check's result start only one update flow; a second try
+    // with it (e.g. "Update Sekarang" after backing out of Play's screen) never
+    // answers. So check again first.
+    try {
+      info = await InAppUpdate.checkForUpdate();
+    } catch (_) {
+      // Keep the old info; the Play Store fallback below still works.
+    }
     if (info.immediateUpdateAllowed) {
       try {
         final result = await InAppUpdate.performImmediateUpdate();

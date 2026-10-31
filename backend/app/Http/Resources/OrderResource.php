@@ -42,13 +42,15 @@ class OrderResource extends JsonResource
             'accepted_at' => $this->accepted_at,
             'completed_at' => $this->completed_at,
             'cancelled_at' => $this->cancelled_at,
-            'qr_code' => $this->qrCode(),
+            'cancelled_by' => $this->cancelled_by,
+            'cancel_reason' => $this->cancel_reason,
+            'qr_code' => $this->qrLink($this->qrCode()),
             'packages_count' => $this->packagesCount(),
             // One QR per parcel; the driver may scan any of them.
             'packages' => $this->whenLoaded('items', fn () => collect($this->packingList())
                 ->map(fn (array $items, int $i) => [
                     'number' => $i + 1,
-                    'qr_code' => $this->packageQrCode($i + 1),
+                    'qr_code' => $this->qrLink($this->packageQrCode($i + 1)),
                     'items' => $items,
                 ])->all()),
             'shipped_at' => $this->shipped_at,

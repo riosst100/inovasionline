@@ -182,7 +182,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     });
 
     try {
-      await ref.read(feedProvider.notifier).createPost(
+      // Any tab's notifier works: the new post lands in the author's own tab.
+      await ref.read(feedProvider(PostTab.public).notifier).createPost(
             body: _bodyController.text.trim().isEmpty ? null : _bodyController.text.trim(),
             media: _media,
             productIds: _taggedProducts.map((p) => p.id).toList(),
