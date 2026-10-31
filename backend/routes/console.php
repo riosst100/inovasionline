@@ -7,4 +7,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+Schedule::command('payments:expire-unpaid')->everyMinute()->withoutOverlapping();
 Schedule::command('push:prune-tokens')->dailyAt('03:30')->withoutOverlapping();

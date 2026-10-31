@@ -52,8 +52,8 @@ class FeedState {
 /// Resmi: posts by users with the admin-granted verified badge. Publik: everyone's (those included),
 /// filterable by region.
 enum PostTab {
-  official('official', 'Resmi'),
-  public('public', 'Publik');
+  official('official', 'Info Resmi'),
+  public('public', 'Postingan Publik');
 
   const PostTab(this.apiValue, this.label);
 

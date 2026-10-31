@@ -147,7 +147,12 @@ class _TabLabel extends ConsumerWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(tab.label),
+        // Same blue check as on badge holders' names; the globe takes the tab's color.
+        tab == PostTab.official
+            ? const Icon(Icons.verified, size: 18, color: verifiedBadgeColor)
+            : const Icon(Icons.public, size: 18),
+        const SizedBox(width: 6),
+        Flexible(child: Text(tab.label, overflow: TextOverflow.ellipsis)),
         if (count > 0) ...[
           const SizedBox(width: 6),
           Container(

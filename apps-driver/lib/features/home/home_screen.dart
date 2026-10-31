@@ -30,8 +30,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// A parcel QR opened from the phone camera: iodriver://scan?code=... (see the admin page /d/[code]).
   Future<void> _openLink(Uri uri) async {
-    final code = uri.queryParameters['code'];
-    if (uri.scheme != 'iodriver' || code == null || !mounted) return;
+    // Custom scheme (iodriver://scan?code=...) or the https App Link (https://<admin>/d/<code>).
+    final code = uri.scheme == 'iodriver'
+        ? uri.queryParameters['code']
+        : (uri.pathSegments.length >= 2 && uri.pathSegments.first == 'd' ? uri.pathSegments[1] : null);
+    if (code == null || !mounted) return;
     try {
       final parcel = await ref.read(deliveryServiceProvider).scan(code);
       if (!mounted) return;

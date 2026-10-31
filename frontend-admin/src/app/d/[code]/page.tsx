@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { PackageCheck, ShoppingBag, Truck } from 'lucide-react';
 
@@ -9,6 +9,14 @@ import { PackageCheck, ShoppingBag, Truck } from 'lucide-react';
  * can open it: the driver goes on to the driver app (scan), the buyer to the Inovasi Online app (order).
  */
 export default function ParcelLinkPage() {
+  return (
+    <Suspense fallback={null}>
+      <ParcelLink />
+    </Suspense>
+  );
+}
+
+function ParcelLink() {
   const params = useParams<{ code: string }>();
   const code = decodeURIComponent(String(params.code ?? ''));
   const [orderId, setOrderId] = useState('');

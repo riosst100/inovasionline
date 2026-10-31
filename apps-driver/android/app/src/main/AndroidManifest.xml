@@ -32,6 +32,14 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- App Link: the QR label link opens the driver app directly. Needs
+                 https://admin.inovasionline.com/.well-known/assetlinks.json (frontend-admin/public). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="admin.inovasionline.com" android:pathPrefix="/d/"/>
+            </intent-filter>
             <!-- Parcel QR label: the admin web page /d/<code> sends the driver to iodriver://scan?code=<code>. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>

@@ -149,8 +149,8 @@ export default function CustomersPage() {
 
   const handleToggleVerifiedBadge = async (c: Customer) => {
     const message = c.has_verified_badge
-      ? `Cabut badge verified ${c.name}? Postingannya pindah ke tab Publik di aplikasi.`
-      : `Beri badge verified ke ${c.name}? Postingannya tampil di tab Resmi di aplikasi.`;
+      ? `Cabut badge verified ${c.name}? Postingannya tidak lagi tampil di tab Info Resmi di aplikasi.`
+      : `Beri badge verified ke ${c.name}? Postingannya juga tampil di tab Info Resmi di aplikasi.`;
     if (!window.confirm(message)) return;
 
     try {

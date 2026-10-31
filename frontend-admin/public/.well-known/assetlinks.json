@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.inovasionline.inovasionline_driver",
+      "sha256_cert_fingerprints": [
+        "3A:F0:23:83:7D:1C:01:D4:0F:28:28:4C:38:1E:5F:81:FE:FA:62:75:27:AF:B3:CE:02:A3:D9:1F:97:26:54:30"
+      ]
+    }
+  }
+]
